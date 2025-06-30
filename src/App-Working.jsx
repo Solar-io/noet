@@ -243,25 +243,40 @@ const NoteEditor = ({ selectedNote, onNoteChange, onCreateNewNote }) => {
     const isActive = isBlockActive(format);
     const isList = LIST_TYPES.includes(format);
 
-    Transforms.unwrapNodes(editorRef.current, {
-      match: n => SlateElement.isElement(n) && LIST_TYPES.includes(n.type),
-      split: true,
-    });
+    if (isList) {
+      if (isActive) {
+        // We're in this list type, convert to paragraph
+        Transforms.unwrapNodes(editorRef.current, {
+          match: n => SlateElement.isElement(n) && LIST_TYPES.includes(n.type),
+          split: true,
+        });
+        Transforms.setNodes(editorRef.current, { type: 'paragraph' });
+      } else {
+        // Convert to list
+        const isInOtherList = LIST_TYPES.some(listType => 
+          listType !== format && isBlockActive(listType)
+        );
 
-    let newProperties;
-    if (isActive) {
-      newProperties = { type: 'paragraph' };
-    } else if (isList) {
-      newProperties = { type: 'list-item' };
+        if (isInOtherList) {
+          // First unwrap from existing list
+          Transforms.unwrapNodes(editorRef.current, {
+            match: n => SlateElement.isElement(n) && LIST_TYPES.includes(n.type),
+            split: true,
+          });
+        }
+
+        // Set current node to list-item
+        Transforms.setNodes(editorRef.current, { type: 'list-item' });
+        
+        // Wrap in the new list type
+        const block = { type: format, children: [] };
+        Transforms.wrapNodes(editorRef.current, block);
+      }
     } else {
-      newProperties = { type: format };
-    }
-
-    Transforms.setNodes(editorRef.current, newProperties);
-
-    if (!isActive && isList) {
-      const block = { type: format, children: [] };
-      Transforms.wrapNodes(editorRef.current, block);
+      // Handle non-list block types
+      Transforms.setNodes(editorRef.current, {
+        type: isActive ? 'paragraph' : format
+      });
     }
   };
 
@@ -300,11 +315,11 @@ const NoteEditor = ({ selectedNote, onNoteChange, onCreateNewNote }) => {
     
     if (event.key === 'Enter') {
       // Check if we're in a list
-      const [match] = Editor.nodes(editorRef.current, {
+      const [listMatch] = Editor.nodes(editorRef.current, {
         match: n => SlateElement.isElement(n) && LIST_TYPES.includes(n.type),
       });
 
-      if (match) {
+      if (listMatch) {
         event.preventDefault();
         
         // Get current list item
@@ -313,28 +328,93 @@ const NoteEditor = ({ selectedNote, onNoteChange, onCreateNewNote }) => {
         });
 
         if (listItemMatch) {
-          const [listItem] = listItemMatch;
-          const isEmpty = listItem.children.length === 1 && 
-                         listItem.children[0].children.length === 1 && 
-                         listItem.children[0].children[0].text === '';
+          const [listItem, listItemPath] = listItemMatch;
+          
+          // Check if the list item is empty
+          const itemText = Editor.string(editorRef.current, listItemPath);
+          const isEmpty = itemText.trim() === '';
 
           if (isEmpty) {
-            // Exit the list - unwrap and convert to paragraph
-            Transforms.unwrapNodes(editorRef.current, {
-              match: n => SlateElement.isElement(n) && LIST_TYPES.includes(n.type),
-              split: true,
+            // Remove the empty list item
+            Transforms.removeNodes(editorRef.current, {
+              at: listItemPath,
             });
-            Transforms.setNodes(editorRef.current, { type: 'paragraph' });
+
+            // Check if the list is now empty, if so, remove it too
+            const [currentList] = Editor.nodes(editorRef.current, {
+              match: n => SlateElement.isElement(n) && LIST_TYPES.includes(n.type),
+            });
+
+            if (currentList) {
+              const [list] = currentList;
+              if (list.children.length === 0) {
+                // Remove empty list and insert paragraph
+                Transforms.removeNodes(editorRef.current, {
+                  match: n => SlateElement.isElement(n) && LIST_TYPES.includes(n.type),
+                });
+                Transforms.insertNodes(editorRef.current, {
+                  type: 'paragraph',
+                  children: [{ text: '' }],
+                });
+              } else {
+                // Just insert a paragraph after the list
+                Transforms.insertNodes(editorRef.current, {
+                  type: 'paragraph',
+                  children: [{ text: '' }],
+                });
+              }
+            }
             return;
           }
         }
 
-        // Create new list item
+        // Create new list item if not empty
         Transforms.insertNodes(editorRef.current, {
           type: 'list-item',
           children: [{ text: '' }],
         });
         return;
+      }
+    }
+
+    if (event.key === 'Backspace') {
+      // Check if we're at the start of a list item
+      const [listItemMatch] = Editor.nodes(editorRef.current, {
+        match: n => SlateElement.isElement(n) && n.type === 'list-item',
+      });
+
+      if (listItemMatch && selection && selection.anchor.offset === 0) {
+        const [listItem, listItemPath] = listItemMatch;
+        const itemText = Editor.string(editorRef.current, listItemPath);
+        
+        if (itemText.trim() === '') {
+          event.preventDefault();
+          
+          // Remove the empty list item
+          Transforms.removeNodes(editorRef.current, {
+            at: listItemPath,
+          });
+
+          // Check if list is now empty
+          const [currentList] = Editor.nodes(editorRef.current, {
+            match: n => SlateElement.isElement(n) && LIST_TYPES.includes(n.type),
+          });
+
+          if (currentList) {
+            const [list] = currentList;
+            if (list.children.length === 0) {
+              // Remove empty list and insert paragraph
+              Transforms.removeNodes(editorRef.current, {
+                match: n => SlateElement.isElement(n) && LIST_TYPES.includes(n.type),
+              });
+              Transforms.insertNodes(editorRef.current, {
+                type: 'paragraph',
+                children: [{ text: '' }],
+              });
+            }
+          }
+          return;
+        }
       }
     }
 
