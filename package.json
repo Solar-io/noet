@@ -1,6 +1,6 @@
 {
   "name": "noet-app",
-  "version": "1.0.0",
+  "version": "1.0.0-beta",
   "description": "A modern note-taking app with Slate editor",
   "main": "index.js",
   "scripts": {
@@ -8,8 +8,16 @@
     "build": "vite build",
     "preview": "vite preview"
   },
-  "keywords": ["notes", "editor", "react", "slate"],
-  "author": "",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SamGallant/noet.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SamGallant/noet/issues"
+  },
+  "homepage": "https://github.com/SamGallant/noet#readme",
+  "keywords": ["notes", "editor", "react", "slate", "note-taking", "rich-text"],
+  "author": "Sam Gallant",
   "license": "MIT",
   "dependencies": {
     "react": "^18.2.0",
