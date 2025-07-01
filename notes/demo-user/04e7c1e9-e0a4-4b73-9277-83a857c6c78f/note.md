@@ -1,0 +1,1 @@
+<p>This note will be tested for soft delete functionality.</p>

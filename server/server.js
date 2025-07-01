@@ -358,6 +358,10 @@ app.get("/api/:userId/notes", async (req, res) => {
     const { userId } = req.params;
     const userPath = join(NOTES_BASE_PATH, userId);
 
+    // Extract query parameters for filtering
+    const { starred, deleted, archived, since, notebook, folder, tag } =
+      req.query;
+
     try {
       const noteDirs = await fs.readdir(userPath);
       const notes = [];
@@ -369,10 +373,73 @@ app.get("/api/:userId/notes", async (req, res) => {
         if (stats.isDirectory()) {
           const metadata = await readMetadata(userId, noteId);
           if (metadata) {
-            notes.push(metadata);
+            // Apply filters
+            let includeNote = true;
+
+            // Filter by deleted status
+            if (deleted === "true") {
+              // Only include notes that are explicitly marked as deleted (true)
+              if (metadata.deleted !== true) {
+                includeNote = false;
+              }
+            } else {
+              // For all other views, exclude deleted notes (only include non-deleted)
+              if (metadata.deleted === true) {
+                includeNote = false;
+              }
+            }
+
+            // Filter by starred status
+            if (includeNote && starred === "true" && !metadata.starred) {
+              includeNote = false;
+            }
+
+            // Filter by archived status
+            if (includeNote && archived === "true" && !metadata.archived) {
+              includeNote = false;
+            }
+
+            // Filter by date (recent notes)
+            if (includeNote && since) {
+              const sinceDate = new Date(since);
+              const noteDate = new Date(metadata.updated);
+              if (noteDate <= sinceDate) {
+                includeNote = false;
+              }
+            }
+
+            // Filter by notebook
+            if (includeNote && notebook && metadata.notebook !== notebook) {
+              includeNote = false;
+            }
+
+            // Filter by folder
+            if (includeNote && folder && metadata.folder !== folder) {
+              includeNote = false;
+            }
+
+            // Filter by tag
+            if (includeNote && tag) {
+              const noteTags = metadata.tags || [];
+              const hasTag = noteTags.some((noteTag) =>
+                typeof noteTag === "string"
+                  ? noteTag === tag
+                  : noteTag.id === tag
+              );
+              if (!hasTag) {
+                includeNote = false;
+              }
+            }
+
+            if (includeNote) {
+              notes.push(metadata);
+            }
           }
         }
       }
+
+      // Sort notes by updated date (most recent first)
+      notes.sort((a, b) => new Date(b.updated) - new Date(a.updated));
 
       res.json(notes);
     } catch (error) {
@@ -480,11 +547,22 @@ app.put("/api/:userId/notes/:noteId", async (req, res) => {
 app.delete("/api/:userId/notes/:noteId", async (req, res) => {
   try {
     const { userId, noteId } = req.params;
-    const notePath = getNotePath(userId, noteId);
 
-    await fs.rm(notePath, { recursive: true, force: true });
+    // Read the current metadata
+    const metadata = await readMetadata(userId, noteId);
+    if (!metadata) {
+      return res.status(404).json({ error: "Note not found" });
+    }
 
-    res.json({ success: true });
+    // Implement soft delete by setting deleted flag to true
+    metadata.deleted = true;
+    metadata.deletedAt = new Date().toISOString();
+    metadata.updated = new Date().toISOString();
+
+    // Save the updated metadata
+    await writeMetadata(userId, noteId, metadata);
+
+    res.json({ success: true, message: "Note moved to trash" });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -676,25 +754,32 @@ app.post("/api/:userId/notebooks/reorder", async (req, res) => {
     const sourceNotebook = notebooks.get(sourceId);
     const targetNotebook = notebooks.get(targetId);
 
-    if (!sourceNotebook || !targetNotebook || sourceNotebook.userId !== userId || targetNotebook.userId !== userId) {
+    if (
+      !sourceNotebook ||
+      !targetNotebook ||
+      sourceNotebook.userId !== userId ||
+      targetNotebook.userId !== userId
+    ) {
       return res.status(404).json({ error: "One or both notebooks not found" });
     }
 
     // For in-memory storage, we can implement ordering by updating a sort order field
-    const userNotebooks = Array.from(notebooks.values()).filter(nb => nb.userId === userId);
-    
+    const userNotebooks = Array.from(notebooks.values()).filter(
+      (nb) => nb.userId === userId
+    );
+
     // Update sort orders
     userNotebooks.forEach((notebook, index) => {
       if (!notebook.sortOrder) notebook.sortOrder = index;
     });
-    
+
     // Calculate new sort order for the moved notebook
     if (position === "before") {
       sourceNotebook.sortOrder = targetNotebook.sortOrder - 0.5;
     } else {
       sourceNotebook.sortOrder = targetNotebook.sortOrder + 0.5;
     }
-    
+
     notebooks.set(sourceId, sourceNotebook);
 
     res.json({ success: true });
@@ -789,24 +874,31 @@ app.post("/api/:userId/tags/reorder", async (req, res) => {
     const sourceTag = tags.get(sourceId);
     const targetTag = tags.get(targetId);
 
-    if (!sourceTag || !targetTag || sourceTag.userId !== userId || targetTag.userId !== userId) {
+    if (
+      !sourceTag ||
+      !targetTag ||
+      sourceTag.userId !== userId ||
+      targetTag.userId !== userId
+    ) {
       return res.status(404).json({ error: "One or both tags not found" });
     }
 
     // For in-memory storage, we can implement ordering by updating a sort order field
     // In a real database, you'd handle this differently
-    const userTags = Array.from(tags.values()).filter(t => t.userId === userId);
+    const userTags = Array.from(tags.values()).filter(
+      (t) => t.userId === userId
+    );
     const currentTime = Date.now();
-    
+
     // Update sort orders
     userTags.forEach((tag, index) => {
       if (!tag.sortOrder) tag.sortOrder = index;
     });
-    
+
     // Remove source from its current position and insert at target position
-    const sourceIndex = userTags.findIndex(t => t.id === sourceId);
-    const targetIndex = userTags.findIndex(t => t.id === targetId);
-    
+    const sourceIndex = userTags.findIndex((t) => t.id === sourceId);
+    const targetIndex = userTags.findIndex((t) => t.id === targetId);
+
     if (sourceIndex !== -1 && targetIndex !== -1) {
       // Calculate new sort order for the moved tag
       if (position === "before") {
@@ -814,7 +906,7 @@ app.post("/api/:userId/tags/reorder", async (req, res) => {
       } else {
         sourceTag.sortOrder = targetTag.sortOrder + 0.5;
       }
-      
+
       tags.set(sourceId, sourceTag);
     }
 
@@ -912,25 +1004,32 @@ app.post("/api/:userId/folders/reorder", async (req, res) => {
     const sourceFolder = folders.get(sourceId);
     const targetFolder = folders.get(targetId);
 
-    if (!sourceFolder || !targetFolder || sourceFolder.userId !== userId || targetFolder.userId !== userId) {
+    if (
+      !sourceFolder ||
+      !targetFolder ||
+      sourceFolder.userId !== userId ||
+      targetFolder.userId !== userId
+    ) {
       return res.status(404).json({ error: "One or both folders not found" });
     }
 
     // For in-memory storage, we can implement ordering by updating a sort order field
-    const userFolders = Array.from(folders.values()).filter(f => f.userId === userId);
-    
+    const userFolders = Array.from(folders.values()).filter(
+      (f) => f.userId === userId
+    );
+
     // Update sort orders
     userFolders.forEach((folder, index) => {
       if (!folder.sortOrder) folder.sortOrder = index;
     });
-    
+
     // Calculate new sort order for the moved folder
     if (position === "before") {
       sourceFolder.sortOrder = targetFolder.sortOrder - 0.5;
     } else {
       sourceFolder.sortOrder = targetFolder.sortOrder + 0.5;
     }
-    
+
     folders.set(sourceId, sourceFolder);
 
     res.json({ success: true });
@@ -1156,3 +1255,59 @@ async function startServer() {
 }
 
 startServer();
+
+// Permanent delete (for emptying trash)
+app.delete("/api/:userId/notes/:noteId/permanent", async (req, res) => {
+  try {
+    const { userId, noteId } = req.params;
+
+    // Check if note is in trash first
+    const metadata = await readMetadata(userId, noteId);
+    if (!metadata) {
+      return res.status(404).json({ error: "Note not found" });
+    }
+
+    if (!metadata.deleted) {
+      return res
+        .status(400)
+        .json({ error: "Note must be in trash before permanent deletion" });
+    }
+
+    // Permanently delete the note directory
+    const notePath = getNotePath(userId, noteId);
+    await fs.rm(notePath, { recursive: true, force: true });
+
+    res.json({ success: true, message: "Note permanently deleted" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Restore note from trash
+app.post("/api/:userId/notes/:noteId/restore", async (req, res) => {
+  try {
+    const { userId, noteId } = req.params;
+
+    // Read the current metadata
+    const metadata = await readMetadata(userId, noteId);
+    if (!metadata) {
+      return res.status(404).json({ error: "Note not found" });
+    }
+
+    if (!metadata.deleted) {
+      return res.status(400).json({ error: "Note is not in trash" });
+    }
+
+    // Restore by removing deleted flag
+    metadata.deleted = false;
+    delete metadata.deletedAt;
+    metadata.updated = new Date().toISOString();
+
+    // Save the updated metadata
+    await writeMetadata(userId, noteId, metadata);
+
+    res.json({ success: true, message: "Note restored from trash" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});

@@ -99,14 +99,14 @@ const ImprovedNotesList = ({
   // Helper function to get notebook name by ID
   const getNotebookName = (notebookId) => {
     if (!notebookId) return null;
-    const notebook = notebooks.find(nb => nb.id === notebookId);
+    const notebook = notebooks.find((nb) => nb.id === notebookId);
     return notebook ? notebook.name : "Unknown Notebook";
   };
 
   // Helper function to get folder name by ID
   const getFolderName = (folderId) => {
     if (!folderId) return null;
-    const folder = folders.find(f => f.id === folderId);
+    const folder = folders.find((f) => f.id === folderId);
     return folder ? folder.name : "Unknown Folder";
   };
 

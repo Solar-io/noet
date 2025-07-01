@@ -488,15 +488,18 @@ const ImprovedSidebar = ({
         targetNotebookId
       );
 
-      const response = await fetch(`${backendUrl}/api/${user.id}/notebooks/reorder`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          sourceId: sourceNotebookId, 
-          targetId: targetNotebookId,
-          position: 'after' 
-        })
-      });
+      const response = await fetch(
+        `${backendUrl}/api/${user.id}/notebooks/reorder`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sourceId: sourceNotebookId,
+            targetId: targetNotebookId,
+            position: "after",
+          }),
+        }
+      );
 
       if (response.ok) {
         console.log("✅ Notebook reordering completed successfully");
@@ -518,15 +521,18 @@ const ImprovedSidebar = ({
         targetFolderId
       );
 
-      const response = await fetch(`${backendUrl}/api/${user.id}/folders/reorder`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          sourceId: sourceFolderId, 
-          targetId: targetFolderId,
-          position: 'after' 
-        })
-      });
+      const response = await fetch(
+        `${backendUrl}/api/${user.id}/folders/reorder`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sourceId: sourceFolderId,
+            targetId: targetFolderId,
+            position: "after",
+          }),
+        }
+      );
 
       if (response.ok) {
         console.log("✅ Folder reordering completed successfully");
@@ -543,15 +549,18 @@ const ImprovedSidebar = ({
     try {
       console.log("🏷️ Reordering tags:", sourceTagId, "->", targetTagId);
 
-      const response = await fetch(`${backendUrl}/api/${user.id}/tags/reorder`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          sourceId: sourceTagId, 
-          targetId: targetTagId,
-          position: 'after' 
-        })
-      });
+      const response = await fetch(
+        `${backendUrl}/api/${user.id}/tags/reorder`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sourceId: sourceTagId,
+            targetId: targetTagId,
+            position: "after",
+          }),
+        }
+      );
 
       if (response.ok) {
         console.log("✅ Tag reordering completed successfully");

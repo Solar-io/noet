@@ -13,7 +13,7 @@
 console.log("🧪 Testing UI Fixes for noet-app");
 console.log("=================================");
 
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Test 1: Check that tags API returns proper data
 console.log("\n1. Testing tags API...");
@@ -24,7 +24,7 @@ fetch("http://localhost:3004/api/user-1/tags")
     tags.forEach((tag) => {
       console.log(`   - ${tag.name} (${tag.id.substring(0, 8)}...)`);
     });
-    
+
     if (tags.length === 0) {
       console.log("⚠️  No tags found - this might explain missing tag filters");
     }
@@ -42,7 +42,7 @@ fetch("http://localhost:3004/api/user-1/notebooks")
     notebooks.forEach((notebook) => {
       console.log(`   - ${notebook.name} (${notebook.id.substring(0, 8)}...)`);
     });
-    
+
     if (notebooks.length === 0) {
       console.log("⚠️  No notebooks found");
     }
@@ -60,7 +60,7 @@ fetch("http://localhost:3004/api/user-1/folders")
     folders.forEach((folder) => {
       console.log(`   - ${folder.name} (${folder.id.substring(0, 8)}...)`);
     });
-    
+
     if (folders.length === 0) {
       console.log("⚠️  No folders found");
     }
@@ -75,23 +75,31 @@ fetch("http://localhost:3004/api/user-1/notes")
   .then((response) => response.json())
   .then((notes) => {
     console.log("✅ Notes loaded:", notes.length, "notes");
-    
+
     let notesWithNotebooks = 0;
     let notesWithFolders = 0;
     let notesWithTags = 0;
     let starredNotes = 0;
-    
+
     notes.forEach((note) => {
       if (note.notebook) notesWithNotebooks++;
       if (note.folder) notesWithFolders++;
       if (note.tags?.length > 0) notesWithTags++;
       if (note.starred) starredNotes++;
-      
-      console.log(`   - "${note.title}" | notebook: ${note.notebook ? '✓' : '✗'} | folder: ${note.folder ? '✓' : '✗'} | tags: ${note.tags?.length || 0} | starred: ${note.starred ? '⭐' : '☐'}`);
+
+      console.log(
+        `   - "${note.title}" | notebook: ${
+          note.notebook ? "✓" : "✗"
+        } | folder: ${note.folder ? "✓" : "✗"} | tags: ${
+          note.tags?.length || 0
+        } | starred: ${note.starred ? "⭐" : "☐"}`
+      );
     });
-    
+
     console.log(`📊 Summary:`);
-    console.log(`   - Notes with notebooks: ${notesWithNotebooks}/${notes.length}`);
+    console.log(
+      `   - Notes with notebooks: ${notesWithNotebooks}/${notes.length}`
+    );
     console.log(`   - Notes with folders: ${notesWithFolders}/${notes.length}`);
     console.log(`   - Notes with tags: ${notesWithTags}/${notes.length}`);
     console.log(`   - Starred notes: ${starredNotes}/${notes.length}`);

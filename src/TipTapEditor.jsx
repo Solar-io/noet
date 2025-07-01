@@ -526,10 +526,29 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId }) => {
     try {
       setIsLoading(true);
 
-      // Use the storage service to upload the attachment
-      const storage = new NoteStorageService();
-      const result = await storage.uploadAttachment(userId, note.id, file);
+      // Get backend URL
+      const backendUrl = await configService.getBackendUrl();
 
+      // Create form data for file upload
+      const formData = new FormData();
+      formData.append("file", file);
+
+      // Upload the file to the backend
+      const response = await fetch(
+        `${backendUrl}/api/${userId}/notes/${note.id}/attachments`,
+        {
+          method: "POST",
+          body: formData, // Don't set Content-Type header, let browser set it for FormData
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `Upload failed: ${response.status} ${response.statusText}`
+        );
+      }
+
+      const result = await response.json();
       console.log("Upload successful:", result);
 
       // Update local attachments state
@@ -538,8 +557,7 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId }) => {
 
       // If it's an image, also insert it into the editor
       if (isImage) {
-        const storageService = new NoteStorageService();
-        const imageUrl = `${storageService.baseUrl}/${userId}/notes/${note.id}/attachments/${result.attachment.filename}`;
+        const imageUrl = `${backendUrl}/api/${userId}/notes/${note.id}/attachments/${result.attachment.filename}`;
         editor
           ?.chain()
           .focus()
@@ -581,9 +599,24 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId }) => {
     try {
       setIsLoading(true);
 
-      // Use the storage service to remove the attachment
-      const storage = new NoteStorageService();
-      await storage.removeAttachment(userId, note.id, filename);
+      // Get backend URL
+      const backendUrl = await configService.getBackendUrl();
+
+      // Remove the attachment from the backend
+      const response = await fetch(
+        `${backendUrl}/api/${userId}/notes/${note.id}/attachments/${filename}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `Delete failed: ${response.status} ${response.statusText}`
+        );
+      }
+
+      console.log("Attachment removed successfully:", filename);
 
       // Update local attachments state
       setAttachments((prev) => prev.filter((att) => att.filename !== filename));
@@ -893,10 +926,10 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId }) => {
                   </div>
                   <div className="flex items-center space-x-2">
                     <button
-                      onClick={() => {
-                        const storageService = new NoteStorageService();
+                      onClick={async () => {
+                        const backendUrl = await configService.getBackendUrl();
                         window.open(
-                          `${storageService.baseUrl}/${userId}/notes/${note.id}/attachments/${attachment.filename}`,
+                          `${backendUrl}/api/${userId}/notes/${note.id}/attachments/${attachment.filename}`,
                           "_blank"
                         );
                       }}
@@ -1226,15 +1259,30 @@ const AdminSettings = ({ isOpen, onClose, currentPath, onPathChange }) => {
   const [newPath, setNewPath] = useState(currentPath);
   const [validation, setValidation] = useState(null);
   const [isValidating, setIsValidating] = useState(false);
-  const storage = new NoteStorageService();
 
   const validatePath = async () => {
     if (!newPath) return;
 
     setIsValidating(true);
     try {
-      const result = await storage.validateStoragePath(newPath);
-      setValidation(result);
+      // Use configService to validate the path
+      const backendUrl = await configService.getBackendUrl();
+      const response = await fetch(`${backendUrl}/api/validate-path`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: newPath }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setValidation(result);
+      } else {
+        setValidation({
+          valid: false,
+          errors: ["Failed to validate path"],
+          path: newPath,
+        });
+      }
     } catch (error) {
       setValidation({
         valid: false,

@@ -783,7 +783,7 @@ const NoetTipTapApp = () => {
       loadNotes(),
       loadNotebooks(),
       loadTags(),
-      loadFolders()
+      loadFolders(),
     ]);
   };
 
