@@ -1,0 +1,64 @@
+{
+  "folders": [
+    {
+      "name": "noet-app",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "terminal.integrated.cwd": "${workspaceFolder}",
+    "terminal.integrated.defaultLocation": "view"
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-vscode.vscode-typescript-next",
+      "bradlc.vscode-tailwindcss",
+      "esbenp.prettier-vscode",
+      "ms-vscode.vscode-json"
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Start Backend",
+        "type": "shell",
+        "command": "npm",
+        "args": ["run", "backend"],
+        "group": "build",
+        "presentation": {
+          "echo": true,
+          "reveal": "always",
+          "focus": false,
+          "panel": "shared"
+        },
+        "isBackground": true,
+        "problemMatcher": []
+      },
+      {
+        "label": "Start Frontend",
+        "type": "shell",
+        "command": "npm",
+        "args": ["run", "dev"],
+        "group": "build",
+        "presentation": {
+          "echo": true,
+          "reveal": "always",
+          "focus": false,
+          "panel": "shared"
+        },
+        "isBackground": true,
+        "problemMatcher": []
+      },
+      {
+        "label": "Start Both Servers",
+        "dependsOrder": "parallel",
+        "dependsOn": ["Start Backend", "Start Frontend"],
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        }
+      }
+    ]
+  }
+}

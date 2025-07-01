@@ -1,0 +1,24 @@
+{
+  "id": "e86e65b9-1fdb-4dcf-a4b1-deeff70285dc",
+  "title": "Untitled Note",
+  "created": "2025-06-30T21:16:48.425Z",
+  "updated": "2025-07-01T11:23:24.330Z",
+  "tags": [
+    "2fa0e2eb-69c1-4d6f-80a9-b45012f74d4b",
+    "4c88ca4a-4979-4b71-a207-241c3de5de1d"
+  ],
+  "notebook": null,
+  "folder": null,
+  "starred": false,
+  "deleted": false,
+  "version": 5,
+  "attachments": [
+    {
+      "filename": "Noet_App_-_Component_Reference_Card.pdf",
+      "originalName": "Noet App - Component Reference Card.pdf",
+      "size": 235415,
+      "type": "application/pdf",
+      "uploaded": "2025-06-30T21:17:07.212Z"
+    }
+  ]
+}

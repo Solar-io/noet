@@ -12,13 +12,16 @@ Thank you for your interest in contributing to Noet! We welcome contributions fr
 ## 📋 Development Process
 
 ### Branch Naming
+
 - `feature/description` - New features
 - `bugfix/description` - Bug fixes
 - `enhance/description` - UI/UX improvements
 - `docs/description` - Documentation updates
 
 ### Commit Messages
+
 Follow conventional commit format:
+
 - `feat(scope): description` - New features
 - `fix(scope): description` - Bug fixes
 - `docs(scope): description` - Documentation
@@ -38,18 +41,21 @@ Follow conventional commit format:
 ## 🎯 What to Contribute
 
 ### High Priority
+
 - Rich text editor features (headings, lists, links)
 - Search and filtering functionality
 - UI/UX improvements
 - Bug fixes
 
 ### Medium Priority
+
 - Notebook and tag organization
 - Export/import features
 - Mobile responsiveness
 - Performance optimizations
 
 ### Documentation
+
 - Code comments
 - Feature documentation
 - Tutorial content
@@ -58,6 +64,7 @@ Follow conventional commit format:
 ## 🧪 Testing
 
 Before submitting a PR, please ensure:
+
 - [ ] The app starts without errors (`npm run dev`)
 - [ ] Basic functionality works (login, create/edit notes)
 - [ ] No console errors in browser dev tools
@@ -75,6 +82,7 @@ Before submitting a PR, please ensure:
 ## 🐛 Reporting Issues
 
 When reporting bugs, please include:
+
 - Steps to reproduce
 - Expected vs actual behavior
 - Browser and OS information
@@ -84,6 +92,7 @@ When reporting bugs, please include:
 ## 💡 Suggesting Features
 
 For feature requests, please provide:
+
 - Use case description
 - Proposed solution
 - Alternative approaches considered
@@ -98,6 +107,7 @@ For feature requests, please provide:
 ## 🙏 Recognition
 
 Contributors will be recognized in:
+
 - README.md contributors section
 - Release notes for significant contributions
 - GitHub contributor statistics

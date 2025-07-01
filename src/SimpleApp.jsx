@@ -1,7 +1,5 @@
-import React, { useState } from 'react';
-import { 
-  FileText, Plus, Settings, LogOut
-} from 'lucide-react';
+import React, { useState } from "react";
+import { FileText, Plus, Settings, LogOut } from "lucide-react";
 
 const SimpleNoetApp = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -14,7 +12,7 @@ const SimpleNoetApp = () => {
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Noet</h1>
             <p className="text-gray-600">Simple login test</p>
           </div>
-          <button 
+          <button
             onClick={() => setIsAuthenticated(true)}
             className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-4 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-colors font-medium"
           >
@@ -51,7 +49,9 @@ const SimpleNoetApp = () => {
           <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center">
             <FileText size={40} className="text-blue-600" />
           </div>
-          <h3 className="text-xl font-semibold text-slate-900 mb-3">Simple App Working</h3>
+          <h3 className="text-xl font-semibold text-slate-900 mb-3">
+            Simple App Working
+          </h3>
           <p className="text-slate-600 mb-6">
             If you can see this, the basic React app is working correctly.
           </p>

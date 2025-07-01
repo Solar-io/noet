@@ -1,13 +1,47 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { createEditor, Transforms, Editor, Text, Element as SlateElement } from 'slate';
-import { Slate, Editable, withReact } from 'slate-react';
-import { withHistory } from 'slate-history';
-import { 
-  Bold, Italic, Underline, Plus, FileText, Eye, EyeOff, AlertTriangle,
-  Heading1, Heading2, List, ListOrdered, Code, Quote, AlignLeft, AlignCenter, AlignRight,
-  Search, Star, Hash, Trash2, Archive, Folder, Settings, Download, Upload, 
-  Filter, SortAsc, SortDesc, Calendar, Tag, Book
-} from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import {
+  createEditor,
+  Transforms,
+  Editor,
+  Text,
+  Element as SlateElement,
+} from "slate";
+import { Slate, Editable, withReact } from "slate-react";
+import { withHistory } from "slate-history";
+import {
+  Bold,
+  Italic,
+  Underline,
+  Plus,
+  FileText,
+  Eye,
+  EyeOff,
+  AlertTriangle,
+  Heading1,
+  Heading2,
+  List,
+  ListOrdered,
+  Code,
+  Quote,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Search,
+  Star,
+  Hash,
+  Trash2,
+  Archive,
+  Folder,
+  Settings,
+  Download,
+  Upload,
+  Filter,
+  SortAsc,
+  SortDesc,
+  Calendar,
+  Tag,
+  Book,
+} from "lucide-react";
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -23,9 +57,9 @@ class ErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) {
     this.setState({
       error: error,
-      errorInfo: errorInfo
+      errorInfo: errorInfo,
     });
-    console.error('React Error Boundary caught an error:', error, errorInfo);
+    console.error("React Error Boundary caught an error:", error, errorInfo);
   }
 
   render() {
@@ -33,17 +67,21 @@ class ErrorBoundary extends React.Component {
       return (
         <div className="min-h-screen bg-red-50 flex items-center justify-center p-4">
           <div className="max-w-2xl w-full bg-white rounded-lg shadow-lg p-6">
-            <h1 className="text-2xl font-bold text-red-600 mb-4">Something went wrong!</h1>
+            <h1 className="text-2xl font-bold text-red-600 mb-4">
+              Something went wrong!
+            </h1>
             <details className="mb-4">
-              <summary className="cursor-pointer text-sm font-medium">Error Details</summary>
+              <summary className="cursor-pointer text-sm font-medium">
+                Error Details
+              </summary>
               <pre className="mt-2 text-xs bg-gray-100 p-3 rounded overflow-auto">
                 {this.state.error && this.state.error.toString()}
                 <br />
                 {this.state.errorInfo.componentStack}
               </pre>
             </details>
-            <button 
-              onClick={() => window.location.reload()} 
+            <button
+              onClick={() => window.location.reload()}
               className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
             >
               Reload Page
@@ -60,84 +98,88 @@ class ErrorBoundary extends React.Component {
 // Enhanced initial value with different element types
 const initialValue = [
   {
-    type: 'heading-one',
-    children: [{ text: 'Welcome to your new note!' }],
+    type: "heading-one",
+    children: [{ text: "Welcome to your new note!" }],
   },
   {
-    type: 'paragraph',
-    children: [{ text: 'This is a rich text editor with support for:' }],
+    type: "paragraph",
+    children: [{ text: "This is a rich text editor with support for:" }],
   },
   {
-    type: 'bulleted-list',
+    type: "bulleted-list",
     children: [
       {
-        type: 'list-item',
-        children: [{ text: 'Bold, italic, and underline text formatting' }],
+        type: "list-item",
+        children: [{ text: "Bold, italic, and underline text formatting" }],
       },
       {
-        type: 'list-item',
-        children: [{ text: 'Multiple heading levels' }],
+        type: "list-item",
+        children: [{ text: "Multiple heading levels" }],
       },
       {
-        type: 'list-item',
-        children: [{ text: 'Bulleted and numbered lists' }],
+        type: "list-item",
+        children: [{ text: "Bulleted and numbered lists" }],
       },
       {
-        type: 'list-item',
-        children: [{ text: 'Code blocks and quotes' }],
+        type: "list-item",
+        children: [{ text: "Code blocks and quotes" }],
       },
     ],
   },
   {
-    type: 'paragraph',
-    children: [{ text: 'Start writing to replace this content!' }],
+    type: "paragraph",
+    children: [{ text: "Start writing to replace this content!" }],
   },
 ];
 
 // Authentication Component
 const AuthenticationFlow = ({ onLoginSuccess }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [loginError, setLoginError] = useState('');
+  const [loginError, setLoginError] = useState("");
 
   const handleLogin = (e) => {
     if (e) e.preventDefault();
-    setLoginError('');
-    
+    setLoginError("");
+
     if (!email || !password) {
-      setLoginError('Please enter both email and password');
+      setLoginError("Please enter both email and password");
       return;
     }
-    
-    if (email === 'demo@example.com' && password === 'demo123') {
-      onLoginSuccess({ 
-        id: 1, 
-        email, 
-        name: 'Demo User',
-        notes: [{
-          id: 1001,
-          title: 'Welcome Note',
-          content: JSON.stringify(initialValue),
-          created: new Date().toISOString(),
-          updated: new Date().toISOString(),
-        }]
+
+    if (email === "demo@example.com" && password === "demo123") {
+      onLoginSuccess({
+        id: 1,
+        email,
+        name: "Demo User",
+        notes: [
+          {
+            id: 1001,
+            title: "Welcome Note",
+            content: JSON.stringify(initialValue),
+            created: new Date().toISOString(),
+            updated: new Date().toISOString(),
+          },
+        ],
       });
-    } else if (email === 'admin@example.com' && password === 'admin123') {
-      onLoginSuccess({ 
-        id: 2, 
-        email, 
-        name: 'Admin User',
-        notes: [{
-          id: 2001,
-          title: 'Admin Note',
-          content: JSON.stringify(initialValue),
-          created: new Date().toISOString(),
-          updated: new Date().toISOString(),
-        }]
+    } else if (email === "admin@example.com" && password === "admin123") {
+      onLoginSuccess({
+        id: 2,
+        email,
+        name: "Admin User",
+        notes: [
+          {
+            id: 2001,
+            title: "Admin Note",
+            content: JSON.stringify(initialValue),
+            created: new Date().toISOString(),
+            updated: new Date().toISOString(),
+          },
+        ],
       });
     } else {
-      setLoginError('Invalid credentials. Try demo@example.com / demo123');
+      setLoginError("Invalid credentials. Try demo@example.com / demo123");
     }
   };
 
@@ -145,22 +187,30 @@ const AuthenticationFlow = ({ onLoginSuccess }) => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8">
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Sign in to Noet</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Sign in to Noet
+          </h2>
           <p className="text-gray-600">Enter your credentials to continue</p>
         </div>
         <form onSubmit={handleLogin} className="space-y-6">
           <input
             type="email"
             value={email}
-            onChange={(e) => {setEmail(e.target.value); setLoginError('');}}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setLoginError("");
+            }}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="demo@example.com"
           />
           <div className="relative">
             <input
-              type={showPassword ? 'text' : 'password'}
+              type={showPassword ? "text" : "password"}
               value={password}
-              onChange={(e) => {setPassword(e.target.value); setLoginError('');}}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setLoginError("");
+              }}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-12"
               placeholder="demo123"
             />
@@ -178,7 +228,7 @@ const AuthenticationFlow = ({ onLoginSuccess }) => {
               <span className="text-sm text-red-700">{loginError}</span>
             </div>
           )}
-          <button 
+          <button
             type="submit"
             className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-4 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-colors font-medium"
           >
@@ -186,7 +236,9 @@ const AuthenticationFlow = ({ onLoginSuccess }) => {
           </button>
         </form>
         <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-          <h4 className="text-sm font-medium text-gray-900 mb-2">Demo Accounts</h4>
+          <h4 className="text-sm font-medium text-gray-900 mb-2">
+            Demo Accounts
+          </h4>
           <div className="text-xs text-gray-600 space-y-1">
             <div>Email: demo@example.com | Password: demo123</div>
             <div>Email: admin@example.com | Password: admin123</div>
@@ -199,19 +251,21 @@ const AuthenticationFlow = ({ onLoginSuccess }) => {
 
 // Simple Note Editor with Slate
 const NoteEditor = ({ selectedNote, onNoteChange, onCreateNewNote }) => {
-  const [noteTitle, setNoteTitle] = useState('');
+  const [noteTitle, setNoteTitle] = useState("");
   const [value, setValue] = useState(initialValue);
   const editorRef = useRef();
-  
+
   if (!editorRef.current) {
     editorRef.current = withHistory(withReact(createEditor()));
   }
 
   useEffect(() => {
     if (selectedNote) {
-      setNoteTitle(selectedNote.title || 'Untitled Note');
+      setNoteTitle(selectedNote.title || "Untitled Note");
       try {
-        setValue(selectedNote.content ? JSON.parse(selectedNote.content) : initialValue);
+        setValue(
+          selectedNote.content ? JSON.parse(selectedNote.content) : initialValue
+        );
       } catch {
         setValue(initialValue);
       }
@@ -226,7 +280,7 @@ const NoteEditor = ({ selectedNote, onNoteChange, onCreateNewNote }) => {
           ...selectedNote,
           title: noteTitle,
           content: JSON.stringify(value),
-          updated: new Date().toISOString()
+          updated: new Date().toISOString(),
         });
       }, 2000);
       return () => clearTimeout(timeout);
@@ -241,7 +295,7 @@ const NoteEditor = ({ selectedNote, onNoteChange, onCreateNewNote }) => {
       Editor.addMark(editorRef.current, format, true);
     }
   };
-  
+
   const isMarkActive = (format) => {
     const marks = Editor.marks(editorRef.current);
     return marks ? marks[format] === true : false;
@@ -252,15 +306,15 @@ const NoteEditor = ({ selectedNote, onNoteChange, onCreateNewNote }) => {
     const isList = LIST_TYPES.includes(format);
 
     Transforms.unwrapNodes(editorRef.current, {
-      match: n => SlateElement.isElement(n) && LIST_TYPES.includes(n.type),
+      match: (n) => SlateElement.isElement(n) && LIST_TYPES.includes(n.type),
       split: true,
     });
 
     let newProperties;
     if (isActive) {
-      newProperties = { type: 'paragraph' };
+      newProperties = { type: "paragraph" };
     } else if (isList) {
-      newProperties = { type: 'list-item' };
+      newProperties = { type: "list-item" };
     } else {
       newProperties = { type: format };
     }
@@ -275,99 +329,169 @@ const NoteEditor = ({ selectedNote, onNoteChange, onCreateNewNote }) => {
 
   const isBlockActive = (format) => {
     const nodeGen = Editor.nodes(editorRef.current, {
-      match: n => SlateElement.isElement(n) && n.type === format,
+      match: (n) => SlateElement.isElement(n) && n.type === format,
     });
 
     let node = nodeGen.next();
     return !node.done;
   };
 
-  const LIST_TYPES = ['numbered-list', 'bulleted-list'];
+  const LIST_TYPES = ["numbered-list", "bulleted-list"];
 
   const renderLeaf = useCallback((props) => {
     let { children } = props;
     if (props.leaf.bold) children = <strong>{children}</strong>;
     if (props.leaf.italic) children = <em>{children}</em>;
     if (props.leaf.underline) children = <u>{children}</u>;
-    if (props.leaf.code) children = <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono">{children}</code>;
+    if (props.leaf.code)
+      children = (
+        <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono">
+          {children}
+        </code>
+      );
     return <span {...props.attributes}>{children}</span>;
   }, []);
 
   const renderElement = useCallback((props) => {
     const style = { textAlign: props.element.align };
-    
+
     switch (props.element.type) {
-      case 'heading-one':
-        return <h1 style={style} className="text-3xl font-bold mb-4 mt-6" {...props.attributes}>{props.children}</h1>;
-      case 'heading-two':
-        return <h2 style={style} className="text-2xl font-semibold mb-3 mt-5" {...props.attributes}>{props.children}</h2>;
-      case 'heading-three':
-        return <h3 style={style} className="text-xl font-semibold mb-2 mt-4" {...props.attributes}>{props.children}</h3>;
-      case 'block-quote':
-        return <blockquote style={style} className="border-l-4 border-gray-300 pl-4 italic text-gray-700 my-4" {...props.attributes}>{props.children}</blockquote>;
-      case 'bulleted-list':
-        return <ul style={style} className="list-disc list-inside ml-4 my-2" {...props.attributes}>{props.children}</ul>;
-      case 'numbered-list':
-        return <ol style={style} className="list-decimal list-inside ml-4 my-2" {...props.attributes}>{props.children}</ol>;
-      case 'list-item':
-        return <li style={style} className="mb-1" {...props.attributes}>{props.children}</li>;
-      case 'code-block':
-        return <pre style={style} className="bg-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto my-4" {...props.attributes}><code>{props.children}</code></pre>;
+      case "heading-one":
+        return (
+          <h1
+            style={style}
+            className="text-3xl font-bold mb-4 mt-6"
+            {...props.attributes}
+          >
+            {props.children}
+          </h1>
+        );
+      case "heading-two":
+        return (
+          <h2
+            style={style}
+            className="text-2xl font-semibold mb-3 mt-5"
+            {...props.attributes}
+          >
+            {props.children}
+          </h2>
+        );
+      case "heading-three":
+        return (
+          <h3
+            style={style}
+            className="text-xl font-semibold mb-2 mt-4"
+            {...props.attributes}
+          >
+            {props.children}
+          </h3>
+        );
+      case "block-quote":
+        return (
+          <blockquote
+            style={style}
+            className="border-l-4 border-gray-300 pl-4 italic text-gray-700 my-4"
+            {...props.attributes}
+          >
+            {props.children}
+          </blockquote>
+        );
+      case "bulleted-list":
+        return (
+          <ul
+            style={style}
+            className="list-disc list-inside ml-4 my-2"
+            {...props.attributes}
+          >
+            {props.children}
+          </ul>
+        );
+      case "numbered-list":
+        return (
+          <ol
+            style={style}
+            className="list-decimal list-inside ml-4 my-2"
+            {...props.attributes}
+          >
+            {props.children}
+          </ol>
+        );
+      case "list-item":
+        return (
+          <li style={style} className="mb-1" {...props.attributes}>
+            {props.children}
+          </li>
+        );
+      case "code-block":
+        return (
+          <pre
+            style={style}
+            className="bg-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto my-4"
+            {...props.attributes}
+          >
+            <code>{props.children}</code>
+          </pre>
+        );
       default:
-        return <p style={style} className="mb-2" {...props.attributes}>{props.children}</p>;
+        return (
+          <p style={style} className="mb-2" {...props.attributes}>
+            {props.children}
+          </p>
+        );
     }
   }, []);
 
   const onKeyDown = (event) => {
     // Handle Enter key for lists
-    if (event.key === 'Enter') {
+    if (event.key === "Enter") {
       const [match] = Editor.nodes(editorRef.current, {
-        match: n => SlateElement.isElement(n) && LIST_TYPES.includes(n.type),
+        match: (n) => SlateElement.isElement(n) && LIST_TYPES.includes(n.type),
       });
 
       if (match) {
         const [, path] = Editor.node(editorRef.current, []);
         const text = Editor.string(editorRef.current, path);
-        
+
         // If current line is empty, break out of list
-        if (text.trim() === '') {
+        if (text.trim() === "") {
           event.preventDefault();
           Transforms.unwrapNodes(editorRef.current, {
-            match: n => SlateElement.isElement(n) && LIST_TYPES.includes(n.type),
+            match: (n) =>
+              SlateElement.isElement(n) && LIST_TYPES.includes(n.type),
           });
-          Transforms.setNodes(editorRef.current, { type: 'paragraph' });
+          Transforms.setNodes(editorRef.current, { type: "paragraph" });
           return;
         }
       }
     }
-    
+
     // Handle keyboard shortcuts
     if (!event.ctrlKey && !event.metaKey) return;
-    
+
     switch (event.key) {
-      case 'b':
+      case "b":
         event.preventDefault();
-        toggleMark('bold');
+        toggleMark("bold");
         break;
-      case 'i':
+      case "i":
         event.preventDefault();
-        toggleMark('italic');
+        toggleMark("italic");
         break;
-      case 'u':
+      case "u":
         event.preventDefault();
-        toggleMark('underline');
+        toggleMark("underline");
         break;
-      case '`':
+      case "`":
         event.preventDefault();
-        toggleMark('code');
+        toggleMark("code");
         break;
-      case '1':
+      case "1":
         event.preventDefault();
-        toggleBlock('heading-one');
+        toggleBlock("heading-one");
         break;
-      case '2':
+      case "2":
         event.preventDefault();
-        toggleBlock('heading-two');
+        toggleBlock("heading-two");
         break;
     }
   };
@@ -379,7 +503,9 @@ const NoteEditor = ({ selectedNote, onNoteChange, onCreateNewNote }) => {
           <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center">
             <FileText size={40} className="text-blue-600" />
           </div>
-          <h3 className="text-xl font-semibold text-slate-900 mb-3">Select a note to edit</h3>
+          <h3 className="text-xl font-semibold text-slate-900 mb-3">
+            Select a note to edit
+          </h3>
           <p className="text-slate-600 mb-6">
             Choose a note from the list or create a new one to start writing.
           </p>
@@ -402,7 +528,7 @@ const NoteEditor = ({ selectedNote, onNoteChange, onCreateNewNote }) => {
         <input
           type="text"
           value={noteTitle}
-          onChange={e => setNoteTitle(e.target.value)}
+          onChange={(e) => setNoteTitle(e.target.value)}
           className="text-2xl font-bold bg-transparent border-none outline-none flex-1 text-slate-900 placeholder-slate-400 w-full"
           placeholder="Untitled Note"
         />
@@ -410,77 +536,99 @@ const NoteEditor = ({ selectedNote, onNoteChange, onCreateNewNote }) => {
         <div className="bg-white border border-slate-200 rounded-lg p-3 mt-4 flex flex-wrap gap-2">
           {/* Text Formatting */}
           <div className="flex space-x-1 border-r border-slate-200 pr-2 mr-2">
-            <button 
-              onClick={() => toggleMark('bold')} 
-              className={`p-2 hover:bg-slate-100 rounded-lg transition-colors ${isMarkActive('bold') ? 'bg-blue-100 text-blue-700' : ''}`}
+            <button
+              onClick={() => toggleMark("bold")}
+              className={`p-2 hover:bg-slate-100 rounded-lg transition-colors ${
+                isMarkActive("bold") ? "bg-blue-100 text-blue-700" : ""
+              }`}
               title="Bold (Ctrl+B)"
             >
               <Bold size={16} />
             </button>
-            <button 
-              onClick={() => toggleMark('italic')} 
-              className={`p-2 hover:bg-slate-100 rounded-lg transition-colors ${isMarkActive('italic') ? 'bg-blue-100 text-blue-700' : ''}`}
+            <button
+              onClick={() => toggleMark("italic")}
+              className={`p-2 hover:bg-slate-100 rounded-lg transition-colors ${
+                isMarkActive("italic") ? "bg-blue-100 text-blue-700" : ""
+              }`}
               title="Italic (Ctrl+I)"
             >
               <Italic size={16} />
             </button>
-            <button 
-              onClick={() => toggleMark('underline')} 
-              className={`p-2 hover:bg-slate-100 rounded-lg transition-colors ${isMarkActive('underline') ? 'bg-blue-100 text-blue-700' : ''}`}
+            <button
+              onClick={() => toggleMark("underline")}
+              className={`p-2 hover:bg-slate-100 rounded-lg transition-colors ${
+                isMarkActive("underline") ? "bg-blue-100 text-blue-700" : ""
+              }`}
               title="Underline (Ctrl+U)"
             >
               <Underline size={16} />
             </button>
-            <button 
-              onClick={() => toggleMark('code')} 
-              className={`p-2 hover:bg-slate-100 rounded-lg transition-colors ${isMarkActive('code') ? 'bg-blue-100 text-blue-700' : ''}`}
+            <button
+              onClick={() => toggleMark("code")}
+              className={`p-2 hover:bg-slate-100 rounded-lg transition-colors ${
+                isMarkActive("code") ? "bg-blue-100 text-blue-700" : ""
+              }`}
               title="Code (Ctrl+`)"
             >
               <Code size={16} />
             </button>
           </div>
-          
+
           {/* Headings */}
           <div className="flex space-x-1 border-r border-slate-200 pr-2 mr-2">
-            <button 
-              onClick={() => toggleBlock('heading-one')} 
-              className={`p-2 hover:bg-slate-100 rounded-lg transition-colors ${isBlockActive('heading-one') ? 'bg-blue-100 text-blue-700' : ''}`}
+            <button
+              onClick={() => toggleBlock("heading-one")}
+              className={`p-2 hover:bg-slate-100 rounded-lg transition-colors ${
+                isBlockActive("heading-one") ? "bg-blue-100 text-blue-700" : ""
+              }`}
               title="Heading 1 (Ctrl+1)"
             >
               <Heading1 size={16} />
             </button>
-            <button 
-              onClick={() => toggleBlock('heading-two')} 
-              className={`p-2 hover:bg-slate-100 rounded-lg transition-colors ${isBlockActive('heading-two') ? 'bg-blue-100 text-blue-700' : ''}`}
+            <button
+              onClick={() => toggleBlock("heading-two")}
+              className={`p-2 hover:bg-slate-100 rounded-lg transition-colors ${
+                isBlockActive("heading-two") ? "bg-blue-100 text-blue-700" : ""
+              }`}
               title="Heading 2 (Ctrl+2)"
             >
               <Heading2 size={16} />
             </button>
           </div>
-          
+
           {/* Lists */}
           <div className="flex space-x-1 border-r border-slate-200 pr-2 mr-2">
-            <button 
-              onClick={() => toggleBlock('bulleted-list')} 
-              className={`p-2 hover:bg-slate-100 rounded-lg transition-colors ${isBlockActive('bulleted-list') ? 'bg-blue-100 text-blue-700' : ''}`}
+            <button
+              onClick={() => toggleBlock("bulleted-list")}
+              className={`p-2 hover:bg-slate-100 rounded-lg transition-colors ${
+                isBlockActive("bulleted-list")
+                  ? "bg-blue-100 text-blue-700"
+                  : ""
+              }`}
               title="Bullet List"
             >
               <List size={16} />
             </button>
-            <button 
-              onClick={() => toggleBlock('numbered-list')} 
-              className={`p-2 hover:bg-slate-100 rounded-lg transition-colors ${isBlockActive('numbered-list') ? 'bg-blue-100 text-blue-700' : ''}`}
+            <button
+              onClick={() => toggleBlock("numbered-list")}
+              className={`p-2 hover:bg-slate-100 rounded-lg transition-colors ${
+                isBlockActive("numbered-list")
+                  ? "bg-blue-100 text-blue-700"
+                  : ""
+              }`}
               title="Numbered List"
             >
               <ListOrdered size={16} />
             </button>
           </div>
-          
+
           {/* Other Blocks */}
           <div className="flex space-x-1">
-            <button 
-              onClick={() => toggleBlock('block-quote')} 
-              className={`p-2 hover:bg-slate-100 rounded-lg transition-colors ${isBlockActive('block-quote') ? 'bg-blue-100 text-blue-700' : ''}`}
+            <button
+              onClick={() => toggleBlock("block-quote")}
+              className={`p-2 hover:bg-slate-100 rounded-lg transition-colors ${
+                isBlockActive("block-quote") ? "bg-blue-100 text-blue-700" : ""
+              }`}
               title="Quote"
             >
               <Quote size={16} />
@@ -490,7 +638,11 @@ const NoteEditor = ({ selectedNote, onNoteChange, onCreateNewNote }) => {
       </div>
       {/* Slate Editor */}
       <div className="flex-1 p-6 overflow-y-auto bg-white">
-        <Slate editor={editorRef.current} initialValue={value} onChange={setValue}>
+        <Slate
+          editor={editorRef.current}
+          initialValue={value}
+          onChange={setValue}
+        >
           <Editable
             renderElement={renderElement}
             renderLeaf={renderLeaf}
@@ -499,7 +651,11 @@ const NoteEditor = ({ selectedNote, onNoteChange, onCreateNewNote }) => {
             spellCheck
             autoFocus
             className="w-full h-full outline-none text-slate-900 leading-relaxed"
-            style={{ minHeight: '400px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
+            style={{
+              minHeight: "400px",
+              fontFamily:
+                '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            }}
           />
         </Slate>
       </div>
@@ -508,14 +664,22 @@ const NoteEditor = ({ selectedNote, onNoteChange, onCreateNewNote }) => {
 };
 
 // Enhanced Sidebar Component
-const Sidebar = ({ currentView, onViewChange, user, onLogout, notes, onSearch, searchQuery }) => {
+const Sidebar = ({
+  currentView,
+  onViewChange,
+  user,
+  onLogout,
+  notes,
+  onSearch,
+  searchQuery,
+}) => {
   const [showSettings, setShowSettings] = useState(false);
-  
+
   const noteStats = {
     total: notes.length,
-    starred: notes.filter(n => n.starred).length,
-    archived: notes.filter(n => n.archived).length,
-    trashed: notes.filter(n => n.trashed).length,
+    starred: notes.filter((n) => n.starred).length,
+    archived: notes.filter((n) => n.archived).length,
+    trashed: notes.filter((n) => n.trashed).length,
   };
 
   return (
@@ -524,102 +688,127 @@ const Sidebar = ({ currentView, onViewChange, user, onLogout, notes, onSearch, s
         <h2 className="text-lg font-semibold text-gray-900">Noet</h2>
         <p className="text-sm text-gray-600">Welcome, {user?.name}</p>
       </div>
-      
+
       {/* Search */}
       <div className="p-4 border-b border-gray-200">
         <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          <Search
+            size={16}
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+          />
           <input
             type="text"
             placeholder="Search notes..."
-            value={searchQuery || ''}
+            value={searchQuery || ""}
             onChange={(e) => onSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
           />
         </div>
       </div>
-      
+
       {/* Navigation */}
       <div className="flex-1 p-4 overflow-y-auto">
         <nav className="space-y-1">
           <button
-            onClick={() => onViewChange('all')}
+            onClick={() => onViewChange("all")}
             className={`w-full text-left p-2 rounded-lg transition-colors flex items-center space-x-2 ${
-              currentView === 'all' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+              currentView === "all"
+                ? "bg-blue-100 text-blue-700"
+                : "hover:bg-gray-100"
             }`}
           >
             <FileText size={16} />
             <span>All Notes</span>
-            <span className="ml-auto text-xs text-gray-500">{noteStats.total}</span>
+            <span className="ml-auto text-xs text-gray-500">
+              {noteStats.total}
+            </span>
           </button>
-          
+
           <button
-            onClick={() => onViewChange('recent')}
+            onClick={() => onViewChange("recent")}
             className={`w-full text-left p-2 rounded-lg transition-colors flex items-center space-x-2 ${
-              currentView === 'recent' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+              currentView === "recent"
+                ? "bg-blue-100 text-blue-700"
+                : "hover:bg-gray-100"
             }`}
           >
             <Calendar size={16} />
             <span>Recent</span>
           </button>
-          
+
           <button
-            onClick={() => onViewChange('starred')}
+            onClick={() => onViewChange("starred")}
             className={`w-full text-left p-2 rounded-lg transition-colors flex items-center space-x-2 ${
-              currentView === 'starred' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+              currentView === "starred"
+                ? "bg-blue-100 text-blue-700"
+                : "hover:bg-gray-100"
             }`}
           >
             <Star size={16} />
             <span>Starred</span>
-            <span className="ml-auto text-xs text-gray-500">{noteStats.starred}</span>
+            <span className="ml-auto text-xs text-gray-500">
+              {noteStats.starred}
+            </span>
           </button>
-          
+
           <button
-            onClick={() => onViewChange('notebooks')}
+            onClick={() => onViewChange("notebooks")}
             className={`w-full text-left p-2 rounded-lg transition-colors flex items-center space-x-2 ${
-              currentView === 'notebooks' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+              currentView === "notebooks"
+                ? "bg-blue-100 text-blue-700"
+                : "hover:bg-gray-100"
             }`}
           >
             <Book size={16} />
             <span>Notebooks</span>
           </button>
-          
+
           <button
-            onClick={() => onViewChange('tags')}
+            onClick={() => onViewChange("tags")}
             className={`w-full text-left p-2 rounded-lg transition-colors flex items-center space-x-2 ${
-              currentView === 'tags' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+              currentView === "tags"
+                ? "bg-blue-100 text-blue-700"
+                : "hover:bg-gray-100"
             }`}
           >
             <Tag size={16} />
             <span>Tags</span>
           </button>
-          
+
           <hr className="my-3 border-gray-300" />
-          
+
           <button
-            onClick={() => onViewChange('archived')}
+            onClick={() => onViewChange("archived")}
             className={`w-full text-left p-2 rounded-lg transition-colors flex items-center space-x-2 ${
-              currentView === 'archived' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+              currentView === "archived"
+                ? "bg-blue-100 text-blue-700"
+                : "hover:bg-gray-100"
             }`}
           >
             <Archive size={16} />
             <span>Archived</span>
-            <span className="ml-auto text-xs text-gray-500">{noteStats.archived}</span>
+            <span className="ml-auto text-xs text-gray-500">
+              {noteStats.archived}
+            </span>
           </button>
-          
+
           <button
-            onClick={() => onViewChange('trash')}
+            onClick={() => onViewChange("trash")}
             className={`w-full text-left p-2 rounded-lg transition-colors flex items-center space-x-2 ${
-              currentView === 'trash' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
+              currentView === "trash"
+                ? "bg-blue-100 text-blue-700"
+                : "hover:bg-gray-100"
             }`}
           >
             <Trash2 size={16} />
             <span>Trash</span>
-            <span className="ml-auto text-xs text-gray-500">{noteStats.trashed}</span>
+            <span className="ml-auto text-xs text-gray-500">
+              {noteStats.trashed}
+            </span>
           </button>
         </nav>
       </div>
-      
+
       {/* Settings and Logout */}
       <div className="p-4 border-t border-gray-200">
         <div className="space-y-1">
@@ -630,7 +819,7 @@ const Sidebar = ({ currentView, onViewChange, user, onLogout, notes, onSearch, s
             <Settings size={16} />
             <span>Settings</span>
           </button>
-          
+
           {showSettings && (
             <div className="ml-6 space-y-1">
               <button className="w-full text-left p-1 text-sm hover:bg-gray-100 rounded flex items-center space-x-2">
@@ -643,7 +832,7 @@ const Sidebar = ({ currentView, onViewChange, user, onLogout, notes, onSearch, s
               </button>
             </div>
           )}
-          
+
           <button
             onClick={onLogout}
             className="w-full text-left p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center space-x-2"
@@ -657,42 +846,55 @@ const Sidebar = ({ currentView, onViewChange, user, onLogout, notes, onSearch, s
 };
 
 // Enhanced Notes List Component
-const NotesList = ({ notes, selectedNote, onSelectNote, onCreateNewNote, currentView, searchQuery, onStarNote, onArchiveNote, onDeleteNote, sortBy, setSortBy }) => {
+const NotesList = ({
+  notes,
+  selectedNote,
+  onSelectNote,
+  onCreateNewNote,
+  currentView,
+  searchQuery,
+  onStarNote,
+  onArchiveNote,
+  onDeleteNote,
+  sortBy,
+  setSortBy,
+}) => {
   const [showSortMenu, setShowSortMenu] = useState(false);
-  
+
   // Filter notes based on current view and search
-  const filteredNotes = notes.filter(note => {
+  const filteredNotes = notes.filter((note) => {
     // Apply search filter
     if (searchQuery) {
       const searchLower = searchQuery.toLowerCase();
       const titleMatch = note.title.toLowerCase().includes(searchLower);
-      const contentMatch = note.content && note.content.toLowerCase().includes(searchLower);
+      const contentMatch =
+        note.content && note.content.toLowerCase().includes(searchLower);
       if (!titleMatch && !contentMatch) return false;
     }
-    
+
     // Apply view filter
     switch (currentView) {
-      case 'starred':
+      case "starred":
         return note.starred && !note.trashed;
-      case 'archived':
+      case "archived":
         return note.archived && !note.trashed;
-      case 'trash':
+      case "trash":
         return note.trashed;
-      case 'recent':
+      case "recent":
         return !note.archived && !note.trashed;
       default:
         return !note.archived && !note.trashed;
     }
   });
-  
+
   // Sort notes
   const sortedNotes = [...filteredNotes].sort((a, b) => {
     switch (sortBy) {
-      case 'title':
+      case "title":
         return a.title.localeCompare(b.title);
-      case 'created':
+      case "created":
         return new Date(b.created) - new Date(a.created);
-      case 'updated':
+      case "updated":
       default:
         return new Date(b.updated) - new Date(a.updated);
     }
@@ -701,11 +903,14 @@ const NotesList = ({ notes, selectedNote, onSelectNote, onCreateNewNote, current
   const getPreviewText = (content) => {
     try {
       const parsed = JSON.parse(content);
-      return parsed.map(block => 
-        block.children.map(child => child.text).join('')
-      ).join(' ').substring(0, 100) + '...';
+      return (
+        parsed
+          .map((block) => block.children.map((child) => child.text).join(""))
+          .join(" ")
+          .substring(0, 100) + "..."
+      );
     } catch {
-      return 'No preview available...';
+      return "No preview available...";
     }
   };
 
@@ -714,17 +919,17 @@ const NotesList = ({ notes, selectedNote, onSelectNote, onCreateNewNote, current
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">
-            {currentView === 'all' && 'All Notes'}
-            {currentView === 'recent' && 'Recent Notes'}
-            {currentView === 'starred' && 'Starred Notes'}
-            {currentView === 'archived' && 'Archived Notes'}
-            {currentView === 'trash' && 'Trash'}
-            {currentView === 'notebooks' && 'Notebooks'}
-            {currentView === 'tags' && 'Tags'}
+            {currentView === "all" && "All Notes"}
+            {currentView === "recent" && "Recent Notes"}
+            {currentView === "starred" && "Starred Notes"}
+            {currentView === "archived" && "Archived Notes"}
+            {currentView === "trash" && "Trash"}
+            {currentView === "notebooks" && "Notebooks"}
+            {currentView === "tags" && "Tags"}
           </h3>
           <div className="flex space-x-1">
             <div className="relative">
-              <button 
+              <button
                 onClick={() => setShowSortMenu(!showSortMenu)}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 title="Sort Options"
@@ -735,20 +940,35 @@ const NotesList = ({ notes, selectedNote, onSelectNote, onCreateNewNote, current
                 <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
                   <div className="p-2">
                     <button
-                      onClick={() => {setSortBy('updated'); setShowSortMenu(false);}}
-                      className={`w-full text-left p-2 rounded hover:bg-gray-100 ${sortBy === 'updated' ? 'bg-blue-50 text-blue-700' : ''}`}
+                      onClick={() => {
+                        setSortBy("updated");
+                        setShowSortMenu(false);
+                      }}
+                      className={`w-full text-left p-2 rounded hover:bg-gray-100 ${
+                        sortBy === "updated" ? "bg-blue-50 text-blue-700" : ""
+                      }`}
                     >
                       Sort by Updated
                     </button>
                     <button
-                      onClick={() => {setSortBy('created'); setShowSortMenu(false);}}
-                      className={`w-full text-left p-2 rounded hover:bg-gray-100 ${sortBy === 'created' ? 'bg-blue-50 text-blue-700' : ''}`}
+                      onClick={() => {
+                        setSortBy("created");
+                        setShowSortMenu(false);
+                      }}
+                      className={`w-full text-left p-2 rounded hover:bg-gray-100 ${
+                        sortBy === "created" ? "bg-blue-50 text-blue-700" : ""
+                      }`}
                     >
                       Sort by Created
                     </button>
                     <button
-                      onClick={() => {setSortBy('title'); setShowSortMenu(false);}}
-                      className={`w-full text-left p-2 rounded hover:bg-gray-100 ${sortBy === 'title' ? 'bg-blue-50 text-blue-700' : ''}`}
+                      onClick={() => {
+                        setSortBy("title");
+                        setShowSortMenu(false);
+                      }}
+                      className={`w-full text-left p-2 rounded hover:bg-gray-100 ${
+                        sortBy === "title" ? "bg-blue-50 text-blue-700" : ""
+                      }`}
                     >
                       Sort by Title
                     </button>
@@ -756,7 +976,7 @@ const NotesList = ({ notes, selectedNote, onSelectNote, onCreateNewNote, current
                 </div>
               )}
             </div>
-            <button 
+            <button
               onClick={onCreateNewNote}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               title="Create New Note"
@@ -765,14 +985,15 @@ const NotesList = ({ notes, selectedNote, onSelectNote, onCreateNewNote, current
             </button>
           </div>
         </div>
-        
+
         {searchQuery && (
           <div className="text-sm text-gray-600 mb-2">
-            {sortedNotes.length} result{sortedNotes.length !== 1 ? 's' : ''} for "{searchQuery}"
+            {sortedNotes.length} result{sortedNotes.length !== 1 ? "s" : ""} for
+            "{searchQuery}"
           </div>
         )}
       </div>
-      
+
       <div className="flex-1 overflow-y-auto">
         {sortedNotes.length === 0 ? (
           <div className="p-4 text-center text-gray-500">
@@ -781,12 +1002,12 @@ const NotesList = ({ notes, selectedNote, onSelectNote, onCreateNewNote, current
                 <p>No notes found</p>
                 <p className="text-xs mt-1">Try different search terms</p>
               </div>
-            ) : currentView === 'trash' ? (
+            ) : currentView === "trash" ? (
               <p>Trash is empty</p>
             ) : (
               <div>
                 <p>No notes yet</p>
-                <button 
+                <button
                   onClick={onCreateNewNote}
                   className="mt-2 text-blue-600 hover:text-blue-700"
                 >
@@ -796,59 +1017,82 @@ const NotesList = ({ notes, selectedNote, onSelectNote, onCreateNewNote, current
             )}
           </div>
         ) : (
-          sortedNotes.map(note => (
+          sortedNotes.map((note) => (
             <div
               key={note.id}
               className={`group relative border-b border-gray-100 cursor-pointer hover:bg-gray-50 ${
-                selectedNote?.id === note.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
+                selectedNote?.id === note.id
+                  ? "bg-blue-50 border-l-4 border-l-blue-500"
+                  : ""
               }`}
             >
-              <div 
-                onClick={() => onSelectNote(note)}
-                className="p-4"
-              >
+              <div onClick={() => onSelectNote(note)} className="p-4">
                 <div className="flex items-start justify-between mb-2">
                   <h4 className="font-medium text-gray-900 mb-1 truncate pr-2 flex-1">
                     {note.title}
                   </h4>
-                  {note.starred && <Star size={14} className="text-yellow-500 fill-current" />}
+                  {note.starred && (
+                    <Star size={14} className="text-yellow-500 fill-current" />
+                  )}
                 </div>
-                
+
                 <p className="text-xs text-gray-500 mb-2">
-                  {new Date(note.updated).toLocaleDateString()} • {new Date(note.updated).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                  {new Date(note.updated).toLocaleDateString()} •{" "}
+                  {new Date(note.updated).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </p>
-                
+
                 <p className="text-sm text-gray-600 line-clamp-2">
                   {getPreviewText(note.content)}
                 </p>
-                
-                {(note.tags && note.tags.length > 0) && (
+
+                {note.tags && note.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-2">
-                    {note.tags.slice(0, 2).map(tag => (
-                      <span key={tag} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                    {note.tags.slice(0, 2).map((tag) => (
+                      <span
+                        key={tag}
+                        className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded"
+                      >
                         #{tag}
                       </span>
                     ))}
                     {note.tags.length > 2 && (
-                      <span className="text-xs text-gray-500">+{note.tags.length - 2} more</span>
+                      <span className="text-xs text-gray-500">
+                        +{note.tags.length - 2} more
+                      </span>
                     )}
                   </div>
                 )}
               </div>
-              
+
               {/* Action buttons */}
               <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
-                {currentView !== 'trash' && (
+                {currentView !== "trash" && (
                   <>
                     <button
-                      onClick={(e) => {e.stopPropagation(); onStarNote(note.id);}}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onStarNote(note.id);
+                      }}
                       className="p-1 hover:bg-gray-200 rounded"
                       title={note.starred ? "Unstar" : "Star"}
                     >
-                      <Star size={12} className={note.starred ? "text-yellow-500 fill-current" : "text-gray-400"} />
+                      <Star
+                        size={12}
+                        className={
+                          note.starred
+                            ? "text-yellow-500 fill-current"
+                            : "text-gray-400"
+                        }
+                      />
                     </button>
                     <button
-                      onClick={(e) => {e.stopPropagation(); onArchiveNote(note.id);}}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onArchiveNote(note.id);
+                      }}
                       className="p-1 hover:bg-gray-200 rounded"
                       title={note.archived ? "Unarchive" : "Archive"}
                     >
@@ -857,9 +1101,14 @@ const NotesList = ({ notes, selectedNote, onSelectNote, onCreateNewNote, current
                   </>
                 )}
                 <button
-                  onClick={(e) => {e.stopPropagation(); onDeleteNote(note.id);}}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteNote(note.id);
+                  }}
                   className="p-1 hover:bg-gray-200 rounded"
-                  title={currentView === 'trash' ? "Delete Forever" : "Move to Trash"}
+                  title={
+                    currentView === "trash" ? "Delete Forever" : "Move to Trash"
+                  }
                 >
                   <Trash2 size={12} className="text-red-500" />
                 </button>
@@ -878,16 +1127,16 @@ const NoetApp = () => {
   const [user, setUser] = useState(null);
   const [notes, setNotes] = useState([]);
   const [selectedNote, setSelectedNote] = useState(null);
-  const [currentView, setCurrentView] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('updated');
+  const [currentView, setCurrentView] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState("updated");
 
   const handleLoginSuccess = (authenticatedUser) => {
-    console.log('Login successful:', authenticatedUser);
+    console.log("Login successful:", authenticatedUser);
     setUser(authenticatedUser);
     setNotes(authenticatedUser.notes || []);
     setIsAuthenticated(true);
-    
+
     // Auto-select first note
     if (authenticatedUser.notes && authenticatedUser.notes.length > 0) {
       setSelectedNote(authenticatedUser.notes[0]);
@@ -899,14 +1148,14 @@ const NoetApp = () => {
     setUser(null);
     setNotes([]);
     setSelectedNote(null);
-    setCurrentView('all');
-    setSearchQuery('');
+    setCurrentView("all");
+    setSearchQuery("");
   };
 
   const createNewNote = () => {
     const newNote = {
       id: Date.now(),
-      title: 'Untitled Note',
+      title: "Untitled Note",
       content: JSON.stringify(initialValue),
       created: new Date().toISOString(),
       updated: new Date().toISOString(),
@@ -914,7 +1163,7 @@ const NoetApp = () => {
       archived: false,
       trashed: false,
       tags: [],
-      notebook: 'default'
+      notebook: "default",
     };
     const updatedNotes = [newNote, ...notes];
     setNotes(updatedNotes);
@@ -922,7 +1171,7 @@ const NoetApp = () => {
   };
 
   const handleNoteChange = (updatedNote) => {
-    const updatedNotes = notes.map(note => 
+    const updatedNotes = notes.map((note) =>
       note.id === updatedNote.id ? updatedNote : note
     );
     setNotes(updatedNotes);
@@ -930,37 +1179,37 @@ const NoetApp = () => {
   };
 
   const handleStarNote = (noteId) => {
-    const updatedNotes = notes.map(note => 
+    const updatedNotes = notes.map((note) =>
       note.id === noteId ? { ...note, starred: !note.starred } : note
     );
     setNotes(updatedNotes);
     if (selectedNote?.id === noteId) {
-      setSelectedNote(prev => ({ ...prev, starred: !prev.starred }));
+      setSelectedNote((prev) => ({ ...prev, starred: !prev.starred }));
     }
   };
 
   const handleArchiveNote = (noteId) => {
-    const updatedNotes = notes.map(note => 
+    const updatedNotes = notes.map((note) =>
       note.id === noteId ? { ...note, archived: !note.archived } : note
     );
     setNotes(updatedNotes);
     if (selectedNote?.id === noteId) {
-      setSelectedNote(prev => ({ ...prev, archived: !prev.archived }));
+      setSelectedNote((prev) => ({ ...prev, archived: !prev.archived }));
     }
   };
 
   const handleDeleteNote = (noteId) => {
-    const note = notes.find(n => n.id === noteId);
+    const note = notes.find((n) => n.id === noteId);
     if (note?.trashed) {
       // Permanently delete
-      const updatedNotes = notes.filter(n => n.id !== noteId);
+      const updatedNotes = notes.filter((n) => n.id !== noteId);
       setNotes(updatedNotes);
       if (selectedNote?.id === noteId) {
         setSelectedNote(null);
       }
     } else {
       // Move to trash
-      const updatedNotes = notes.map(note => 
+      const updatedNotes = notes.map((note) =>
         note.id === noteId ? { ...note, trashed: true } : note
       );
       setNotes(updatedNotes);
@@ -985,8 +1234,8 @@ const NoetApp = () => {
   return (
     <ErrorBoundary>
       <div className="h-screen flex bg-gray-50">
-        <Sidebar 
-          currentView={currentView} 
+        <Sidebar
+          currentView={currentView}
           onViewChange={setCurrentView}
           user={user}
           onLogout={handleLogout}
@@ -994,7 +1243,7 @@ const NoetApp = () => {
           onSearch={handleSearch}
           searchQuery={searchQuery}
         />
-        <NotesList 
+        <NotesList
           notes={notes}
           selectedNote={selectedNote}
           onSelectNote={setSelectedNote}
@@ -1007,7 +1256,7 @@ const NoetApp = () => {
           sortBy={sortBy}
           setSortBy={setSortBy}
         />
-        <NoteEditor 
+        <NoteEditor
           selectedNote={selectedNote}
           onNoteChange={handleNoteChange}
           onCreateNewNote={createNewNote}

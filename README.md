@@ -21,22 +21,26 @@ Open [http://localhost:3000](http://localhost:3000) to view the app.
 ## 🎯 Demo Accounts
 
 ### Demo User
+
 - **Email**: demo@example.com
 - **Password**: demo123
 
-### Admin User  
+### Admin User
+
 - **Email**: admin@example.com
 - **Password**: admin123
 
 ## ✨ Features
 
 ### Rich Text Editor (Slate.js)
+
 - **Text Formatting**: Bold, italic, underline, inline code
 - **Auto-save**: Notes save automatically every 2 seconds
 - **Keyboard Shortcuts**: Standard shortcuts (Ctrl+B, Ctrl+I, etc.)
 - **Modern Architecture**: Built on Slate.js for extensibility
 
 ### Core Functionality
+
 - **Secure Authentication**: User accounts with session management
 - **Notes Management**: Create, edit, organize notes
 - **Clean UI**: Modern interface with Tailwind CSS
@@ -45,6 +49,7 @@ Open [http://localhost:3000](http://localhost:3000) to view the app.
 ## 🚧 In Development
 
 ### Enhanced Editor Features
+
 - [ ] Headings (H1, H2, H3)
 - [ ] Lists (bulleted, numbered)
 - [ ] Block quotes and code blocks
@@ -54,6 +59,7 @@ Open [http://localhost:3000](http://localhost:3000) to view the app.
 - [ ] Advanced keyboard shortcuts
 
 ### Organization Features
+
 - [ ] Notebook management
 - [ ] Tag-based organization
 - [ ] Search and filtering
@@ -91,18 +97,21 @@ config/
 ## 🔄 Development Workflow
 
 ### Branch Strategy
+
 - `main` - Stable, working versions
 - `feature/*` - Individual feature development
 - `bugfix/*` - Bug fixes
 - `enhance/*` - UI/UX enhancements
 
 ### Commit Conventions
+
 - `feat(scope): description` - New features
 - `fix(scope): description` - Bug fixes
 - `docs(scope): description` - Documentation
 - `enhance(scope): description` - UI/UX improvements
 
 ### Development Commands
+
 ```bash
 # Quick status and commit helper
 ./dev-status.sh
@@ -127,12 +136,13 @@ This project represents a complete migration from a broken contenteditable-based
 - Poor state management
 
 ### Migration Achievements
+
 ✅ **Eliminated custom DOM manipulation**  
 ✅ **Implemented modern Slate.js editor**  
 ✅ **Restored all core functionality**  
 ✅ **Added auto-save and keyboard shortcuts**  
 ✅ **Clean, maintainable codebase**  
-✅ **Modern React patterns and state management**  
+✅ **Modern React patterns and state management**
 
 ## 🤝 Contributing
 
@@ -145,6 +155,7 @@ This project represents a complete migration from a broken contenteditable-based
 ## 📋 Development Roadmap
 
 ### Phase 1: Core Editor (In Progress)
+
 - [x] Basic text formatting
 - [x] Auto-save functionality
 - [ ] Headings and lists
@@ -152,12 +163,14 @@ This project represents a complete migration from a broken contenteditable-based
 - [ ] Links and images
 
 ### Phase 2: Organization
+
 - [ ] Enhanced sidebar navigation
 - [ ] Search and filtering
 - [ ] Notebook management
 - [ ] Tag system
 
 ### Phase 3: Advanced Features
+
 - [ ] Collaboration features
 - [ ] Export/import functionality
 - [ ] Themes and customization

@@ -1,0 +1,32 @@
+{
+  "development": {
+    "frontend": {
+      "port": 3001,
+      "host": "localhost"
+    },
+    "backend": {
+      "port": 3004,
+      "host": "localhost"
+    }
+  },
+  "production": {
+    "frontend": {
+      "port": 3000,
+      "host": "0.0.0.0"
+    },
+    "backend": {
+      "port": 3001,
+      "host": "0.0.0.0"
+    }
+  },
+  "services": {
+    "healthCheckInterval": 30000,
+    "maxRetries": 3,
+    "timeoutMs": 5000
+  },
+  "notes": {
+    "Note": "This is the single source of truth for all port configurations.",
+    "Frontend": "http://localhost:3001 (development) or http://localhost:3000 (production)",
+    "Backend": "http://localhost:3004 (development) or http://localhost:3001 (production)"
+  }
+}

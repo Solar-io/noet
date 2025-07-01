@@ -1,11 +1,34 @@
-import React from 'react';
+import React from "react";
 
 const TestApp = () => {
-  return (
-    <div style={{ padding: '20px', backgroundColor: '#f0f0f0', minHeight: '100vh' }}>
-      <h1>Test App Loading...</h1>
-      <p>If you can see this, React is working correctly.</p>
-    </div>
+  console.log("TestApp component is rendering");
+
+  return React.createElement(
+    "div",
+    {
+      style: {
+        padding: "20px",
+        backgroundColor: "#f0f8ff",
+        minHeight: "100vh",
+        fontFamily: "Arial, sans-serif",
+      },
+    },
+    React.createElement(
+      "h1",
+      { style: { color: "green" } },
+      "🎉 React is Working!"
+    ),
+    React.createElement(
+      "p",
+      null,
+      "If you can see this, React is rendering correctly."
+    ),
+    React.createElement(
+      "p",
+      null,
+      `Current time: ${new Date().toLocaleString()}`
+    ),
+    React.createElement("p", null, "This is a minimal test component.")
   );
 };
 

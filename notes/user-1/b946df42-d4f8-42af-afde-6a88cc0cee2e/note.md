@@ -1,0 +1,1 @@
+This note should go to trash when deleted

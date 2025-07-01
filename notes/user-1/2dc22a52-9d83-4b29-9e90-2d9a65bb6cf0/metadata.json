@@ -1,0 +1,21 @@
+{
+  "id": "2dc22a52-9d83-4b29-9e90-2d9a65bb6cf0",
+  "title": "Test Functionality123221",
+  "created": "2025-06-30T18:47:05.967Z",
+  "updated": "2025-07-01T02:30:08.931Z",
+  "tags": [],
+  "notebook": "6158662c-4abf-4c28-a7b8-8837929297d7",
+  "folder": null,
+  "starred": false,
+  "deleted": false,
+  "version": 5,
+  "attachments": [
+    {
+      "filename": "test-upload.txt",
+      "originalName": "test-upload.txt",
+      "size": 20,
+      "type": "text/plain",
+      "uploaded": "2025-06-30T18:48:33.924Z"
+    }
+  ]
+}

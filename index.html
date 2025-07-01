@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -7,7 +7,19 @@
     <title>Noet - Modern Note Taking</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div style="padding: 20px; color: blue">Loading React app...</div>
+    </div>
+    <script>
+      console.log("Basic JavaScript is working");
+      setTimeout(() => {
+        const root = document.getElementById("root");
+        if (root && root.innerHTML.includes("Loading React app")) {
+          root.innerHTML =
+            '<div style="padding: 20px; color: red;">React failed to load. Check console for errors.</div>';
+        }
+      }, 5000);
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
