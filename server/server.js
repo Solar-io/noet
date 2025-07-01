@@ -596,9 +596,9 @@ app.delete(
 app.get("/api/:userId/notebooks", async (req, res) => {
   try {
     const { userId } = req.params;
-    const userNotebooks = Array.from(notebooks.values()).filter(
-      (nb) => nb.userId === userId
-    );
+    const userNotebooks = Array.from(notebooks.values())
+      .filter((nb) => nb.userId === userId)
+      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
     res.json(userNotebooks);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -667,6 +667,42 @@ app.delete("/api/:userId/notebooks/:notebookId", async (req, res) => {
   }
 });
 
+// Reorder notebooks
+app.post("/api/:userId/notebooks/reorder", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { sourceId, targetId, position = "after" } = req.body;
+
+    const sourceNotebook = notebooks.get(sourceId);
+    const targetNotebook = notebooks.get(targetId);
+
+    if (!sourceNotebook || !targetNotebook || sourceNotebook.userId !== userId || targetNotebook.userId !== userId) {
+      return res.status(404).json({ error: "One or both notebooks not found" });
+    }
+
+    // For in-memory storage, we can implement ordering by updating a sort order field
+    const userNotebooks = Array.from(notebooks.values()).filter(nb => nb.userId === userId);
+    
+    // Update sort orders
+    userNotebooks.forEach((notebook, index) => {
+      if (!notebook.sortOrder) notebook.sortOrder = index;
+    });
+    
+    // Calculate new sort order for the moved notebook
+    if (position === "before") {
+      sourceNotebook.sortOrder = targetNotebook.sortOrder - 0.5;
+    } else {
+      sourceNotebook.sortOrder = targetNotebook.sortOrder + 0.5;
+    }
+    
+    notebooks.set(sourceId, sourceNotebook);
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ==========================================
 // TAGS API
 // ==========================================
@@ -675,9 +711,9 @@ app.delete("/api/:userId/notebooks/:notebookId", async (req, res) => {
 app.get("/api/:userId/tags", async (req, res) => {
   try {
     const { userId } = req.params;
-    const userTags = Array.from(tags.values()).filter(
-      (tag) => tag.userId === userId
-    );
+    const userTags = Array.from(tags.values())
+      .filter((tag) => tag.userId === userId)
+      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
     res.json(userTags);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -744,6 +780,50 @@ app.delete("/api/:userId/tags/:tagId", async (req, res) => {
   }
 });
 
+// Reorder tags
+app.post("/api/:userId/tags/reorder", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { sourceId, targetId, position = "after" } = req.body;
+
+    const sourceTag = tags.get(sourceId);
+    const targetTag = tags.get(targetId);
+
+    if (!sourceTag || !targetTag || sourceTag.userId !== userId || targetTag.userId !== userId) {
+      return res.status(404).json({ error: "One or both tags not found" });
+    }
+
+    // For in-memory storage, we can implement ordering by updating a sort order field
+    // In a real database, you'd handle this differently
+    const userTags = Array.from(tags.values()).filter(t => t.userId === userId);
+    const currentTime = Date.now();
+    
+    // Update sort orders
+    userTags.forEach((tag, index) => {
+      if (!tag.sortOrder) tag.sortOrder = index;
+    });
+    
+    // Remove source from its current position and insert at target position
+    const sourceIndex = userTags.findIndex(t => t.id === sourceId);
+    const targetIndex = userTags.findIndex(t => t.id === targetId);
+    
+    if (sourceIndex !== -1 && targetIndex !== -1) {
+      // Calculate new sort order for the moved tag
+      if (position === "before") {
+        sourceTag.sortOrder = targetTag.sortOrder - 0.5;
+      } else {
+        sourceTag.sortOrder = targetTag.sortOrder + 0.5;
+      }
+      
+      tags.set(sourceId, sourceTag);
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ==========================================
 // FOLDERS API
 // ==========================================
@@ -752,9 +832,9 @@ app.delete("/api/:userId/tags/:tagId", async (req, res) => {
 app.get("/api/:userId/folders", async (req, res) => {
   try {
     const { userId } = req.params;
-    const userFolders = Array.from(folders.values()).filter(
-      (folder) => folder.userId === userId
-    );
+    const userFolders = Array.from(folders.values())
+      .filter((folder) => folder.userId === userId)
+      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
     res.json(userFolders);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -817,6 +897,42 @@ app.delete("/api/:userId/folders/:folderId", async (req, res) => {
     }
 
     folders.delete(folderId);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Reorder folders
+app.post("/api/:userId/folders/reorder", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { sourceId, targetId, position = "after" } = req.body;
+
+    const sourceFolder = folders.get(sourceId);
+    const targetFolder = folders.get(targetId);
+
+    if (!sourceFolder || !targetFolder || sourceFolder.userId !== userId || targetFolder.userId !== userId) {
+      return res.status(404).json({ error: "One or both folders not found" });
+    }
+
+    // For in-memory storage, we can implement ordering by updating a sort order field
+    const userFolders = Array.from(folders.values()).filter(f => f.userId === userId);
+    
+    // Update sort orders
+    userFolders.forEach((folder, index) => {
+      if (!folder.sortOrder) folder.sortOrder = index;
+    });
+    
+    // Calculate new sort order for the moved folder
+    if (position === "before") {
+      sourceFolder.sortOrder = targetFolder.sortOrder - 0.5;
+    } else {
+      sourceFolder.sortOrder = targetFolder.sortOrder + 0.5;
+    }
+    
+    folders.set(sourceId, sourceFolder);
+
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -43,6 +43,9 @@ const ImprovedNotesList = ({
   currentView,
   currentViewParams = {},
   onViewChange,
+  notebooks = [],
+  folders = [],
+  tags = [],
   className = "",
 }) => {
   const [backendUrl, setBackendUrl] = useState("");
@@ -56,7 +59,7 @@ const ImprovedNotesList = ({
   const [availableTags, setAvailableTags] = useState([]);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
 
-  // Initialize backend URL and load tags
+  // Initialize backend URL and load tags if not provided as props
   useEffect(() => {
     const loadTags = async (url) => {
       if (!url || !userId) return;
@@ -64,8 +67,8 @@ const ImprovedNotesList = ({
       try {
         const response = await fetch(`${url}/api/${userId}/tags`);
         if (response.ok) {
-          const tags = await response.json();
-          setAvailableTags(tags);
+          const tagsData = await response.json();
+          setAvailableTags(tagsData);
         }
       } catch (error) {
         console.error("Error loading tags:", error);
@@ -77,20 +80,35 @@ const ImprovedNotesList = ({
         const url = await configService.getBackendUrl();
         setBackendUrl(url);
 
-        if (userId && url) {
+        // Only load tags from API if not provided as props
+        if (userId && url && tags.length === 0) {
           await loadTags(url);
         }
       } catch (error) {
         console.error("Failed to get backend URL:", error);
         const fallbackUrl = "http://localhost:3004";
         setBackendUrl(fallbackUrl);
-        if (userId) {
+        if (userId && tags.length === 0) {
           await loadTags(fallbackUrl);
         }
       }
     };
     initBackendUrl();
-  }, [userId]);
+  }, [userId, tags.length]);
+
+  // Helper function to get notebook name by ID
+  const getNotebookName = (notebookId) => {
+    if (!notebookId) return null;
+    const notebook = notebooks.find(nb => nb.id === notebookId);
+    return notebook ? notebook.name : "Unknown Notebook";
+  };
+
+  // Helper function to get folder name by ID
+  const getFolderName = (folderId) => {
+    if (!folderId) return null;
+    const folder = folders.find(f => f.id === folderId);
+    return folder ? folder.name : "Unknown Folder";
+  };
 
   // Helper function to get tag names from IDs
   const getTagNames = (tagIds) => {
@@ -700,14 +718,14 @@ const ImprovedNotesList = ({
                 {note.notebook && (
                   <span className="flex items-center space-x-1">
                     <Book size={12} />
-                    <span>Notebook</span>
+                    <span>{getNotebookName(note.notebook)}</span>
                   </span>
                 )}
 
                 {note.folder && (
                   <span className="flex items-center space-x-1">
                     <FolderOpen size={12} />
-                    <span>Folder</span>
+                    <span>{getFolderName(note.folder)}</span>
                   </span>
                 )}
 
@@ -722,10 +740,6 @@ const ImprovedNotesList = ({
 
             {/* Actions */}
             <div className="flex items-center space-x-1 ml-2">
-              {note.starred && (
-                <Star size={16} className="text-yellow-500 fill-current" />
-              )}
-
               {note.archived && (
                 <Archive size={16} className="text-orange-500" />
               )}

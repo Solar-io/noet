@@ -2,14 +2,14 @@
   "id": "8bb3d197-f885-4c37-bda8-e096e3c7e8f8",
   "title": "test 4",
   "created": "2025-07-01T14:58:59.237Z",
-  "updated": "2025-07-01T15:14:08.757Z",
+  "updated": "2025-07-01T21:20:45.133Z",
   "tags": [
-    "4c88ca4a-4979-4b71-a207-241c3de5de1d"
+    "22a1f731-baaa-4abe-a455-c240934c9395"
   ],
-  "notebook": null,
+  "notebook": "bd9c5185-6eb7-4752-bee3-4538ecc0527c",
   "folder": null,
   "starred": false,
   "deleted": false,
-  "version": 23,
+  "version": 25,
   "attachments": []
 }

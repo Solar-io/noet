@@ -585,6 +585,8 @@ const NoetTipTapApp = () => {
   const [user, setUser] = useState(null);
   const [notes, setNotes] = useState([]);
   const [notebooks, setNotebooks] = useState([]);
+  const [tags, setTags] = useState([]);
+  const [folders, setFolders] = useState([]);
   const [selectedNote, setSelectedNote] = useState(null);
   const [currentView, setCurrentView] = useState("all");
   const [currentViewParams, setCurrentViewParams] = useState({});
@@ -712,9 +714,82 @@ const NoetTipTapApp = () => {
     }
   };
 
+  // Load notebooks from backend
+  const loadNotebooks = async () => {
+    if (!validateUser(user) || !backendUrl) {
+      console.warn("Cannot load notebooks: missing user or backend URL");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${backendUrl}/api/${user.id}/notebooks`);
+      if (!response.ok) {
+        throw new Error(`Failed to load notebooks: ${response.status}`);
+      }
+      const notebooksData = await response.json();
+      console.log(`✅ Loaded ${notebooksData.length} notebooks`);
+      setNotebooks(notebooksData);
+    } catch (error) {
+      console.error("Error loading notebooks:", error);
+      setNotebooks([]);
+    }
+  };
+
+  // Load tags from backend
+  const loadTags = async () => {
+    if (!validateUser(user) || !backendUrl) {
+      console.warn("Cannot load tags: missing user or backend URL");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${backendUrl}/api/${user.id}/tags`);
+      if (!response.ok) {
+        throw new Error(`Failed to load tags: ${response.status}`);
+      }
+      const tagsData = await response.json();
+      console.log(`✅ Loaded ${tagsData.length} tags`);
+      setTags(tagsData);
+    } catch (error) {
+      console.error("Error loading tags:", error);
+      setTags([]);
+    }
+  };
+
+  // Load folders from backend
+  const loadFolders = async () => {
+    if (!validateUser(user) || !backendUrl) {
+      console.warn("Cannot load folders: missing user or backend URL");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${backendUrl}/api/${user.id}/folders`);
+      if (!response.ok) {
+        throw new Error(`Failed to load folders: ${response.status}`);
+      }
+      const foldersData = await response.json();
+      console.log(`✅ Loaded ${foldersData.length} folders`);
+      setFolders(foldersData);
+    } catch (error) {
+      console.error("Error loading folders:", error);
+      setFolders([]);
+    }
+  };
+
+  // Load all data
+  const loadAllData = async () => {
+    await Promise.all([
+      loadNotes(),
+      loadNotebooks(),
+      loadTags(),
+      loadFolders()
+    ]);
+  };
+
   useEffect(() => {
     if (isAuthenticated && user && backendUrl) {
-      loadNotes();
+      loadAllData();
     }
   }, [isAuthenticated, user, currentView, currentViewParams, backendUrl]);
 
@@ -1103,6 +1178,9 @@ const NoetTipTapApp = () => {
             currentView={currentView}
             currentViewParams={currentViewParams}
             onViewChange={handleViewChange}
+            notebooks={notebooks}
+            folders={folders}
+            tags={tags}
             className="w-96"
           />
         </RobustErrorBoundary>

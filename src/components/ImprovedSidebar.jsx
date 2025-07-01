@@ -342,6 +342,11 @@ const ImprovedSidebar = ({
         console.log("📚→📁 Moving notebook to folder");
         await updateItem("notebook", sourceId, { folderId: targetId });
       }
+      // Handle notebook reordering
+      else if (sourceType === "notebook" && targetType === "notebook") {
+        console.log("📚↔️📚 Reordering notebooks");
+        await reorderNotebooks(sourceId, targetId);
+      }
       // Handle folder reordering
       else if (sourceType === "folder" && targetType === "folder") {
         console.log("📁↔️📁 Reordering folders");
@@ -474,6 +479,36 @@ const ImprovedSidebar = ({
   }, {});
 
   // Reordering functions
+  const reorderNotebooks = async (sourceNotebookId, targetNotebookId) => {
+    try {
+      console.log(
+        "📚 Reordering notebooks:",
+        sourceNotebookId,
+        "->",
+        targetNotebookId
+      );
+
+      const response = await fetch(`${backendUrl}/api/${user.id}/notebooks/reorder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          sourceId: sourceNotebookId, 
+          targetId: targetNotebookId,
+          position: 'after' 
+        })
+      });
+
+      if (response.ok) {
+        console.log("✅ Notebook reordering completed successfully");
+      } else {
+        console.error("❌ Failed to reorder notebooks:", await response.text());
+      }
+    } catch (error) {
+      console.error("❌ Error reordering notebooks:", error);
+      throw error;
+    }
+  };
+
   const reorderFolders = async (sourceFolderId, targetFolderId) => {
     try {
       console.log(
@@ -483,28 +518,21 @@ const ImprovedSidebar = ({
         targetFolderId
       );
 
-      // For now, implement client-side reordering
-      // In a real app, you'd send this to the backend
-      const sourceFolder = folders.find((f) => f.id === sourceFolderId);
-      const targetFolder = folders.find((f) => f.id === targetFolderId);
+      const response = await fetch(`${backendUrl}/api/${user.id}/folders/reorder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          sourceId: sourceFolderId, 
+          targetId: targetFolderId,
+          position: 'after' 
+        })
+      });
 
-      if (!sourceFolder || !targetFolder) {
-        console.error("Source or target folder not found");
-        return;
+      if (response.ok) {
+        console.log("✅ Folder reordering completed successfully");
+      } else {
+        console.error("❌ Failed to reorder folders:", await response.text());
       }
-
-      console.log(
-        `📁 Moving "${sourceFolder.name}" relative to "${targetFolder.name}"`
-      );
-
-      // TODO: Implement backend API call for folder reordering
-      // await fetch(`${backendUrl}/api/${user.id}/folders/reorder`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ sourceId: sourceFolderId, targetId: targetFolderId })
-      // });
-
-      console.log("✅ Folder reordering completed (client-side)");
     } catch (error) {
       console.error("❌ Error reordering folders:", error);
       throw error;
@@ -515,28 +543,21 @@ const ImprovedSidebar = ({
     try {
       console.log("🏷️ Reordering tags:", sourceTagId, "->", targetTagId);
 
-      // For now, implement client-side reordering
-      // In a real app, you'd send this to the backend
-      const sourceTag = tags.find((t) => t.id === sourceTagId);
-      const targetTag = tags.find((t) => t.id === targetTagId);
+      const response = await fetch(`${backendUrl}/api/${user.id}/tags/reorder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          sourceId: sourceTagId, 
+          targetId: targetTagId,
+          position: 'after' 
+        })
+      });
 
-      if (!sourceTag || !targetTag) {
-        console.error("Source or target tag not found");
-        return;
+      if (response.ok) {
+        console.log("✅ Tag reordering completed successfully");
+      } else {
+        console.error("❌ Failed to reorder tags:", await response.text());
       }
-
-      console.log(
-        `🏷️ Moving "${sourceTag.name}" relative to "${targetTag.name}"`
-      );
-
-      // TODO: Implement backend API call for tag reordering
-      // await fetch(`${backendUrl}/api/${user.id}/tags/reorder`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ sourceId: sourceTagId, targetId: targetTagId })
-      // });
-
-      console.log("✅ Tag reordering completed (client-side)");
     } catch (error) {
       console.error("❌ Error reordering tags:", error);
       throw error;

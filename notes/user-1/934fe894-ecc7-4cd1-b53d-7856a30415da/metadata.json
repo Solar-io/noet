@@ -2,15 +2,16 @@
   "id": "934fe894-ecc7-4cd1-b53d-7856a30415da",
   "title": "Quarterly Planning Meeting",
   "created": "2025-07-01T15:33:08.287Z",
-  "updated": "2025-07-01T15:33:08.287Z",
+  "updated": "2025-07-01T21:20:45.134Z",
   "tags": [
     "meeting",
-    "urgent"
+    "urgent",
+    "dbebaeba-53ff-4446-b3da-c2063680b6d9"
   ],
-  "notebook": null,
+  "notebook": "ac567507-7c86-4ed8-a9ca-08dcf25a2428",
   "folder": null,
   "starred": false,
   "deleted": false,
-  "version": 1,
+  "version": 4,
   "attachments": []
 }
