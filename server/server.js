@@ -1221,33 +1221,24 @@ app.use((error, req, res, next) => {
   res.status(500).json({ error: "Internal server error" });
 });
 
-// Start server with port availability check
+// Start server with strict port enforcement
 async function startServer() {
   try {
     // Check if port is available
     const isAvailable = await portManager.isPortAvailable(PORT, HOST);
 
     if (!isAvailable) {
-      console.log(`⚠️  Port ${PORT} is already in use, finding alternative...`);
-      const availablePort = await portManager.findAvailablePort(PORT, HOST);
-      console.log(`✅ Found available port: ${availablePort}`);
-
-      app.listen(availablePort, HOST, () => {
-        console.log(
-          `🚀 Noet server running on http://${HOST}:${availablePort}`
-        );
-        console.log(`📁 Notes storage path: ${NOTES_BASE_PATH}`);
-        console.log(
-          `⚠️  Note: Using alternative port ${availablePort} instead of configured ${PORT}`
-        );
-      });
-    } else {
-      app.listen(PORT, HOST, () => {
-        console.log(`🚀 Noet server running on http://${HOST}:${PORT}`);
-        console.log(`📁 Notes storage path: ${NOTES_BASE_PATH}`);
-        console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
-      });
+      console.error(`❌ Port ${PORT} is already in use!`);
+      console.error(`💡 Kill the process using port ${PORT} with: lsof -ti:${PORT} | xargs kill -9`);
+      console.error(`� Or change the port in config.json`);
+      process.exit(1);
     }
+
+    app.listen(PORT, HOST, () => {
+      console.log(`🚀 Noet server running on http://${HOST}:${PORT}`);
+      console.log(`📁 Notes storage path: ${NOTES_BASE_PATH}`);
+      console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+    });
   } catch (error) {
     console.error("❌ Failed to start server:", error.message);
     process.exit(1);

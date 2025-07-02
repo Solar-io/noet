@@ -60,14 +60,10 @@ class ConfigService {
     const env = this.getEnvironment();
     const backendConfig = config[env]?.backend || config.development.backend;
 
-    // Try multiple possible backend URLs in order of preference
+    // Try backend URL - now expects fixed port!
     const possibleUrls = [
-      `http://${backendConfig.host}:${backendConfig.port}`, // From config
-      `http://localhost:3004`, // Current actual port
-      `http://localhost:3003`, // Original config port
-      `http://localhost:3000`, // Production fallback
-      `http://localhost:3001`, // Alternative
-      `http://localhost:3002`, // Alternative
+      `http://${backendConfig.host}:${backendConfig.port}`, // From config (should be 3004)
+      `http://localhost:3004`, // Fixed backend port
     ];
 
     console.log("ConfigService: Discovering backend URL...");

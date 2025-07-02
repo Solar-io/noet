@@ -23,7 +23,7 @@ class PortManager {
       return {
         development: {
           frontend: { port: 3001, host: "localhost" },
-          backend: { port: 3003, host: "localhost" },
+          backend: { port: 3004, host: "localhost" },
         },
         production: {
           frontend: { port: 3000, host: "0.0.0.0" },
@@ -80,13 +80,35 @@ class PortManager {
   async isPortAvailable(port, host = "localhost") {
     return new Promise((resolve) => {
       const server = net.createServer();
+      let resolved = false;
+
+      // Add timeout to prevent hanging
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          server.close();
+          resolve(false);
+        }
+      }, 3000); // 3 second timeout
 
       server.listen(port, host, () => {
-        server.once("close", () => resolve(true));
+        server.once("close", () => {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeout);
+            resolve(true);
+          }
+        });
         server.close();
       });
 
-      server.on("error", () => resolve(false));
+      server.on("error", () => {
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          resolve(false);
+        }
+      });
     });
   }
 

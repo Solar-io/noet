@@ -28,7 +28,7 @@ export default defineConfig({
   server: {
     port: parseInt(process.env.VITE_PORT) || config.frontend.port,
     host: process.env.VITE_HOST || config.frontend.host,
-    strictPort: false, // Allow fallback to another port if busy
+    strictPort: true, // Fail if port is in use instead of finding alternative
     open: false, // Don't auto-open browser since we'll control this
   },
   preview: {
