@@ -97,6 +97,45 @@ const ImprovedNotesList = ({
     initBackendUrl();
   }, [userId, tags.length]);
 
+  // Generate dynamic tags from notes
+  const generateAvailableTagsFromNotes = () => {
+    const tagMap = new Map();
+    
+    notes.forEach(note => {
+      if (note.tags && Array.isArray(note.tags)) {
+        note.tags.forEach(tag => {
+          if (typeof tag === 'string' && tag.trim()) {
+            const tagName = tag.trim();
+            if (tagMap.has(tagName)) {
+              tagMap.set(tagName, tagMap.get(tagName) + 1);
+            } else {
+              tagMap.set(tagName, 1);
+            }
+          }
+        });
+      }
+    });
+
+    return Array.from(tagMap.entries()).map(([name, count]) => ({
+      id: name, // Use the name as the ID for string tags
+      name: name,
+      noteCount: count,
+      color: `#${Math.floor(Math.random() * 16777215).toString(16)}`, // Random color
+    })).sort((a, b) => b.noteCount - a.noteCount); // Sort by usage
+  };
+
+  // Update available tags when notes change
+  useEffect(() => {
+    if (notes.length > 0 && tags.length === 0) {
+      // If no tags provided via props but we have notes, generate from notes
+      const dynamicTags = generateAvailableTagsFromNotes();
+      setAvailableTags(dynamicTags);
+    } else if (tags.length > 0) {
+      // Use provided tags
+      setAvailableTags(tags);
+    }
+  }, [notes, tags]);
+
   // Helper function to get notebook name by ID
   const getNotebookName = (notebookId) => {
     if (!notebookId) return null;
@@ -111,10 +150,22 @@ const ImprovedNotesList = ({
     return folder ? folder.name : "Unknown Folder";
   };
 
-  // Helper function to get tag names from IDs
+  // Helper function to get tag names from IDs or strings
   const getTagNames = (tagIds) => {
     if (!tagIds || !Array.isArray(tagIds)) return [];
     return tagIds.map((tagId) => {
+      // If it's already a string, return it directly
+      if (typeof tagId === 'string') {
+        // Check if it looks like a UUID (has hyphens), if so try to find in availableTags
+        if (tagId.includes('-')) {
+          const tag = availableTags.find((t) => t.id === tagId);
+          return tag ? tag.name : `Unknown (${tagId.slice(0, 8)}...)`;
+        } else {
+          // It's a simple string tag, return as-is
+          return tagId;
+        }
+      }
+      // Fallback for other types
       const tag = availableTags.find((t) => t.id === tagId);
       return tag ? tag.name : `Tag ${tagId}`;
     });
@@ -127,7 +178,8 @@ const ImprovedNotesList = ({
         return (
           note.tags &&
           Array.isArray(note.tags) &&
-          note.tags.includes(tag.id) &&
+          // Check for both tag ID and tag name matches
+          (note.tags.includes(tag.id) || note.tags.includes(tag.name)) &&
           !note.deleted &&
           !note.archived
         );
@@ -443,91 +495,30 @@ const ImprovedNotesList = ({
     }
   };
 
-  // Helper function for note reordering
-  const handleNoteReorder = async (dragData, targetNote, position) => {
-    console.log(
-      `📋 Reordering: Moving note "${dragData.title}" ${position} note "${targetNote.title}"`
-    );
+  // Helper function for removing tags from notes
+  const removeTagFromNote = async (noteId, tagToRemove) => {
+    if (!confirm(`Are you sure you want to remove the tag "${tagToRemove}" from this note?`)) return;
 
-    const draggedNote = notes.find((n) => n.id === dragData.id);
-    const targetIndex = notes.findIndex((n) => n.id === targetNote.id);
-
-    if (!draggedNote || targetIndex === -1) {
-      console.error(
-        "Could not find dragged note or target note in notes array"
+    try {
+      // Get the current note
+      const noteResponse = await fetch(`${backendUrl}/api/${userId}/notes/${noteId}`);
+      if (!noteResponse.ok) throw new Error("Failed to get note");
+      
+      const note = await noteResponse.json();
+      
+      // Remove the tag from the note's tags array
+      const updatedTags = (note.tags || []).filter(tag => 
+        tag !== tagToRemove && tag !== tagToRemove.id
       );
-      return;
-    }
 
-    // Perform client-side reordering for immediate feedback
-    const newNotes = [...notes];
-    const draggedIndex = newNotes.findIndex((n) => n.id === dragData.id);
-
-    if (draggedIndex === -1) {
-      console.error("Dragged note not found in notes array");
-      return;
-    }
-
-    // Remove the dragged note
-    const [removed] = newNotes.splice(draggedIndex, 1);
-
-    // Calculate new position
-    let insertIndex = position === "above" ? targetIndex : targetIndex + 1;
-
-    // Adjust for removal affecting indices
-    if (draggedIndex < targetIndex) {
-      insertIndex -= 1;
-    }
-
-    // Insert at new position
-    newNotes.splice(insertIndex, 0, removed);
-
-    // Update the notes list immediately for visual feedback
-    if (onNotesRefresh) {
-      console.log("✨ Client-side reordering completed, refreshing notes");
-      onNotesRefresh();
-    }
-
-    // TODO: Send reorder request to backend if needed
-    // This would depend on your backend API supporting note ordering
-    try {
-      // Optional: persist the new order to backend
-      // await persistNoteOrder(newNotes.map(n => n.id));
-      console.log("ℹ️ Note reordering completed (client-side only)");
-    } catch (error) {
-      console.warn("⚠️ Failed to persist note order to backend:", error);
-      // Client-side reordering is still applied
-    }
-  };
-
-  // Helper function for moving notes between categories
-  const handleNoteCategoryMove = async (dragData, targetNote) => {
-    console.log(
-      `📝 Moving note "${targetNote.title}" to ${dragData.type}: ${dragData.name}`
-    );
-
-    const updates = {};
-    if (dragData.type === "notebook") {
-      updates.notebook = dragData.id;
-      updates.folder = null;
-    } else if (dragData.type === "folder") {
-      updates.folder = dragData.id;
-      updates.notebook = null;
-    }
-
-    console.log("🔄 Updating note with:", updates);
-
-    try {
-      await updateNote(targetNote.id, updates);
-      console.log("✅ Successfully moved note to", dragData.type);
-
-      // Refresh notes to reflect changes
-      if (onNotesRefresh) {
-        onNotesRefresh();
+      // Update the note
+      const success = await updateNote(noteId, { tags: updatedTags });
+      if (success) {
+        console.log(`✅ Removed tag "${tagToRemove}" from note ${noteId}`);
       }
     } catch (error) {
-      console.error("❌ Failed to move note:", error);
-      throw error; // Re-throw to be handled by caller
+      console.error("Error removing tag from note:", error);
+      alert("Failed to remove tag from note");
     }
   };
 
@@ -753,9 +744,21 @@ const ImprovedNotesList = ({
                   {getTagNames(note.tags).map((tagName, index) => (
                     <span
                       key={index}
-                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 group hover:bg-blue-200"
                     >
                       #{tagName}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Use the original tag value (could be string or ID)
+                          const originalTag = note.tags[index];
+                          removeTagFromNote(note.id, originalTag);
+                        }}
+                        className="ml-1 p-0.5 rounded-full hover:bg-blue-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title={`Remove tag "${tagName}"`}
+                      >
+                        <X size={10} className="text-blue-600" />
+                      </button>
                     </span>
                   ))}
                 </div>
