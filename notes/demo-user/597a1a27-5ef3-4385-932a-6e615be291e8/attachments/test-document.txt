@@ -1,5 +1,0 @@
-This is a test file for attachment upload functionality.
-It contains some sample text to verify that file uploads work correctly.
-
-Created on: 2024-12-28
-Purpose: Testing file attachment in noet app

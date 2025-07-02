@@ -1,1 +1,0 @@
-<p>Start writing your note...</p><p></p><p></p><p></p><p></p>

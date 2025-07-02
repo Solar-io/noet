@@ -1,1 +1,0 @@
-This note tests tag display and removal functionality

@@ -1,1 +1,0 @@
-This note will test the complete trash workflow: soft delete → restore → permanent delete

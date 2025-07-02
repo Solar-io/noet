@@ -1,1 +1,0 @@
-This is a test note to verify tag functionality

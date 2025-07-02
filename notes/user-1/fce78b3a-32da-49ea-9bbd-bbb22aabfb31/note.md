@@ -1,2 +1,0 @@
-<p>Start writing your note...</p><p></p><p></p><p></p><p>sdfadsfdsaf</p><p></p><p>sdfasfasfadsf</p><p></p><p></p><pre class="editor-code-block"><code>sdfadsfds
-sadfadsf</code></pre><p></p><p><code>fsadfafsafafdfads</code></p><p><code>sdfasdlfajsdflasfj</code></p><p><code>sdflajsfsafljsljdj</code></p><p></p><blockquote class="editor-blockquote"><p>sdfasfdsfffdsdfjk</p><p>sdfasf;kdljffdjks</p></blockquote><p></p><p><mark class="editor-highlight" data-color="#f8e71c" style="background-color: #f8e71c; color: inherit">sdfasdffsf</mark></p>

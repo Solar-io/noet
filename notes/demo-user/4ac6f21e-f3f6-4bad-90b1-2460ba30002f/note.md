@@ -1,1 +1,0 @@
-This note will test restore and permanent delete functionality

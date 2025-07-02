@@ -1,1 +1,0 @@
-This note was created by the debug tool to test delete functionality
