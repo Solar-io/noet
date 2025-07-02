@@ -195,13 +195,22 @@ const ImprovedNotesList = ({
   };
 
   const deleteNote = async (noteId) => {
-    if (!confirm("Are you sure you want to delete this note?")) return;
+    if (!confirm("Are you sure you want to move this note to trash?")) return;
 
     try {
       const response = await fetch(
         `${backendUrl}/api/${userId}/notes/${noteId}`,
         {
-          method: "DELETE",
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ 
+            metadata: { 
+              deleted: true,
+              deletedAt: new Date().toISOString()
+            } 
+          }),
         }
       );
 
