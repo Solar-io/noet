@@ -19,22 +19,41 @@ Complete soft delete functionality with incremental, tested changes
 ### Phase 1: Foundation ✅
 - [x] Created `.ai-context/project-rules.md`
 - [x] Created session progress tracking
-- [ ] Set up feature branch for soft delete
-- [ ] Create soft delete test script
+- [x] Set up feature branch for soft delete (`fix-soft-delete-ui`)
+- [x] Verified soft delete test script exists and is comprehensive
 
-### Phase 2: Backend Validation
-- [ ] Restart server to activate soft delete changes
-- [ ] Run test-soft-delete.js script
-- [ ] Verify backend filtering logic
+### Phase 3: Soft Delete UI Implementation ✅
+- [x] **STEP 1 COMPLETE ✅**: Fixed delete button in ImprovedNotesList.jsx
+  - Changed from hard DELETE to soft delete using PUT with metadata format
+  - Updated confirmation message to indicate "move to trash"
+  - Added test-ui-soft-delete.js script for verification
+  - **CONFIRMED WORKING**: User verified trash icon now works correctly
+  - Successfully committed changes
+- [x] **PORT MANAGEMENT FIXED ✅**: Resolved all port conflicts
+  - Frontend: Always http://localhost:3001 (strictPort: true)
+  - Backend: Always http://localhost:3004 (fail if port in use)
+  - Added port-manager.sh script for easy management
+- [ ] **STEP 2 NEXT**: Add restore/permanent delete buttons when in trash view
+  - Need to detect currentView === "trash" 
+  - Replace regular delete button with restore + permanent delete buttons
+  - Implement restore API call (PUT with deleted: false)
+  - Implement permanent delete API call (DELETE)
+- [ ] Run test-soft-delete.js script to validate backend
+- [ ] Verify backend filtering logic works correctly
 - [ ] Commit working backend state
 
-### Phase 3: Frontend UI (Incremental)
+**Root Cause Found**: Promise in `portManager.isPortAvailable()` never resolved, causing infinite hang
+
+### Phase 3: Frontend UI (Incremental) 🔄
+- [ ] **STARTING NOW**: Read current note list component
 - [ ] Step 1: Add trash icon to note list only
-- [ ] Step 2: Test trash icon functionality
+- [ ] Step 2: Test trash icon functionality (when backend ready)
 - [ ] Step 3: Add restore button to trash view
-- [ ] Step 4: Test restore functionality  
+- [ ] Step 4: Test restore functionality
 - [ ] Step 5: Add permanent delete button
 - [ ] Step 6: Test permanent delete
+
+**Current Focus**: UI development independent of backend status
 
 ### Phase 4: Integration Testing
 - [ ] Run comprehensive tests
