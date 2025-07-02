@@ -28,6 +28,7 @@ import {
   Download,
   Upload,
   X,
+  RefreshCw,
 } from "lucide-react";
 import configService from "../configService.js";
 
@@ -220,6 +221,49 @@ const ImprovedNotesList = ({
     } catch (error) {
       console.error("Error deleting note:", error);
       alert("Failed to delete note");
+    }
+  };
+
+  const restoreNote = async (noteId) => {
+    if (!confirm("Are you sure you want to restore this note?")) return;
+
+    try {
+      const response = await fetch(
+        `${backendUrl}/api/${userId}/notes/${noteId}/restore`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) throw new Error("Failed to restore note");
+
+      onNotesRefresh?.();
+    } catch (error) {
+      console.error("Error restoring note:", error);
+      alert("Failed to restore note");
+    }
+  };
+
+  const permanentDeleteNote = async (noteId) => {
+    if (!confirm("Are you sure you want to permanently delete this note? This action cannot be undone.")) return;
+
+    try {
+      const response = await fetch(
+        `${backendUrl}/api/${userId}/notes/${noteId}/permanent`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!response.ok) throw new Error("Failed to permanently delete note");
+
+      onNotesRefresh?.();
+    } catch (error) {
+      console.error("Error permanently deleting note:", error);
+      alert("Failed to permanently delete note");
     }
   };
 
@@ -778,16 +822,45 @@ const ImprovedNotesList = ({
                 <Archive size={16} />
               </button>
 
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteNote(note.id);
-                }}
-                className="p-1 text-gray-400 hover:text-red-500 transition-colors"
-                title="Delete note"
-              >
-                <Trash2 size={16} />
-              </button>
+              {/* Conditional buttons based on current view */}
+              {currentView === "trash" ? (
+                // Trash view: Show restore and permanent delete buttons
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      restoreNote(note.id);
+                    }}
+                    className="p-1 text-gray-400 hover:text-green-500 transition-colors"
+                    title="Restore note"
+                  >
+                    <RefreshCw size={16} />
+                  </button>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      permanentDeleteNote(note.id);
+                    }}
+                    className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                    title="Permanently delete note"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </>
+              ) : (
+                // Regular views: Show normal delete button (soft delete)
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteNote(note.id);
+                  }}
+                  className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                  title="Move to trash"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
             </div>
           </div>
         </div>
