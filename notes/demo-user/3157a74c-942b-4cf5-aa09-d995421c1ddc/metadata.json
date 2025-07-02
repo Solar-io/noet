@@ -1,0 +1,17 @@
+{
+  "id": "3157a74c-942b-4cf5-aa09-d995421c1ddc",
+  "title": "UI Soft Delete Test Note",
+  "created": "2025-07-02T19:28:10.732Z",
+  "updated": "2025-07-02T19:28:10.794Z",
+  "tags": [
+    "test",
+    "ui-delete"
+  ],
+  "notebook": null,
+  "folder": null,
+  "starred": false,
+  "deleted": true,
+  "version": 2,
+  "attachments": [],
+  "deletedAt": "2025-07-02T19:28:10.794Z"
+}

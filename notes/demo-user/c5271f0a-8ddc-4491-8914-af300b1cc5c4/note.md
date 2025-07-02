@@ -1,0 +1,1 @@
+This note is for testing the soft delete functionality in the UI. Click the trash button to test!

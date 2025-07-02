@@ -1,0 +1,1 @@
+This note will test the UI soft delete functionality

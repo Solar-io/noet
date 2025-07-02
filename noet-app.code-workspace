@@ -6,8 +6,9 @@
     }
   ],
   "settings": {
-    "terminal.integrated.cwd": "${workspaceFolder}",
-    "terminal.integrated.defaultLocation": "view"
+    "terminal.integrated.cwd": "/Users/sgallant/sync/rygel/noet-app",
+    "terminal.integrated.defaultLocation": "view",
+    "terminal.integrated.defaultProfile.osx": "bash"
   },
   "extensions": {
     "recommendations": [

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NOET Debug - Trash Button Test</title>
+    <style>
+        body { font-family: monospace; margin: 20px; }
+        .log { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .error { background: #ffebee; color: #c62828; }
+        .success { background: #e8f5e9; color: #2e7d32; }
+        .info { background: #e3f2fd; color: #1565c0; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        .test-section { border: 1px solid #ccc; margin: 10px 0; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>🔧 NOET Trash Button Debug Tool</h1>
+    <p>This page will help debug why the trash button isn't working.</p>
+    
+    <div class="test-section">
+        <h2>Step 1: Test Backend Connection</h2>
+        <button onclick="testBackendHealth()">Test Backend Health</button>
+        <div id="health-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Step 2: Test Frontend ConfigService</h2>
+        <button onclick="testConfigService()">Test Config Service</button>
+        <div id="config-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Step 3: Create & Delete Test Note</h2>
+        <button onclick="createTestNote()">Create Test Note</button>
+        <button onclick="deleteTestNote()" disabled id="delete-btn">Delete Test Note</button>
+        <div id="note-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Step 4: Test Actual UI Delete Function</h2>
+        <button onclick="testUIDeleteFunction()">Test UI Delete Function</button>
+        <div id="ui-result"></div>
+    </div>
+
+    <div id="log-area"></div>
+
+    <script>
+        let testNoteId = null;
+        
+        function log(message, type = 'info') {
+            const logArea = document.getElementById('log-area');
+            const logEntry = document.createElement('div');
+            logEntry.className = `log ${type}`;
+            logEntry.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logArea.appendChild(logEntry);
+            console.log(message);
+        }
+
+        async function testBackendHealth() {
+            log('🔍 Testing backend health...', 'info');
+            try {
+                const response = await fetch('http://localhost:3004/api/health');
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ Backend health OK: ${data.status}`, 'success');
+                    document.getElementById('health-result').innerHTML = 
+                        `<div class="log success">✅ Backend responding on port ${data.port}</div>`;
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                log(`❌ Backend health failed: ${error.message}`, 'error');
+                document.getElementById('health-result').innerHTML = 
+                    `<div class="log error">❌ Backend not responding: ${error.message}</div>`;
+            }
+        }
+
+        async function testConfigService() {
+            log('🔍 Testing config service discovery...', 'info');
+            try {
+                // Simulate configService discovery
+                const ports = [3004, 3005, 3003];
+                let backendUrl = null;
+                
+                for (const port of ports) {
+                    try {
+                        const url = `http://localhost:${port}`;
+                        log(`Trying ${url}...`);
+                        const response = await fetch(`${url}/api/health`, { 
+                            signal: AbortSignal.timeout(2000) 
+                        });
+                        if (response.ok) {
+                            backendUrl = url;
+                            log(`✅ Found backend at ${url}`, 'success');
+                            break;
+                        }
+                    } catch (e) {
+                        log(`❌ ${port} not available: ${e.message}`);
+                    }
+                }
+                
+                if (backendUrl) {
+                    document.getElementById('config-result').innerHTML = 
+                        `<div class="log success">✅ ConfigService would discover: ${backendUrl}</div>`;
+                } else {
+                    document.getElementById('config-result').innerHTML = 
+                        `<div class="log error">❌ ConfigService would fail to find backend</div>`;
+                }
+            } catch (error) {
+                log(`❌ Config service test failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function createTestNote() {
+            log('📝 Creating test note...', 'info');
+            try {
+                const response = await fetch('http://localhost:3004/api/demo-user/notes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: '🧪 Debug Test Note',
+                        content: 'This note was created by the debug tool to test delete functionality',
+                        tags: ['debug', 'delete-test']
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const note = await response.json();
+                testNoteId = note.id;
+                log(`✅ Created test note: ${note.id}`, 'success');
+                document.getElementById('delete-btn').disabled = false;
+                document.getElementById('note-result').innerHTML = 
+                    `<div class="log success">✅ Note created: ${note.title} (ID: ${note.id})</div>`;
+            } catch (error) {
+                log(`❌ Failed to create note: ${error.message}`, 'error');
+                document.getElementById('note-result').innerHTML = 
+                    `<div class="log error">❌ Failed to create note: ${error.message}</div>`;
+            }
+        }
+
+        async function deleteTestNote() {
+            if (!testNoteId) {
+                log('❌ No test note to delete', 'error');
+                return;
+            }
+
+            log(`🗑️ Testing soft delete on note ${testNoteId}...`, 'info');
+            try {
+                // This mimics the exact call that the UI makes
+                const response = await fetch(`http://localhost:3004/api/demo-user/notes/${testNoteId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        metadata: { 
+                            deleted: true,
+                            deletedAt: new Date().toISOString()
+                        } 
+                    }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                log(`✅ Soft delete successful`, 'success');
+                document.getElementById('note-result').innerHTML += 
+                    `<div class="log success">✅ Soft delete worked! Note moved to trash.</div>`;
+                
+                // Test if note appears in trash
+                setTimeout(async () => {
+                    try {
+                        const trashResponse = await fetch('http://localhost:3004/api/demo-user/notes?deleted=true');
+                        const trashNotes = await trashResponse.json();
+                        const deletedNote = trashNotes.find(note => note.id === testNoteId);
+                        if (deletedNote) {
+                            log(`✅ Note found in trash: ${deletedNote.title}`, 'success');
+                        } else {
+                            log(`❌ Note not found in trash`, 'error');
+                        }
+                    } catch (e) {
+                        log(`❌ Failed to check trash: ${e.message}`, 'error');
+                    }
+                }, 1000);
+
+            } catch (error) {
+                log(`❌ Soft delete failed: ${error.message}`, 'error');
+                document.getElementById('note-result').innerHTML += 
+                    `<div class="log error">❌ Soft delete failed: ${error.message}</div>`;
+            }
+        }
+
+        async function testUIDeleteFunction() {
+            log('🔍 Testing UI delete function simulation...', 'info');
+            
+            // Simulate the deleteNote function from ImprovedNotesList.jsx
+            const backendUrl = 'http://localhost:3004';
+            const userId = 'demo-user';
+            
+            if (!testNoteId) {
+                log('❌ No test note available. Create one first.', 'error');
+                return;
+            }
+
+            // This is exactly what the UI code does
+            try {
+                log('Simulating UI deleteNote function...');
+                
+                // Step 1: Show confirmation (skipping for test)
+                log('Step 1: Confirmation dialog (skipped for test)');
+                
+                // Step 2: Make the exact API call
+                log('Step 2: Making API call...');
+                const response = await fetch(`${backendUrl}/api/${userId}/notes/${testNoteId}`, {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ 
+                        metadata: { 
+                            deleted: true,
+                            deletedAt: new Date().toISOString()
+                        } 
+                    }),
+                });
+
+                if (!response.ok) throw new Error("Failed to delete note");
+                
+                log('Step 3: API call successful');
+                log('Step 4: Would call onNotesRefresh()');
+                
+                document.getElementById('ui-result').innerHTML = 
+                    `<div class="log success">✅ UI delete function simulation successful!</div>`;
+                    
+            } catch (error) {
+                log(`❌ UI delete simulation failed: ${error.message}`, 'error');
+                document.getElementById('ui-result').innerHTML = 
+                    `<div class="log error">❌ UI delete simulation failed: ${error.message}</div>`;
+            }
+        }
+
+        // Auto-run basic tests on page load
+        window.onload = function() {
+            log('🚀 Debug tool loaded. Running initial tests...', 'info');
+            testBackendHealth();
+            setTimeout(testConfigService, 1000);
+        };
+    </script>
+</body>
+</html>

@@ -106,7 +106,7 @@ async function testStep2RestoreAndDelete() {
 
     // 7. Test PERMANENT DELETE functionality
     console.log('7. Testing PERMANENT DELETE functionality...');
-    const permanentDeleteResponse = await fetch(`${API_BASE}/api/${userId}/notes/${newNote.id}`, {
+    const permanentDeleteResponse = await fetch(`${API_BASE}/api/${userId}/notes/${newNote.id}/permanent`, {
       method: 'DELETE'
     });
 
