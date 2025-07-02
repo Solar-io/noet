@@ -2,14 +2,14 @@
   "id": "a6f80ab3-bc24-44da-be65-a020c0f9cc24",
   "title": "starred note",
   "created": "2025-07-01T15:11:31.251Z",
-  "updated": "2025-07-01T21:29:11.456Z",
+  "updated": "2025-07-02T21:14:25.368Z",
   "tags": [
     "22a1f731-baaa-4abe-a455-c240934c9395"
   ],
-  "notebook": "bd9c5185-6eb7-4752-bee3-4538ecc0527c",
+  "notebook": "ab6cc683-41da-43e5-aa65-7e3e7016fb05",
   "folder": null,
-  "starred": false,
+  "starred": true,
   "deleted": false,
-  "version": 16,
+  "version": 18,
   "attachments": []
 }

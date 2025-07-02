@@ -159,7 +159,7 @@ const ImprovedNotesList = ({
         // Check if it looks like a UUID (has hyphens), if so try to find in availableTags
         if (tagId.includes('-')) {
           const tag = availableTags.find((t) => t.id === tagId);
-          return tag ? tag.name : `Unknown (${tagId.slice(0, 8)}...)`;
+          return tag ? tag.name : "Unknown";
         } else {
           // It's a simple string tag, return as-is
           return tagId;
@@ -167,7 +167,7 @@ const ImprovedNotesList = ({
       }
       // Fallback for other types
       const tag = availableTags.find((t) => t.id === tagId);
-      return tag ? tag.name : `Tag ${tagId}`;
+      return tag ? tag.name : "Unknown";
     });
   };
 
@@ -497,7 +497,11 @@ const ImprovedNotesList = ({
 
   // Helper function for removing tags from notes
   const removeTagFromNote = async (noteId, tagToRemove) => {
-    if (!confirm(`Are you sure you want to remove the tag "${tagToRemove}" from this note?`)) return;
+    const displayName = typeof tagToRemove === 'string' && tagToRemove.includes('-') 
+      ? "Unknown" 
+      : tagToRemove;
+    
+    if (!confirm(`Are you sure you want to remove the tag "${displayName}" from this note?`)) return;
 
     try {
       // Get the current note
@@ -506,15 +510,15 @@ const ImprovedNotesList = ({
       
       const note = await noteResponse.json();
       
-      // Remove the tag from the note's tags array
+      // Remove the tag from the note's tags array (using original tag value)
       const updatedTags = (note.tags || []).filter(tag => 
-        tag !== tagToRemove && tag !== tagToRemove.id
+        tag !== tagToRemove
       );
 
       // Update the note
       const success = await updateNote(noteId, { tags: updatedTags });
       if (success) {
-        console.log(`✅ Removed tag "${tagToRemove}" from note ${noteId}`);
+        console.log(`✅ Removed tag "${displayName}" from note ${noteId}`);
       }
     } catch (error) {
       console.error("Error removing tag from note:", error);
