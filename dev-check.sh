@@ -6,6 +6,18 @@
 echo "🔍 NOET DEVELOPMENT SANITY CHECK"
 echo "================================"
 
+# Ensure we're in the project directory
+if [[ -n "$NOET_PROJECT_PATH" ]] && [[ -d "$NOET_PROJECT_PATH" ]]; then
+    cd "$NOET_PROJECT_PATH"
+    echo "📁 Using NOET_PROJECT_PATH: $(pwd)"
+elif [[ -f "package.json" ]]; then
+    echo "📁 Working in current directory: $(pwd)"
+else
+    echo "❌ Not in project directory and NOET_PROJECT_PATH not set"
+    echo "💡 Run 'noet' to navigate to project directory or set NOET_PROJECT_PATH"
+    exit 1
+fi
+
 # Check if dev server is running
 echo "📡 Checking dev server..."
 if curl -s http://localhost:3001 > /dev/null; then

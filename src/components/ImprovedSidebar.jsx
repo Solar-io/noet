@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Search,
   Plus,
@@ -69,7 +69,7 @@ const ImprovedSidebar = ({
     }
   }, [backendUrl, user?.id]);
 
-  const loadAllData = async () => {
+  const loadAllData = useCallback(async () => {
     try {
       setLoading(true);
       await Promise.all([loadFolders(), loadNotebooks(), loadTags()]);
@@ -78,9 +78,9 @@ const ImprovedSidebar = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [backendUrl, user?.id]);
 
-  const loadFolders = async () => {
+  const loadFolders = useCallback(async () => {
     try {
       const response = await fetch(`${backendUrl}/api/${user.id}/folders`);
       if (response.ok) {
@@ -90,9 +90,9 @@ const ImprovedSidebar = ({
     } catch (error) {
       console.error("Error loading folders:", error);
     }
-  };
+  }, [backendUrl, user?.id]);
 
-  const loadNotebooks = async () => {
+  const loadNotebooks = useCallback(async () => {
     try {
       const response = await fetch(`${backendUrl}/api/${user.id}/notebooks`);
       if (response.ok) {
@@ -102,9 +102,9 @@ const ImprovedSidebar = ({
     } catch (error) {
       console.error("Error loading notebooks:", error);
     }
-  };
+  }, [backendUrl, user?.id]);
 
-  const loadTags = async () => {
+  const loadTags = useCallback(async () => {
     try {
       const response = await fetch(`${backendUrl}/api/${user.id}/tags`);
       if (response.ok) {
@@ -114,7 +114,7 @@ const ImprovedSidebar = ({
     } catch (error) {
       console.error("Error loading tags:", error);
     }
-  };
+  }, [backendUrl, user?.id]);
 
   // Create operations
   const createFolder = async (name, parentId = null) => {
@@ -137,7 +137,7 @@ const ImprovedSidebar = ({
       if (response.ok) {
         const newFolder = await response.json();
         setFolders((prev) => [...prev, newFolder]);
-        onNotesUpdate?.(); // Refresh the main app
+        // Don't trigger notes refresh for folder creation
         return newFolder;
       } else {
         throw new Error(`Failed to create folder: ${response.status}`);
@@ -168,7 +168,7 @@ const ImprovedSidebar = ({
       if (response.ok) {
         const newNotebook = await response.json();
         setNotebooks((prev) => [...prev, newNotebook]);
-        onNotesUpdate?.(); // Refresh the main app
+        // Don't trigger notes refresh for notebook creation
         return newNotebook;
       } else {
         throw new Error(`Failed to create notebook: ${response.status}`);
@@ -198,7 +198,7 @@ const ImprovedSidebar = ({
       if (response.ok) {
         const newTag = await response.json();
         setTags((prev) => [...prev, newTag]);
-        onNotesUpdate?.(); // Refresh the main app
+        // Don't trigger notes refresh for tag creation
         return newTag;
       } else {
         throw new Error(`Failed to create tag: ${response.status}`);
@@ -359,12 +359,49 @@ const ImprovedSidebar = ({
       }
 
       await loadAllData(); // Refresh data
-      if (onNotesUpdate) {
-        console.log("🔄 Refreshing notes in parent");
-        onNotesUpdate(); // Notify parent to refresh notes
-      }
+      // Don't refresh notes for reordering operations - they don't affect note content
     } catch (error) {
       console.error("❌ Sidebar drop error:", error);
+    }
+  };
+
+  // Handle reordering drops (for above/below drop zones)
+  const handleReorderDrop = async (e, targetType, targetId, position) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    console.log("📦 Reorder drop:", targetType, targetId, position);
+    setDragOver(null);
+
+    try {
+      const dragData = JSON.parse(e.dataTransfer.getData("text/plain"));
+      const { type: sourceType, id: sourceId } = dragData;
+      
+      console.log(
+        "🎯 Reorder data:",
+        sourceType,
+        sourceId,
+        "->",
+        targetType,
+        targetId,
+        position
+      );
+
+      // Only handle reordering within the same type
+      if (sourceType === targetType && sourceId !== targetId) {
+        if (sourceType === "notebook") {
+          await reorderNotebooks(sourceId, targetId, position);
+        } else if (sourceType === "folder") {
+          await reorderFolders(sourceId, targetId, position);
+        } else if (sourceType === "tag") {
+          await reorderTags(sourceId, targetId, position);
+        }
+        
+        await loadAllData(); // Refresh data
+        // Don't refresh notes for reordering operations - they don't affect note content
+      }
+    } catch (error) {
+      console.error("❌ Reorder drop error:", error);
     }
   };
 
@@ -470,16 +507,18 @@ const ImprovedSidebar = ({
     });
   };
 
-  // Organize notebooks by folder
-  const notebooksByFolder = notebooks.reduce((acc, notebook) => {
-    const folderId = notebook.folderId || "root";
-    if (!acc[folderId]) acc[folderId] = [];
-    acc[folderId].push(notebook);
-    return acc;
-  }, {});
+  // Organize notebooks by folder - memoized for performance
+  const notebooksByFolder = useMemo(() => {
+    return notebooks.reduce((acc, notebook) => {
+      const folderId = notebook.folderId || "root";
+      if (!acc[folderId]) acc[folderId] = [];
+      acc[folderId].push(notebook);
+      return acc;
+    }, {});
+  }, [notebooks]);
 
   // Reordering functions
-  const reorderNotebooks = async (sourceNotebookId, targetNotebookId) => {
+  const reorderNotebooks = async (sourceNotebookId, targetNotebookId, position = "after") => {
     try {
       console.log(
         "📚 Reordering notebooks:",
@@ -496,7 +535,7 @@ const ImprovedSidebar = ({
           body: JSON.stringify({
             sourceId: sourceNotebookId,
             targetId: targetNotebookId,
-            position: "after",
+            position: position,
           }),
         }
       );
@@ -512,7 +551,7 @@ const ImprovedSidebar = ({
     }
   };
 
-  const reorderFolders = async (sourceFolderId, targetFolderId) => {
+  const reorderFolders = async (sourceFolderId, targetFolderId, position = "after") => {
     try {
       console.log(
         "📁 Reordering folders:",
@@ -529,7 +568,7 @@ const ImprovedSidebar = ({
           body: JSON.stringify({
             sourceId: sourceFolderId,
             targetId: targetFolderId,
-            position: "after",
+            position: position,
           }),
         }
       );
@@ -545,7 +584,7 @@ const ImprovedSidebar = ({
     }
   };
 
-  const reorderTags = async (sourceTagId, targetTagId) => {
+  const reorderTags = async (sourceTagId, targetTagId, position = "after") => {
     try {
       console.log("🏷️ Reordering tags:", sourceTagId, "->", targetTagId);
 
@@ -557,7 +596,7 @@ const ImprovedSidebar = ({
           body: JSON.stringify({
             sourceId: sourceTagId,
             targetId: targetTagId,
-            position: "after",
+            position: position,
           }),
         }
       );
@@ -579,11 +618,33 @@ const ImprovedSidebar = ({
     const isEditing = editing.type === "folder" && editing.id === folder.id;
     const isDragTarget =
       dragOver?.type === "folder" && dragOver?.id === folder.id;
+    const isDragBefore = dragOver?.type === "folder-before" && dragOver?.id === folder.id;
+    const isDragAfter = dragOver?.type === "folder-after" && dragOver?.id === folder.id;
     const folderNotebooks = notebooksByFolder[folder.id] || [];
     const subFolders = folders.filter((f) => f.parentId === folder.id);
 
     return (
-      <div key={folder.id} style={{ marginLeft: depth * 16 }}>
+      <div key={folder.id} style={{ marginLeft: depth * 16 }} className="relative">
+        {/* Drop zone above */}
+        <div
+          className={`h-3 mx-2 transition-all ${
+            isDragBefore ? "bg-blue-400 rounded-full" : "transparent"
+          }`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = "move";
+            setDragOver({ type: "folder-before", id: folder.id });
+          }}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setDragOver(null);
+            handleReorderDrop(e, "folder", folder.id, "before");
+          }}
+        />
+        
         <div
           className={`flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 cursor-pointer group ${
             isDragTarget ? "bg-blue-100 border-2 border-blue-300" : ""
@@ -671,6 +732,26 @@ const ImprovedSidebar = ({
             {subFolders.map((subFolder) => renderFolder(subFolder, depth + 1))}
           </div>
         )}
+        
+        {/* Drop zone below */}
+        <div
+          className={`h-3 mx-2 transition-all ${
+            isDragAfter ? "bg-blue-400 rounded-full" : "transparent"
+          }`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = "move";
+            setDragOver({ type: "folder-after", id: folder.id });
+          }}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setDragOver(null);
+            handleReorderDrop(e, "folder", folder.id, "after");
+          }}
+        />
       </div>
     );
   };
@@ -679,25 +760,46 @@ const ImprovedSidebar = ({
     const isEditing = editing.type === "notebook" && editing.id === notebook.id;
     const isDragTarget =
       dragOver?.type === "notebook" && dragOver?.id === notebook.id;
+    const isDragBefore = dragOver?.type === "notebook-before" && dragOver?.id === notebook.id;
+    const isDragAfter = dragOver?.type === "notebook-after" && dragOver?.id === notebook.id;
 
     return (
-      <div
-        key={notebook.id}
-        style={{ marginLeft: depth * 16 }}
-        className={`flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 cursor-pointer group ${
-          isDragTarget ? "bg-green-100 border-2 border-green-300" : ""
-        } ${
-          currentView === "notebook" && currentView.notebookId === notebook.id
-            ? "bg-green-50"
-            : ""
-        }`}
-        draggable
-        onDragStart={(e) => handleDragStart(e, "notebook", notebook.id)}
-        onDragOver={(e) => handleDragOver(e, "notebook", notebook.id)}
-        onDragLeave={handleDragLeave}
-        onDrop={(e) => handleDrop(e, "notebook", notebook.id)}
-        onClick={() => onViewChange("notebook", { notebookId: notebook.id })}
-      >
+      <div key={notebook.id} style={{ marginLeft: depth * 16 }} className="relative">
+        {/* Drop zone above */}
+        <div
+          className={`h-3 mx-2 transition-all ${
+            isDragBefore ? "bg-blue-400 rounded-full" : "transparent"
+          }`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = "move";
+            setDragOver({ type: "notebook-before", id: notebook.id });
+          }}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setDragOver(null);
+            handleReorderDrop(e, "notebook", notebook.id, "before");
+          }}
+        />
+        
+        <div
+          className={`flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 cursor-pointer group ${
+            isDragTarget ? "bg-green-100 border-2 border-green-300" : ""
+          } ${
+            currentView === "notebook" && currentView.notebookId === notebook.id
+              ? "bg-green-50"
+              : ""
+          }`}
+          draggable
+          onDragStart={(e) => handleDragStart(e, "notebook", notebook.id)}
+          onDragOver={(e) => handleDragOver(e, "notebook", notebook.id)}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => handleDrop(e, "notebook", notebook.id)}
+          onClick={() => onViewChange("notebook", { notebookId: notebook.id })}
+        >
         <div className="flex items-center space-x-2 flex-1">
           <Book size={16} style={{ color: notebook.color || "#10b981" }} />
           {isEditing ? (
@@ -745,74 +847,138 @@ const ImprovedSidebar = ({
           </button>
         </div>
       </div>
+      
+      {/* Drop zone below */}
+      <div
+        className={`h-3 mx-2 transition-all ${
+          isDragAfter ? "bg-blue-400 rounded-full" : "transparent"
+        }`}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          e.dataTransfer.dropEffect = "move";
+          setDragOver({ type: "notebook-after", id: notebook.id });
+        }}
+        onDragLeave={handleDragLeave}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setDragOver(null);
+          handleReorderDrop(e, "notebook", notebook.id, "after");
+        }}
+      />
+    </div>
     );
   };
 
-  const renderTag = (tag) => {
+  const renderTag = (tag, index) => {
     const isEditing = editing.type === "tag" && editing.id === tag.id;
     const isDragTarget = dragOver?.type === "tag" && dragOver?.id === tag.id;
+    const isDragBefore = dragOver?.type === "tag-before" && dragOver?.id === tag.id;
+    const isDragAfter = dragOver?.type === "tag-after" && dragOver?.id === tag.id;
 
     return (
-      <div
-        key={tag.id}
-        className={`flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 cursor-pointer group ${
-          isDragTarget ? "bg-yellow-100 border-2 border-yellow-300" : ""
-        } ${
-          currentView === "tag" && currentView.tagId === tag.id
-            ? "bg-yellow-50"
-            : ""
-        }`}
-        draggable
-        onDragStart={(e) => handleDragStart(e, "tag", tag.id)}
-        onDragOver={(e) => handleDragOver(e, "tag", tag.id)}
-        onDragLeave={handleDragLeave}
-        onDrop={(e) => handleDrop(e, "tag", tag.id)}
-        onClick={() => onViewChange("tag", { tagId: tag.id })}
-      >
-        <div className="flex items-center space-x-2 flex-1">
-          <Hash size={16} style={{ color: tag.color || "#f59e0b" }} />
-          {isEditing ? (
-            <input
-              value={editing.name}
-              onChange={(e) =>
-                setEditing((prev) => ({ ...prev, name: e.target.value }))
-              }
-              onKeyDown={(e) => {
-                if (e.key === "Enter") saveEdit();
-                if (e.key === "Escape") cancelEdit();
+      <div key={tag.id} className="relative">
+        {/* Drop zone above */}
+        <div
+          className={`h-3 mx-2 transition-all ${
+            isDragBefore ? "bg-blue-400 rounded-full" : "transparent"
+          }`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = "move";
+            setDragOver({ type: "tag-before", id: tag.id });
+          }}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setDragOver(null);
+            handleReorderDrop(e, "tag", tag.id, "before");
+          }}
+        />
+        
+        <div
+          className={`flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 cursor-pointer group ${
+            isDragTarget ? "bg-yellow-100 border-2 border-yellow-300" : ""
+          } ${
+            currentView === "tag" && currentView.tagId === tag.id
+              ? "bg-yellow-50"
+              : ""
+          }`}
+          draggable
+          onDragStart={(e) => handleDragStart(e, "tag", tag.id)}
+          onDragOver={(e) => handleDragOver(e, "tag", tag.id)}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => handleDrop(e, "tag", tag.id)}
+          onClick={() => onViewChange("tag", { tagId: tag.id })}
+        >
+          <div className="flex items-center space-x-2 flex-1">
+            <Hash size={16} style={{ color: tag.color || "#f59e0b" }} />
+            {isEditing ? (
+              <input
+                value={editing.name}
+                onChange={(e) =>
+                  setEditing((prev) => ({ ...prev, name: e.target.value }))
+                }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveEdit();
+                  if (e.key === "Escape") cancelEdit();
+                }}
+                onBlur={saveEdit}
+                className="flex-1 px-1 border rounded"
+                autoFocus
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <span className="text-sm">{tag.name}</span>
+            )}
+            {tag.noteCount > 0 && (
+              <span className="text-xs text-gray-500">({tag.noteCount})</span>
+            )}
+          </div>
+          <div className="opacity-0 group-hover:opacity-100 flex items-center space-x-1">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                startEditing("tag", tag.id, tag.name);
               }}
-              onBlur={saveEdit}
-              className="flex-1 px-1 border rounded"
-              autoFocus
-              onClick={(e) => e.stopPropagation()}
-            />
-          ) : (
-            <span className="text-sm">{tag.name}</span>
-          )}
-          {tag.noteCount > 0 && (
-            <span className="text-xs text-gray-500">({tag.noteCount})</span>
-          )}
+              className="p-1 hover:bg-gray-200 rounded"
+            >
+              <Edit2 size={12} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteItem("tag", tag.id);
+              }}
+              className="p-1 hover:bg-gray-200 rounded text-red-600"
+            >
+              <X size={12} />
+            </button>
+          </div>
         </div>
-        <div className="opacity-0 group-hover:opacity-100 flex items-center space-x-1">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              startEditing("tag", tag.id, tag.name);
-            }}
-            className="p-1 hover:bg-gray-200 rounded"
-          >
-            <Edit2 size={12} />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              deleteItem("tag", tag.id);
-            }}
-            className="p-1 hover:bg-gray-200 rounded text-red-600"
-          >
-            <X size={12} />
-          </button>
-        </div>
+        
+        {/* Drop zone below */}
+        <div
+          className={`h-3 mx-2 transition-all ${
+            isDragAfter ? "bg-blue-400 rounded-full" : "transparent"
+          }`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = "move";
+            setDragOver({ type: "tag-after", id: tag.id });
+          }}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setDragOver(null);
+            handleReorderDrop(e, "tag", tag.id, "after");
+          }}
+        />
       </div>
     );
   };
@@ -1049,4 +1215,4 @@ const ImprovedSidebar = ({
   );
 };
 
-export default ImprovedSidebar;
+export default React.memo(ImprovedSidebar);

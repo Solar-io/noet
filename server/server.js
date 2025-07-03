@@ -883,31 +883,41 @@ app.post("/api/:userId/tags/reorder", async (req, res) => {
       return res.status(404).json({ error: "One or both tags not found" });
     }
 
-    // For in-memory storage, we can implement ordering by updating a sort order field
-    // In a real database, you'd handle this differently
-    const userTags = Array.from(tags.values()).filter(
-      (t) => t.userId === userId
-    );
-    const currentTime = Date.now();
+    // Get all user tags and sort them by current sortOrder
+    const userTags = Array.from(tags.values())
+      .filter((t) => t.userId === userId)
+      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
 
-    // Update sort orders
+    // Initialize sortOrder if not set
     userTags.forEach((tag, index) => {
-      if (!tag.sortOrder) tag.sortOrder = index;
+      if (tag.sortOrder === undefined || tag.sortOrder === null) {
+        tag.sortOrder = index;
+      }
     });
 
-    // Remove source from its current position and insert at target position
+    // Remove source tag from current position
     const sourceIndex = userTags.findIndex((t) => t.id === sourceId);
     const targetIndex = userTags.findIndex((t) => t.id === targetId);
-
+    
     if (sourceIndex !== -1 && targetIndex !== -1) {
-      // Calculate new sort order for the moved tag
+      // Remove source from array
+      const [movedTag] = userTags.splice(sourceIndex, 1);
+      
+      // Calculate new target index after removal
+      let newTargetIndex = userTags.findIndex((t) => t.id === targetId);
+      
+      // Insert at correct position
       if (position === "before") {
-        sourceTag.sortOrder = targetTag.sortOrder - 0.5;
+        userTags.splice(newTargetIndex, 0, movedTag);
       } else {
-        sourceTag.sortOrder = targetTag.sortOrder + 0.5;
+        userTags.splice(newTargetIndex + 1, 0, movedTag);
       }
-
-      tags.set(sourceId, sourceTag);
+      
+      // Reassign sortOrder values to maintain proper order
+      userTags.forEach((tag, index) => {
+        tag.sortOrder = index;
+        tags.set(tag.id, tag);
+      });
     }
 
     res.json({ success: true });

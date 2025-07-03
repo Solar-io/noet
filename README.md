@@ -18,6 +18,30 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) to view the app.
 
+### 🔧 Development Environment Setup
+
+For optimal development workflow, especially if working with multiple projects:
+
+1. **Set up project path variable** (optional but recommended):
+   ```bash
+   # Add to your shell profile (.bash_profile, .zshrc, etc.)
+   export NOET_PROJECT_PATH="~/path/to/noet-app"
+   alias noet="cd $NOET_PROJECT_PATH"
+   ```
+
+2. **Quick navigation**:
+   ```bash
+   noet  # Jump to project directory from anywhere
+   ```
+
+3. **Use project scripts**:
+   ```bash
+   ./quick-start.sh  # Comprehensive setup and status check
+   ./noet.sh both    # Start both frontend and backend
+   ```
+
+For detailed setup instructions, see [DEVELOPMENT_ENVIRONMENT.md](./DEVELOPMENT_ENVIRONMENT.md).
+
 ## 🎯 Demo Accounts
 
 ### Demo User

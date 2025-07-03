@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { validateNote } from "../utils/validation.js";
 import errorRecoveryService from "../services/ErrorRecoveryService.js";
 import {
@@ -41,6 +41,7 @@ const ImprovedNotesList = ({
   onSearchChange,
   userId,
   onNotesRefresh,
+  onNotesUpdate,
   currentView,
   currentViewParams = {},
   onViewChange,
@@ -59,6 +60,11 @@ const ImprovedNotesList = ({
   const [dragOverPosition, setDragOverPosition] = useState(null);
   const [availableTags, setAvailableTags] = useState([]);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [selectedTagFilters, setSelectedTagFilters] = useState([]);
+
+  // Use ref to avoid circular dependencies in useCallback
+  const notesRef = useRef(notes);
+  notesRef.current = notes;
 
   // Initialize backend URL and load tags if not provided as props
   useEffect(() => {
@@ -193,8 +199,15 @@ const ImprovedNotesList = ({
   };
 
   // Note operations
-  const updateNote = async (noteId, updates) => {
+  const updateNote = useCallback(async (noteId, updates) => {
     if (!backendUrl) return false;
+
+    // Optimistic update - update the note locally first
+    const currentNotes = notesRef.current;
+    const optimisticNotes = currentNotes.map(note => 
+      note.id === noteId ? { ...note, ...updates } : note
+    );
+    onNotesUpdate?.(optimisticNotes);
 
     try {
       const response = await fetch(
@@ -206,16 +219,20 @@ const ImprovedNotesList = ({
         }
       );
 
-      if (!response.ok) throw new Error("Failed to update note");
+      if (!response.ok) {
+        // Revert optimistic update on failure
+        onNotesUpdate?.(currentNotes);
+        throw new Error("Failed to update note");
+      }
 
-      onNotesRefresh?.();
+      // Success - the optimistic update is already in place
       return true;
     } catch (error) {
       console.error("Error updating note:", error);
       alert("Failed to update note");
       return false;
     }
-  };
+  }, [backendUrl, userId, onNotesUpdate]);
 
   const startRenaming = (note) => {
     setEditingNoteId(note.id);
@@ -239,16 +256,21 @@ const ImprovedNotesList = ({
     setEditingTitle("");
   };
 
-  const toggleStar = async (note) => {
+  const toggleStar = useCallback(async (note) => {
     await updateNote(note.id, { starred: !note.starred });
-  };
+  }, [updateNote]);
 
-  const toggleArchive = async (note) => {
+  const toggleArchive = useCallback(async (note) => {
     await updateNote(note.id, { archived: !note.archived });
-  };
+  }, [updateNote]);
 
-  const deleteNote = async (noteId) => {
+  const deleteNote = useCallback(async (noteId) => {
     if (!confirm("Are you sure you want to move this note to trash?")) return;
+
+    // Optimistic update - remove note from list immediately
+    const currentNotes = notesRef.current;
+    const optimisticNotes = currentNotes.filter(note => note.id !== noteId);
+    onNotesUpdate?.(optimisticNotes);
 
     try {
       const response = await fetch(
@@ -267,16 +289,20 @@ const ImprovedNotesList = ({
         }
       );
 
-      if (!response.ok) throw new Error("Failed to delete note");
+      if (!response.ok) {
+        // Revert optimistic update on failure
+        onNotesUpdate?.(currentNotes);
+        throw new Error("Failed to delete note");
+      }
 
-      onNotesRefresh?.();
+      // Success - optimistic update is already applied
     } catch (error) {
       console.error("Error deleting note:", error);
       alert("Failed to delete note");
     }
-  };
+  }, [backendUrl, userId, onNotesUpdate]);
 
-  const restoreNote = async (noteId) => {
+  const restoreNote = useCallback(async (noteId) => {
     if (!confirm("Are you sure you want to restore this note?")) return;
 
     try {
@@ -292,15 +318,21 @@ const ImprovedNotesList = ({
 
       if (!response.ok) throw new Error("Failed to restore note");
 
+      // For restore, we need to refresh since note moves between views
       onNotesRefresh?.();
     } catch (error) {
       console.error("Error restoring note:", error);
       alert("Failed to restore note");
     }
-  };
+  }, [backendUrl, userId, onNotesRefresh]);
 
-  const permanentDeleteNote = async (noteId) => {
+  const permanentDeleteNote = useCallback(async (noteId) => {
     if (!confirm("Are you sure you want to permanently delete this note? This action cannot be undone.")) return;
+
+    // Optimistic update - remove note from list immediately
+    const currentNotes = notesRef.current;
+    const optimisticNotes = currentNotes.filter(note => note.id !== noteId);
+    onNotesUpdate?.(optimisticNotes);
 
     try {
       const response = await fetch(
@@ -310,14 +342,35 @@ const ImprovedNotesList = ({
         }
       );
 
-      if (!response.ok) throw new Error("Failed to permanently delete note");
+      if (!response.ok) {
+        // Revert optimistic update on failure
+        onNotesUpdate?.(currentNotes);
+        throw new Error("Failed to permanently delete note");
+      }
 
-      onNotesRefresh?.();
+      // Success - optimistic update is already applied
     } catch (error) {
       console.error("Error permanently deleting note:", error);
       alert("Failed to permanently delete note");
     }
-  };
+  }, [backendUrl, userId, onNotesUpdate]);
+
+  // Handle tag filter selection
+  const toggleTagFilter = useCallback((tagId) => {
+    setSelectedTagFilters(prev => {
+      if (prev.includes(tagId)) {
+        // Remove tag from filter
+        return prev.filter(id => id !== tagId);
+      } else {
+        // Add tag to filter
+        return [...prev, tagId];
+      }
+    });
+  }, []);
+
+  const clearTagFilters = useCallback(() => {
+    setSelectedTagFilters([]);
+  }, []);
 
   // Unified drag and drop handlers
   const handleNoteDragStart = (e, note) => {
@@ -529,6 +582,7 @@ const ImprovedNotesList = ({
   // Filter and sort notes
   const filteredAndSortedNotes = notes
     .filter((note) => {
+      // Search query filter
       if (searchQuery) {
         const searchLower = searchQuery.toLowerCase();
         const titleMatch = note.title.toLowerCase().includes(searchLower);
@@ -539,6 +593,17 @@ const ImprovedNotesList = ({
         }
       }
 
+      // Multi-tag filter (independent of view)
+      if (selectedTagFilters.length > 0) {
+        const hasAllSelectedTags = selectedTagFilters.every(selectedTagId =>
+          note.tags?.includes(selectedTagId)
+        );
+        if (!hasAllSelectedTags) {
+          return false;
+        }
+      }
+
+      // View-based filters
       switch (currentView) {
         case "starred":
           return note.starred === true;
@@ -946,10 +1011,19 @@ const ImprovedNotesList = ({
 
           <button
             onClick={() => setShowFilterMenu(!showFilterMenu)}
-            className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center space-x-1"
+            className={`px-3 py-2 border rounded-lg flex items-center space-x-1 relative ${
+              selectedTagFilters.length > 0 
+                ? 'bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100' 
+                : 'border-gray-300 hover:bg-gray-50'
+            }`}
           >
             <Filter size={16} />
             <span>Filter</span>
+            {selectedTagFilters.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                {selectedTagFilters.length}
+              </span>
+            )}
           </button>
 
           {/* Filter Menu */}
@@ -958,95 +1032,92 @@ const ImprovedNotesList = ({
               <div className="space-y-4">
                 {/* Clear Filters */}
                 <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-medium text-gray-700">Filters</h4>
-                  <button
-                    onClick={() => {
-                      onViewChange?.("all");
-                      setShowFilterMenu(false);
-                    }}
-                    className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded"
-                  >
-                    Clear all filters
-                  </button>
+                  <h4 className="text-sm font-medium text-gray-700">Tag Filters</h4>
+                  {selectedTagFilters.length > 0 && (
+                    <button
+                      onClick={clearTagFilters}
+                      className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded"
+                    >
+                      Clear all
+                    </button>
+                  )}
                 </div>
 
-                {/* Quick Filters */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Quick Filters
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => {
-                        onViewChange?.("starred");
-                        setShowFilterMenu(false);
-                      }}
-                      className="px-3 py-1 text-sm bg-yellow-100 text-yellow-800 rounded-full hover:bg-yellow-200"
-                    >
-                      ⭐ Starred
-                    </button>
-                    <button
-                      onClick={() => {
-                        onViewChange?.("archived");
-                        setShowFilterMenu(false);
-                      }}
-                      className="px-3 py-1 text-sm bg-orange-100 text-orange-800 rounded-full hover:bg-orange-200"
-                    >
-                      📦 Archived
-                    </button>
-                    <button
-                      onClick={() => {
-                        onViewChange?.("recent");
-                        setShowFilterMenu(false);
-                      }}
-                      className="px-3 py-1 text-sm bg-green-100 text-green-800 rounded-full hover:bg-green-200"
-                    >
-                      🕒 Recent
-                    </button>
-                    <button
-                      onClick={() => {
-                        onViewChange?.("trash");
-                        setShowFilterMenu(false);
-                      }}
-                      className="px-3 py-1 text-sm bg-red-100 text-red-800 rounded-full hover:bg-red-200"
-                    >
-                      🗑️ Trash
-                    </button>
+                {/* Selected Tags Display */}
+                {selectedTagFilters.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Active Filters ({selectedTagFilters.length})
+                    </label>
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {selectedTagFilters.map((tagId) => {
+                        const tag = availableTags.find(t => t.id === tagId);
+                        return tag ? (
+                          <span
+                            key={tagId}
+                            className="inline-flex items-center space-x-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs"
+                          >
+                            <span
+                              className="w-2 h-2 rounded-full"
+                              style={{ backgroundColor: tag.color || "#6B7280" }}
+                            />
+                            <span>{tag.name}</span>
+                            <button
+                              onClick={() => toggleTagFilter(tagId)}
+                              className="hover:bg-blue-200 rounded-full p-0.5"
+                            >
+                              <X size={10} />
+                            </button>
+                          </span>
+                        ) : null;
+                      })}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {/* Tag Filters */}
+                {/* Multi-Select Tag Filters */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Filter by Tags
+                    Select Tags (Multi-select enabled)
                   </label>
                   {availableTags.length === 0 ? (
                     <div className="text-sm text-gray-500 py-2">
                       No tags available
                     </div>
                   ) : (
-                    <div className="max-h-32 overflow-y-auto space-y-1">
-                      {getTagWithNoteCounts().map((tag) => (
-                        <button
-                          key={tag.id}
-                          onClick={() => {
-                            onViewChange?.("tag", { tagId: tag.id });
-                            setShowFilterMenu(false);
-                          }}
-                          className="w-full flex items-center space-x-2 p-2 hover:bg-gray-50 rounded text-left"
-                        >
-                          <span
-                            className="w-3 h-3 rounded-full border"
-                            style={{ backgroundColor: tag.color || "#6B7280" }}
-                          />
-                          <span className="text-sm text-gray-700 flex-1">
-                            {tag.name}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            {tag.noteCount}
-                          </span>
-                        </button>
-                      ))}
+                    <div className="max-h-40 overflow-y-auto space-y-1">
+                      {getTagWithNoteCounts().map((tag) => {
+                        const isSelected = selectedTagFilters.includes(tag.id);
+                        return (
+                          <button
+                            key={tag.id}
+                            onClick={() => toggleTagFilter(tag.id)}
+                            className={`w-full flex items-center space-x-2 p-2 rounded text-left transition-colors ${
+                              isSelected 
+                                ? 'bg-blue-50 border border-blue-200' 
+                                : 'hover:bg-gray-50 border border-transparent'
+                            }`}
+                          >
+                            <div className={`w-4 h-4 border rounded flex items-center justify-center ${
+                              isSelected ? 'bg-blue-500 border-blue-500' : 'border-gray-300'
+                            }`}>
+                              {isSelected && <span className="text-white text-xs">✓</span>}
+                            </div>
+                            <span
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: tag.color || "#6B7280" }}
+                            />
+                            <span className={`text-sm flex-1 ${
+                              isSelected ? 'text-blue-800 font-medium' : 'text-gray-700'
+                            }`}>
+                              {tag.name}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {tag.noteCount}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -1107,4 +1178,4 @@ const ImprovedNotesList = ({
   );
 };
 
-export default ImprovedNotesList;
+export default React.memo(ImprovedNotesList);

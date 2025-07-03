@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   TipTapEditor,
   NoteStorageService,
@@ -625,7 +625,7 @@ const NoetTipTapApp = () => {
   }, []);
 
   // Load notes from API
-  const loadNotes = async () => {
+  const loadNotes = useCallback(async () => {
     if (!validateUser(user) || !backendUrl) {
       console.warn("Cannot load notes: missing user or backend URL");
       return;
@@ -712,7 +712,12 @@ const NoetTipTapApp = () => {
         setNotes([]);
       }
     }
-  };
+  }, [user, backendUrl, currentView, currentViewParams]);
+
+  // Optimized notes update for quick local updates (like starring)
+  const updateNotesOptimistically = useCallback((updatedNotes) => {
+    setNotes(updatedNotes);
+  }, []);
 
   // Load notebooks from backend
   const loadNotebooks = async () => {
@@ -793,11 +798,11 @@ const NoetTipTapApp = () => {
     }
   }, [isAuthenticated, user, currentView, currentViewParams, backendUrl]);
 
-  const handleViewChange = (view, params = {}) => {
+  const handleViewChange = useCallback((view, params = {}) => {
     setCurrentView(view);
     setCurrentViewParams(params);
     setSelectedNote(null); // Clear selection when changing views
-  };
+  }, []);
 
   const handleLoginSuccess = async (authenticatedUser) => {
     setUser(authenticatedUser);
@@ -806,13 +811,13 @@ const NoetTipTapApp = () => {
     // Notes will be loaded automatically by the useEffect
   };
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     setIsAuthenticated(false);
     setUser(null);
     setNotes([]);
     setSelectedNote(null);
     setCurrentView("all");
-  };
+  }, []);
 
   const createNewNote = async () => {
     console.log("🚀 createNewNote called");
@@ -1175,6 +1180,7 @@ const NoetTipTapApp = () => {
             onSearchChange={setSearchQuery}
             userId={user?.id}
             onNotesRefresh={loadNotes}
+            onNotesUpdate={updateNotesOptimistically}
             currentView={currentView}
             currentViewParams={currentViewParams}
             onViewChange={handleViewChange}
