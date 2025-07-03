@@ -21,6 +21,7 @@ noet  # Changes to the project directory
 ```
 
 This alias is defined as:
+
 ```bash
 alias noet="cd $NOET_PROJECT_PATH"
 ```
@@ -49,11 +50,13 @@ All project scripts are designed to work correctly regardless of where they are 
 If you encounter issues with scripts not finding the correct directory:
 
 1. Verify the `NOET_PROJECT_PATH` variable is set:
+
    ```bash
    echo $NOET_PROJECT_PATH
    ```
 
 2. Check that the variable points to the correct directory:
+
    ```bash
    ls $NOET_PROJECT_PATH/package.json
    ```
@@ -78,16 +81,19 @@ alias noet="cd $NOET_PROJECT_PATH"
 ## Development Workflow
 
 1. **Starting a new terminal session:**
+
    ```bash
    noet  # Navigate to project directory
    ```
 
 2. **Quick development startup:**
+
    ```bash
    ./quick-start.sh  # Comprehensive setup and status check
    ```
 
 3. **Start development servers:**
+
    ```bash
    ./noet.sh both  # Start both frontend and backend
    ```

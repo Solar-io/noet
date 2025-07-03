@@ -23,6 +23,7 @@ Open [http://localhost:3000](http://localhost:3000) to view the app.
 For optimal development workflow, especially if working with multiple projects:
 
 1. **Set up project path variable** (optional but recommended):
+
    ```bash
    # Add to your shell profile (.bash_profile, .zshrc, etc.)
    export NOET_PROJECT_PATH="~/path/to/noet-app"
@@ -30,6 +31,7 @@ For optimal development workflow, especially if working with multiple projects:
    ```
 
 2. **Quick navigation**:
+
    ```bash
    noet  # Jump to project directory from anywhere
    ```

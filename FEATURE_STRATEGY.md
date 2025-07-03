@@ -109,24 +109,39 @@ npm run build
 
 ## 🎯 Next Features (Prioritized)
 
+## Process
+
+1. **You should maintain a feature list and a bug list.**
+2. **You should make suggestions for thing that make sense to do at the same time or one after the other**
+3. **You should never break the rule of focusing on one thing at a time.** Make suggestions, but remember that stability is more important than going fast.
+
 ### High Impact, Low Risk:
 
 1. **Better visual feedback** (drag & drop)
 2. **Keyboard shortcuts**
 3. **Export functionality**
 4. **Bulk operations**
+5. **Evernote file import**
+6. **Note count on notebooks, but not on folders**
+7. **Add an option to adjust font size**
+8. **Improve Highlighter colors and selection**
+9. **Add ability to change color of tags** 10.**Reimplement note versioning** That includes the ability to quickly select older versions. Highlighting changes and the ability to restore the note.
 
 ### Medium Impact:
 
 1. **Advanced search**
 2. **Note templates**
-3. **Collaboration features**
+3. **Notebook and folder sharing**
+4. **Full user administration functions** including user account creation, deletion, bulk note deletion, move note location configuration to only the admin user within the admin console.
+5. **Improvements in authentication for users.** They need the ability to change email and password. They need the ability to reset their password via email. We need a fully functional OTP for all users, including admin.
 
 ### High Risk (Research first):
 
 1. **Real-time sync**
 2. **Plugin system**
 3. **Performance optimizations**
+4. **Add File handlers for quickview for common file types. Things that are text base, code, scripts, text. Also, pdf, word (if possible), excel (if possible), videos**
+5. **Expand the right pane covering the middle and left pane. This would create a larger viewing area for the right pane. I need a way to undo this as well**
 
 ## 🏆 Current Achievement: STABLE BASE
 

@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import { validateNote } from "../utils/validation.js";
 import errorRecoveryService from "../services/ErrorRecoveryService.js";
 import {
@@ -106,11 +112,11 @@ const ImprovedNotesList = ({
   // Generate dynamic tags from notes
   const generateAvailableTagsFromNotes = () => {
     const tagMap = new Map();
-    
-    notes.forEach(note => {
+
+    notes.forEach((note) => {
       if (note.tags && Array.isArray(note.tags)) {
-        note.tags.forEach(tag => {
-          if (typeof tag === 'string' && tag.trim()) {
+        note.tags.forEach((tag) => {
+          if (typeof tag === "string" && tag.trim()) {
             const tagName = tag.trim();
             if (tagMap.has(tagName)) {
               tagMap.set(tagName, tagMap.get(tagName) + 1);
@@ -122,12 +128,14 @@ const ImprovedNotesList = ({
       }
     });
 
-    return Array.from(tagMap.entries()).map(([name, count]) => ({
-      id: name, // Use the name as the ID for string tags
-      name: name,
-      noteCount: count,
-      color: `#${Math.floor(Math.random() * 16777215).toString(16)}`, // Random color
-    })).sort((a, b) => b.noteCount - a.noteCount); // Sort by usage
+    return Array.from(tagMap.entries())
+      .map(([name, count]) => ({
+        id: name, // Use the name as the ID for string tags
+        name: name,
+        noteCount: count,
+        color: `#${Math.floor(Math.random() * 16777215).toString(16)}`, // Random color
+      }))
+      .sort((a, b) => b.noteCount - a.noteCount); // Sort by usage
   };
 
   // Update available tags when notes change
@@ -161,9 +169,9 @@ const ImprovedNotesList = ({
     if (!tagIds || !Array.isArray(tagIds)) return [];
     return tagIds.map((tagId) => {
       // If it's already a string, return it directly
-      if (typeof tagId === 'string') {
+      if (typeof tagId === "string") {
         // Check if it looks like a UUID (has hyphens), if so try to find in availableTags
-        if (tagId.includes('-')) {
+        if (tagId.includes("-")) {
           const tag = availableTags.find((t) => t.id === tagId);
           return tag ? tag.name : "Unknown";
         } else {
@@ -199,40 +207,43 @@ const ImprovedNotesList = ({
   };
 
   // Note operations
-  const updateNote = useCallback(async (noteId, updates) => {
-    if (!backendUrl) return false;
+  const updateNote = useCallback(
+    async (noteId, updates) => {
+      if (!backendUrl) return false;
 
-    // Optimistic update - update the note locally first
-    const currentNotes = notesRef.current;
-    const optimisticNotes = currentNotes.map(note => 
-      note.id === noteId ? { ...note, ...updates } : note
-    );
-    onNotesUpdate?.(optimisticNotes);
-
-    try {
-      const response = await fetch(
-        `${backendUrl}/api/${userId}/notes/${noteId}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ metadata: updates }),
-        }
+      // Optimistic update - update the note locally first
+      const currentNotes = notesRef.current;
+      const optimisticNotes = currentNotes.map((note) =>
+        note.id === noteId ? { ...note, ...updates } : note
       );
+      onNotesUpdate?.(optimisticNotes);
 
-      if (!response.ok) {
-        // Revert optimistic update on failure
-        onNotesUpdate?.(currentNotes);
-        throw new Error("Failed to update note");
+      try {
+        const response = await fetch(
+          `${backendUrl}/api/${userId}/notes/${noteId}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ metadata: updates }),
+          }
+        );
+
+        if (!response.ok) {
+          // Revert optimistic update on failure
+          onNotesUpdate?.(currentNotes);
+          throw new Error("Failed to update note");
+        }
+
+        // Success - the optimistic update is already in place
+        return true;
+      } catch (error) {
+        console.error("Error updating note:", error);
+        alert("Failed to update note");
+        return false;
       }
-
-      // Success - the optimistic update is already in place
-      return true;
-    } catch (error) {
-      console.error("Error updating note:", error);
-      alert("Failed to update note");
-      return false;
-    }
-  }, [backendUrl, userId, onNotesUpdate]);
+    },
+    [backendUrl, userId, onNotesUpdate]
+  );
 
   const startRenaming = (note) => {
     setEditingNoteId(note.id);
@@ -256,111 +267,131 @@ const ImprovedNotesList = ({
     setEditingTitle("");
   };
 
-  const toggleStar = useCallback(async (note) => {
-    await updateNote(note.id, { starred: !note.starred });
-  }, [updateNote]);
+  const toggleStar = useCallback(
+    async (note) => {
+      await updateNote(note.id, { starred: !note.starred });
+    },
+    [updateNote]
+  );
 
-  const toggleArchive = useCallback(async (note) => {
-    await updateNote(note.id, { archived: !note.archived });
-  }, [updateNote]);
+  const toggleArchive = useCallback(
+    async (note) => {
+      await updateNote(note.id, { archived: !note.archived });
+    },
+    [updateNote]
+  );
 
-  const deleteNote = useCallback(async (noteId) => {
-    if (!confirm("Are you sure you want to move this note to trash?")) return;
+  const deleteNote = useCallback(
+    async (noteId) => {
+      if (!confirm("Are you sure you want to move this note to trash?")) return;
 
-    // Optimistic update - remove note from list immediately
-    const currentNotes = notesRef.current;
-    const optimisticNotes = currentNotes.filter(note => note.id !== noteId);
-    onNotesUpdate?.(optimisticNotes);
+      // Optimistic update - remove note from list immediately
+      const currentNotes = notesRef.current;
+      const optimisticNotes = currentNotes.filter((note) => note.id !== noteId);
+      onNotesUpdate?.(optimisticNotes);
 
-    try {
-      const response = await fetch(
-        `${backendUrl}/api/${userId}/notes/${noteId}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ 
-            metadata: { 
-              deleted: true,
-              deletedAt: new Date().toISOString()
-            } 
-          }),
+      try {
+        const response = await fetch(
+          `${backendUrl}/api/${userId}/notes/${noteId}`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              metadata: {
+                deleted: true,
+                deletedAt: new Date().toISOString(),
+              },
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          // Revert optimistic update on failure
+          onNotesUpdate?.(currentNotes);
+          throw new Error("Failed to delete note");
         }
-      );
 
-      if (!response.ok) {
-        // Revert optimistic update on failure
-        onNotesUpdate?.(currentNotes);
-        throw new Error("Failed to delete note");
+        // Success - optimistic update is already applied
+      } catch (error) {
+        console.error("Error deleting note:", error);
+        alert("Failed to delete note");
       }
+    },
+    [backendUrl, userId, onNotesUpdate]
+  );
 
-      // Success - optimistic update is already applied
-    } catch (error) {
-      console.error("Error deleting note:", error);
-      alert("Failed to delete note");
-    }
-  }, [backendUrl, userId, onNotesUpdate]);
+  const restoreNote = useCallback(
+    async (noteId) => {
+      if (!confirm("Are you sure you want to restore this note?")) return;
 
-  const restoreNote = useCallback(async (noteId) => {
-    if (!confirm("Are you sure you want to restore this note?")) return;
+      try {
+        const response = await fetch(
+          `${backendUrl}/api/${userId}/notes/${noteId}/restore`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
 
-    try {
-      const response = await fetch(
-        `${backendUrl}/api/${userId}/notes/${noteId}/restore`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+        if (!response.ok) throw new Error("Failed to restore note");
 
-      if (!response.ok) throw new Error("Failed to restore note");
-
-      // For restore, we need to refresh since note moves between views
-      onNotesRefresh?.();
-    } catch (error) {
-      console.error("Error restoring note:", error);
-      alert("Failed to restore note");
-    }
-  }, [backendUrl, userId, onNotesRefresh]);
-
-  const permanentDeleteNote = useCallback(async (noteId) => {
-    if (!confirm("Are you sure you want to permanently delete this note? This action cannot be undone.")) return;
-
-    // Optimistic update - remove note from list immediately
-    const currentNotes = notesRef.current;
-    const optimisticNotes = currentNotes.filter(note => note.id !== noteId);
-    onNotesUpdate?.(optimisticNotes);
-
-    try {
-      const response = await fetch(
-        `${backendUrl}/api/${userId}/notes/${noteId}/permanent`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      if (!response.ok) {
-        // Revert optimistic update on failure
-        onNotesUpdate?.(currentNotes);
-        throw new Error("Failed to permanently delete note");
+        // For restore, we need to refresh since note moves between views
+        onNotesRefresh?.();
+      } catch (error) {
+        console.error("Error restoring note:", error);
+        alert("Failed to restore note");
       }
+    },
+    [backendUrl, userId, onNotesRefresh]
+  );
 
-      // Success - optimistic update is already applied
-    } catch (error) {
-      console.error("Error permanently deleting note:", error);
-      alert("Failed to permanently delete note");
-    }
-  }, [backendUrl, userId, onNotesUpdate]);
+  const permanentDeleteNote = useCallback(
+    async (noteId) => {
+      if (
+        !confirm(
+          "Are you sure you want to permanently delete this note? This action cannot be undone."
+        )
+      )
+        return;
+
+      // Optimistic update - remove note from list immediately
+      const currentNotes = notesRef.current;
+      const optimisticNotes = currentNotes.filter((note) => note.id !== noteId);
+      onNotesUpdate?.(optimisticNotes);
+
+      try {
+        const response = await fetch(
+          `${backendUrl}/api/${userId}/notes/${noteId}/permanent`,
+          {
+            method: "DELETE",
+          }
+        );
+
+        if (!response.ok) {
+          // Revert optimistic update on failure
+          onNotesUpdate?.(currentNotes);
+          throw new Error("Failed to permanently delete note");
+        }
+
+        // Success - optimistic update is already applied
+      } catch (error) {
+        console.error("Error permanently deleting note:", error);
+        alert("Failed to permanently delete note");
+      }
+    },
+    [backendUrl, userId, onNotesUpdate]
+  );
 
   // Handle tag filter selection
   const toggleTagFilter = useCallback((tagId) => {
-    setSelectedTagFilters(prev => {
+    setSelectedTagFilters((prev) => {
       if (prev.includes(tagId)) {
         // Remove tag from filter
-        return prev.filter(id => id !== tagId);
+        return prev.filter((id) => id !== tagId);
       } else {
         // Add tag to filter
         return [...prev, tagId];
@@ -550,22 +581,30 @@ const ImprovedNotesList = ({
 
   // Helper function for removing tags from notes
   const removeTagFromNote = async (noteId, tagToRemove) => {
-    const displayName = typeof tagToRemove === 'string' && tagToRemove.includes('-') 
-      ? "Unknown" 
-      : tagToRemove;
-    
-    if (!confirm(`Are you sure you want to remove the tag "${displayName}" from this note?`)) return;
+    const displayName =
+      typeof tagToRemove === "string" && tagToRemove.includes("-")
+        ? "Unknown"
+        : tagToRemove;
+
+    if (
+      !confirm(
+        `Are you sure you want to remove the tag "${displayName}" from this note?`
+      )
+    )
+      return;
 
     try {
       // Get the current note
-      const noteResponse = await fetch(`${backendUrl}/api/${userId}/notes/${noteId}`);
+      const noteResponse = await fetch(
+        `${backendUrl}/api/${userId}/notes/${noteId}`
+      );
       if (!noteResponse.ok) throw new Error("Failed to get note");
-      
+
       const note = await noteResponse.json();
-      
+
       // Remove the tag from the note's tags array (using original tag value)
-      const updatedTags = (note.tags || []).filter(tag => 
-        tag !== tagToRemove
+      const updatedTags = (note.tags || []).filter(
+        (tag) => tag !== tagToRemove
       );
 
       // Update the note
@@ -595,7 +634,7 @@ const ImprovedNotesList = ({
 
       // Multi-tag filter (independent of view)
       if (selectedTagFilters.length > 0) {
-        const hasAllSelectedTags = selectedTagFilters.every(selectedTagId =>
+        const hasAllSelectedTags = selectedTagFilters.every((selectedTagId) =>
           note.tags?.includes(selectedTagId)
         );
         if (!hasAllSelectedTags) {
@@ -1012,9 +1051,9 @@ const ImprovedNotesList = ({
           <button
             onClick={() => setShowFilterMenu(!showFilterMenu)}
             className={`px-3 py-2 border rounded-lg flex items-center space-x-1 relative ${
-              selectedTagFilters.length > 0 
-                ? 'bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100' 
-                : 'border-gray-300 hover:bg-gray-50'
+              selectedTagFilters.length > 0
+                ? "bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100"
+                : "border-gray-300 hover:bg-gray-50"
             }`}
           >
             <Filter size={16} />
@@ -1032,7 +1071,9 @@ const ImprovedNotesList = ({
               <div className="space-y-4">
                 {/* Clear Filters */}
                 <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-medium text-gray-700">Tag Filters</h4>
+                  <h4 className="text-sm font-medium text-gray-700">
+                    Tag Filters
+                  </h4>
                   {selectedTagFilters.length > 0 && (
                     <button
                       onClick={clearTagFilters}
@@ -1051,7 +1092,7 @@ const ImprovedNotesList = ({
                     </label>
                     <div className="flex flex-wrap gap-1 mb-2">
                       {selectedTagFilters.map((tagId) => {
-                        const tag = availableTags.find(t => t.id === tagId);
+                        const tag = availableTags.find((t) => t.id === tagId);
                         return tag ? (
                           <span
                             key={tagId}
@@ -1059,7 +1100,9 @@ const ImprovedNotesList = ({
                           >
                             <span
                               className="w-2 h-2 rounded-full"
-                              style={{ backgroundColor: tag.color || "#6B7280" }}
+                              style={{
+                                backgroundColor: tag.color || "#6B7280",
+                              }}
                             />
                             <span>{tag.name}</span>
                             <button
@@ -1093,23 +1136,35 @@ const ImprovedNotesList = ({
                             key={tag.id}
                             onClick={() => toggleTagFilter(tag.id)}
                             className={`w-full flex items-center space-x-2 p-2 rounded text-left transition-colors ${
-                              isSelected 
-                                ? 'bg-blue-50 border border-blue-200' 
-                                : 'hover:bg-gray-50 border border-transparent'
+                              isSelected
+                                ? "bg-blue-50 border border-blue-200"
+                                : "hover:bg-gray-50 border border-transparent"
                             }`}
                           >
-                            <div className={`w-4 h-4 border rounded flex items-center justify-center ${
-                              isSelected ? 'bg-blue-500 border-blue-500' : 'border-gray-300'
-                            }`}>
-                              {isSelected && <span className="text-white text-xs">✓</span>}
+                            <div
+                              className={`w-4 h-4 border rounded flex items-center justify-center ${
+                                isSelected
+                                  ? "bg-blue-500 border-blue-500"
+                                  : "border-gray-300"
+                              }`}
+                            >
+                              {isSelected && (
+                                <span className="text-white text-xs">✓</span>
+                              )}
                             </div>
                             <span
                               className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: tag.color || "#6B7280" }}
+                              style={{
+                                backgroundColor: tag.color || "#6B7280",
+                              }}
                             />
-                            <span className={`text-sm flex-1 ${
-                              isSelected ? 'text-blue-800 font-medium' : 'text-gray-700'
-                            }`}>
+                            <span
+                              className={`text-sm flex-1 ${
+                                isSelected
+                                  ? "text-blue-800 font-medium"
+                                  : "text-gray-700"
+                              }`}
+                            >
                               {tag.name}
                             </span>
                             <span className="text-xs text-gray-500">

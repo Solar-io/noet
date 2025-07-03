@@ -677,7 +677,43 @@ app.get("/api/:userId/notebooks", async (req, res) => {
     const userNotebooks = Array.from(notebooks.values())
       .filter((nb) => nb.userId === userId)
       .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
-    res.json(userNotebooks);
+    
+    // Add note count to each notebook
+    const notebooksWithCounts = await Promise.all(
+      userNotebooks.map(async (notebook) => {
+        const notebookPath = join(NOTES_BASE_PATH, userId);
+        let noteCount = 0;
+        
+        try {
+          const files = await fs.readdir(notebookPath);
+          const jsonFiles = files.filter(file => file.endsWith('.json'));
+          
+          // Count notes that belong to this notebook
+          for (const file of jsonFiles) {
+            try {
+              const filePath = join(notebookPath, file);
+              const content = await fs.readFile(filePath, 'utf8');
+              const noteData = JSON.parse(content);
+              if (noteData.notebookId === notebook.id) {
+                noteCount++;
+              }
+            } catch (err) {
+              // Skip files that can't be read or parsed
+              continue;
+            }
+          }
+        } catch (err) {
+          // Directory doesn't exist or can't be read, count remains 0
+        }
+        
+        return {
+          ...notebook,
+          noteCount
+        };
+      })
+    );
+    
+    res.json(notebooksWithCounts);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -898,21 +934,21 @@ app.post("/api/:userId/tags/reorder", async (req, res) => {
     // Remove source tag from current position
     const sourceIndex = userTags.findIndex((t) => t.id === sourceId);
     const targetIndex = userTags.findIndex((t) => t.id === targetId);
-    
+
     if (sourceIndex !== -1 && targetIndex !== -1) {
       // Remove source from array
       const [movedTag] = userTags.splice(sourceIndex, 1);
-      
+
       // Calculate new target index after removal
       let newTargetIndex = userTags.findIndex((t) => t.id === targetId);
-      
+
       // Insert at correct position
       if (position === "before") {
         userTags.splice(newTargetIndex, 0, movedTag);
       } else {
         userTags.splice(newTargetIndex + 1, 0, movedTag);
       }
-      
+
       // Reassign sortOrder values to maintain proper order
       userTags.forEach((tag, index) => {
         tag.sortOrder = index;
@@ -1239,7 +1275,9 @@ async function startServer() {
 
     if (!isAvailable) {
       console.error(`❌ Port ${PORT} is already in use!`);
-      console.error(`💡 Kill the process using port ${PORT} with: lsof -ti:${PORT} | xargs kill -9`);
+      console.error(
+        `💡 Kill the process using port ${PORT} with: lsof -ti:${PORT} | xargs kill -9`
+      );
       console.error(`� Or change the port in config.json`);
       process.exit(1);
     }
