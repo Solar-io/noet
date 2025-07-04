@@ -1,128 +1,107 @@
-# 🚀 noet-app - Quick Start Guide
+# Noet App - Quick Start Guide
 
-## Problem Solved: No More Directory Confusion!
+## Immediate Startup (30 seconds)
 
-This setup ensures you **never have to worry about being in the wrong directory again**.
+1. **Clone and setup** (if not already done):
+   ```bash
+   git clone https://github.com/SamGallant/noet.git
+   cd noet
+   npm install
+   ```
 
-## 🎯 Quick Start (Choose One)
+2. **Start the app**:
+   ```bash
+   ./simple-noet.sh
+   ```
 
-### Option 1: VS Code Workspace (Recommended)
+3. **Access the app**:
+   - Frontend: http://localhost:3001
+   - Backend API: http://localhost:3004
 
+4. **Login**:
+   - Email: `demo@example.com`
+   - Password: `demo123`
+
+## That's it! 🎉
+
+You now have a fully functional note-taking app with:
+- Rich text editing
+- Tag management
+- File uploads
+- Archive functionality
+- Color picker
+- Font family selection
+
+## Alternative Startup Methods
+
+### VS Code Tasks
+1. Open Command Palette (Cmd+Shift+P)
+2. Run "Tasks: Run Task"
+3. Select "Start Backend" then "Start Frontend"
+
+### Manual Commands
 ```bash
-# Open the workspace file in VS Code
-code noet-app.code-workspace
+# Terminal 1: Backend
+npm run backend
+
+# Terminal 2: Frontend  
+npm run dev
 ```
 
-Then use `Ctrl+Shift+P` → "Tasks: Run Task" → "Start Both Servers"
+## Troubleshooting
 
-### Option 2: Command Line (Any Directory)
+### Port Issues
+- Frontend should be on port 3001
+- Backend should be on port 3004
+- If ports are busy, stop other processes or restart
 
+### Directory Issues
+- All scripts now use `simple-config.sh` for directory handling
+- Scripts work from any directory
+
+### Missing Dependencies
 ```bash
-# From anywhere, run:
-./quick-start.sh
-# or
-npm run quick-start
+npm install
 ```
 
-### Option 3: Manual Start
+## What's Working
 
+✅ Login/authentication  
+✅ Note creation and editing  
+✅ Tag management (no UUID tags)  
+✅ Archive functionality  
+✅ File uploads  
+✅ Color picker  
+✅ Font family selection  
+✅ Real-time counts  
+
+## Testing
+
+Quick test:
 ```bash
-# Navigate to project (if needed)
-cd /Users/sgallant/sync/rygel/noet-app
-
-# Start both servers
-npm start
+./simple-test.sh
 ```
 
-## 🔧 Configuration
-
-All ports and URLs are defined in `config.json`:
-
-```json
-{
-  "development": {
-    "frontend": { "port": 3001, "host": "localhost" },
-    "backend": { "port": 3004, "host": "localhost" }
-  }
-}
+Full test suite:
+```bash
+./test-runner.sh
 ```
 
-## 📍 Access URLs
+## Next Steps
 
-- **Frontend**: http://localhost:3001
-- **Backend API**: http://localhost:3004/api/health
-- **Login**: demo@example.com / demo123
+- Create notes and organize with tags
+- Try the archive functionality
+- Upload files to notes
+- Experiment with text formatting and colors
+- Check out the comprehensive documentation in the `.md` files
 
-## 🛠️ Developer Experience Features
+## Need Help?
 
-### ✅ Automatic Directory Handling
+All scripts and functionality have been stabilized. If you encounter issues:
 
-- VS Code workspace sets correct working directory
-- Scripts automatically navigate to project root
-- No more "wrong directory" errors
+1. Check that both backend and frontend are running
+2. Verify you're using the correct ports (3001 for frontend, 3004 for backend)
+3. Run the test suite to verify functionality
+4. Check the detailed documentation files
 
-### ✅ Port Auto-Discovery
-
-- Frontend automatically finds backend URL
-- Fallback to alternative ports if busy
-- Clear error messages with suggested fixes
-
-### ✅ Consistent Configuration
-
-- Single source of truth in `config.json`
-- Both frontend and backend use same config
-- Easy to change ports for different environments
-
-### ✅ VS Code Integration
-
-- Workspace file with proper settings
-- Integrated terminal starts in correct directory
-- Tasks for starting servers
-- Recommended extensions
-
-## 🐛 Troubleshooting
-
-### "Cannot GET /" Error
-
-- **Cause**: Frontend not running or wrong URL
-- **Fix**: Check http://localhost:3001 (not 3003)
-
-### "Port in use" Error
-
-- **Cause**: Previous servers still running
-- **Fix**: Scripts automatically find alternative ports
-
-### "Cannot find module" Error
-
-- **Cause**: Dependencies not installed
-- **Fix**: `npm install` (auto-run by quick-start.sh)
-
-### Wrong Directory Error
-
-- **Cause**: Terminal opened in wrong folder
-- **Fix**: Use the VS Code workspace or quick-start.sh
-
-## 📂 Project Structure
-
-```
-noet-app/
-├── config.json                 # Single source of truth for ports/URLs
-├── noet-app.code-workspace     # VS Code workspace configuration
-├── quick-start.sh              # Directory-aware startup script
-├── start.js                    # Node.js startup with auto-navigation
-├── .vscode/
-│   └── settings.json           # VS Code terminal settings
-├── src/                        # Frontend React app
-├── server/                     # Backend Express server
-└── public/                     # Static assets
-```
-
-## 🚀 Next Steps
-
-1. **Open the workspace**: `code noet-app.code-workspace`
-2. **Start developing**: Use VS Code tasks or `npm start`
-3. **No more directory issues**: Everything is configured automatically!
-
----
-
-**🎉 Problem Solved**: You'll never start in the wrong directory again!
+The app is in a stable state and ready for development or daily use!
