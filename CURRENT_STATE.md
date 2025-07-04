@@ -46,6 +46,8 @@
 - `README.md` - Complete overview
 - `README-QUICK-START.md` - 30-second startup
 - `PROJECT_HANDOFF.md` - Comprehensive technical details
+- **`COMPLETE_DEVELOPMENT_HISTORY.md`** - 🔥 **FULL development journey & lessons learned**
+- **`TECHNICAL_REFERENCE.md`** - 🔥 **Copy-paste ready working code**
 - `simple-noet.sh` - Simple startup script
 - `test-runner.sh` - Full test suite
 

@@ -160,6 +160,10 @@ Individual tests:
 
 Start with a stable baseline - all core functionality is working. The application is ready for new feature development or UI improvements. 
 
+**🚨 IMPORTANT: Check these first to avoid redoing work!**
+- `COMPLETE_DEVELOPMENT_HISTORY.md` - Everything we tried for tags & font size (what worked/failed)
+- `TECHNICAL_REFERENCE.md` - Exact working code you can copy/paste
+
 **Before making changes:**
 - Run the test suite to ensure current functionality works
 - Check the comprehensive documentation in the various `.md` files
@@ -167,6 +171,13 @@ Start with a stable baseline - all core functionality is working. The applicatio
 
 ## Documentation Files
 
+### 🔥 Essential References (Start Here!)
+- `COMPLETE_DEVELOPMENT_HISTORY.md` - **Complete journey of all tag & font size work** - Never start from scratch!
+- `TECHNICAL_REFERENCE.md` - **Copy-paste ready working code** for all implementations
+- `CURRENT_STATE.md` - Quick status overview and what's working
+- `PROJECT_HANDOFF.md` - Comprehensive technical handoff guide
+
+### Specific Technical Details
 - `COMPLETE_SIMPLE_SOLUTION.md` - Overview of recent fixes
 - `TAG_NAME_RESOLUTION_FIX.md` - Tag management improvements
 - `SIMPLE_DIRECTORY_SOLUTION.md` - Directory handling solution

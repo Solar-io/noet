@@ -2,7 +2,14 @@
 
 ## Immediate Startup (30 seconds)
 
-1. **Clone and setup** (if not already done):
+1. **Clone and setup**## Next Steps
+
+- Create notes and organize with tags
+- Try the archive functionality
+- Upload files to notes
+- Experiment with text formatting and colors
+- **🔥 Planning new features?** Check `COMPLETE_DEVELOPMENT_HISTORY.md` and `TECHNICAL_REFERENCE.md` first!
+- Check out the comprehensive documentation in the various `.md` filest already done):
    ```bash
    git clone https://github.com/SamGallant/noet.git
    cd noet

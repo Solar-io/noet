@@ -1,0 +1,67 @@
+# Documentation Index
+
+## 🔥 START HERE - Essential Development References
+
+### Must Read Before Development
+- **`COMPLETE_DEVELOPMENT_HISTORY.md`** - Complete journey of tag & font size implementation work. Contains every approach tried, what failed, what worked, and why. **Read this before implementing similar features to avoid weeks of rediscovered failures!**
+
+- **`TECHNICAL_REFERENCE.md`** - Exact working code for all implementations. Copy-paste ready solutions for backend tag filtering, frontend UUID filtering, font family, color picker, directory handling, and testing.
+
+### Quick Start & Overview
+- `README.md` - Main project overview and quick start
+- `README-QUICK-START.md` - 30-second startup guide
+- `CURRENT_STATE.md` - Current status summary
+- `PROJECT_HANDOFF.md` - Comprehensive technical handoff
+
+## Specific Technical Documentation
+
+### Core Fixes & Solutions
+- `COMPLETE_SIMPLE_SOLUTION.md` - Overview of recent major fixes
+- `SIMPLE_DIRECTORY_SOLUTION.md` - Directory handling solution with `simple-config.sh`
+- `TAG_NAME_RESOLUTION_FIX.md` - Tag management improvements and UUID filtering
+- `UUID_TAG_AND_ARCHIVE_FIXES.md` - Recent bug fixes for tags and archive functionality
+
+### Feature Implementation Details
+- `TAGS_IMPLEMENTATION_COMPLETE.md` - Complete tag system implementation details
+- `STORAGE_ARCHITECTURE.md` - Storage system design and file structure
+- `UNKNOWN_TAGS_FIXES.md` - Fixes for unknown tag handling
+- `TRASH_IMPLEMENTATION_COMPLETE.md` - Trash/archive system details
+
+### Development Environment & Process
+- `DEVELOPMENT_ENVIRONMENT.md` - Development setup and environment configuration
+- `DEVELOPMENT_BEST_PRACTICES.md` - Coding standards and best practices
+- `DEVELOPMENT_STABILITY.md` - Stability considerations and testing approaches
+- `BEHAVIORAL_GUIDELINES.md` - Application behavior guidelines
+
+### Historical Context
+- `COMPLETE_DEVELOPMENT_HISTORY.md` - **Most important for new development!**
+- `DEVELOPMENT.md` - Development process and workflow
+- `FEATURE_COMPARISON.md` - Feature comparison and analysis
+- `FEATURE_STRATEGY.md` - Feature development strategy
+
+## Quick Reference
+
+### For Starting Development
+1. Read `COMPLETE_DEVELOPMENT_HISTORY.md` first!
+2. Check `TECHNICAL_REFERENCE.md` for working code
+3. Use `README-QUICK-START.md` to start the app
+4. Run tests with `test-runner.sh`
+
+### For Understanding Current State
+- `CURRENT_STATE.md` - What's working now
+- `PROJECT_HANDOFF.md` - Complete technical overview
+- `README.md` - Full project description
+
+### For Specific Technical Issues
+- Check `TECHNICAL_REFERENCE.md` for working solutions
+- Review `COMPLETE_DEVELOPMENT_HISTORY.md` for context on why things are implemented as they are
+- Use specific technical docs for detailed information
+
+## File Naming Convention
+
+- `COMPLETE_DEVELOPMENT_HISTORY.md` and `TECHNICAL_REFERENCE.md` - **Most important development references**
+- `README*.md` - Getting started and overview
+- `CURRENT_STATE.md` and `PROJECT_HANDOFF.md` - Current status
+- Other `*.md` files - Specific technical topics
+
+**💡 Pro Tip: Always check `COMPLETE_DEVELOPMENT_HISTORY.md` before implementing new features to see if similar work was already attempted and what the outcomes were!**
