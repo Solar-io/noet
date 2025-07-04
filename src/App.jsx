@@ -42,6 +42,7 @@ import {
   Tag,
   Book,
 } from "lucide-react";
+import configService from "./configService.js";
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -1188,13 +1189,34 @@ const NoetApp = () => {
     }
   };
 
-  const handleArchiveNote = (noteId) => {
-    const updatedNotes = notes.map((note) =>
-      note.id === noteId ? { ...note, archived: !note.archived } : note
-    );
-    setNotes(updatedNotes);
-    if (selectedNote?.id === noteId) {
-      setSelectedNote((prev) => ({ ...prev, archived: !prev.archived }));
+  const handleArchiveNote = async (noteId) => {
+    try {
+      const note = notes.find(n => n.id === noteId);
+      if (!note) return;
+
+      const response = await fetch(
+        `${await configService.getBackendUrl()}/api/${currentUser.id}/notes/${noteId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            metadata: { archived: !note.archived }
+          }),
+        }
+      );
+
+      if (!response.ok) throw new Error("Failed to update note");
+
+      const updatedNotes = notes.map((n) =>
+        n.id === noteId ? { ...n, archived: !n.archived } : n
+      );
+      setNotes(updatedNotes);
+      if (selectedNote?.id === noteId) {
+        setSelectedNote((prev) => ({ ...prev, archived: !prev.archived }));
+      }
+    } catch (error) {
+      console.error("Error archiving note:", error);
+      alert("Failed to archive note");
     }
   };
 

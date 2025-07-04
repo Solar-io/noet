@@ -7,14 +7,15 @@ const TagManager = ({
   noteId,
   noteTags = [],
   onTagsChange,
+  availableTags = [], // Receive tags as props instead of loading them
+  onTagsUpdate, // Callback to refresh tags in parent component
   className = "",
 }) => {
-  const [tags, setTags] = useState([]);
   const [isCreating, setIsCreating] = useState(false);
   const [newTagName, setNewTagName] = useState("");
   const [newTagColor, setNewTagColor] = useState("#3b82f6");
   const [editingTag, setEditingTag] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [backendUrl, setBackendUrl] = useState("");
 
@@ -31,29 +32,6 @@ const TagManager = ({
     };
     initBackendUrl();
   }, []);
-
-  useEffect(() => {
-    if (backendUrl && userId) {
-      loadTags();
-    }
-  }, [userId, backendUrl]);
-
-  const loadTags = async () => {
-    if (!backendUrl || !userId) return;
-
-    try {
-      setLoading(true);
-      const response = await fetch(`${backendUrl}/api/${userId}/tags`);
-      if (!response.ok) throw new Error("Failed to load tags");
-      const tagsData = await response.json();
-      setTags(tagsData);
-    } catch (err) {
-      console.error("Error loading tags:", err);
-      setError("Failed to load tags");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const createTag = async () => {
     if (!newTagName.trim() || !backendUrl) return;
@@ -72,10 +50,14 @@ const TagManager = ({
       if (!response.ok) throw new Error("Failed to create tag");
 
       const newTag = await response.json();
-      setTags([...tags, newTag]);
       setNewTagName("");
       setNewTagColor("#3b82f6");
       setIsCreating(false);
+      
+      // Refresh tags in parent component
+      if (onTagsUpdate) {
+        onTagsUpdate();
+      }
     } catch (err) {
       console.error("Error creating tag:", err);
       setError("Failed to create tag");
@@ -96,8 +78,12 @@ const TagManager = ({
       if (!response.ok) throw new Error("Failed to update tag");
 
       const updatedTag = await response.json();
-      setTags(tags.map((tag) => (tag.id === tagId ? updatedTag : tag)));
       setEditingTag(null);
+      
+      // Refresh tags in parent component
+      if (onTagsUpdate) {
+        onTagsUpdate();
+      }
     } catch (err) {
       console.error("Error updating tag:", err);
       setError("Failed to update tag");
@@ -117,12 +103,15 @@ const TagManager = ({
 
       if (!response.ok) throw new Error("Failed to delete tag");
 
-      setTags(tags.filter((tag) => tag.id !== tagId));
-
       // Remove tag from current note if it's assigned
       if (noteTags.includes(tagId)) {
         const updatedTags = noteTags.filter((t) => t !== tagId);
         onTagsChange?.(updatedTags);
+      }
+      
+      // Refresh tags in parent component
+      if (onTagsUpdate) {
+        onTagsUpdate();
       }
     } catch (err) {
       console.error("Error deleting tag:", err);
@@ -139,7 +128,14 @@ const TagManager = ({
     onTagsChange?.(updatedTags);
   };
 
-  const getTagById = (tagId) => tags.find((tag) => tag.id === tagId);
+  const getTagById = (tagId) => {
+    // Filter out UUID tags
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (UUID_REGEX.test(tagId)) {
+      return null;
+    }
+    return availableTags.find((tag) => tag.id === tagId);
+  };
 
   if (loading) {
     return (
@@ -162,7 +158,10 @@ const TagManager = ({
       )}
 
       {/* Assigned Tags Display */}
-      {noteTags.length > 0 && (
+      {noteTags.filter(tagId => {
+        const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        return !UUID_REGEX.test(tagId);
+      }).length > 0 && (
         <div className="space-y-2">
           <label className="text-sm font-medium text-gray-700 flex items-center">
             <Hash size={14} className="mr-1" />
@@ -252,7 +251,7 @@ const TagManager = ({
 
         {/* Tags List */}
         <div className="space-y-1 max-h-40 overflow-y-auto">
-          {tags.map((tag) => (
+          {availableTags.map((tag) => (
             <div
               key={tag.id}
               className="flex items-center justify-between p-2 rounded hover:bg-gray-50 group"
@@ -294,7 +293,7 @@ const TagManager = ({
             </div>
           ))}
 
-          {tags.length === 0 && !isCreating && (
+          {availableTags.length === 0 && !isCreating && (
             <div className="text-gray-500 text-sm text-center py-4">
               No tags yet. Create your first tag!
             </div>

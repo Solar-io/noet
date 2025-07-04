@@ -13,6 +13,7 @@ import Blockquote from "@tiptap/extension-blockquote";
 import Highlight from "@tiptap/extension-highlight";
 import TextStyle from "@tiptap/extension-text-style";
 import Color from "@tiptap/extension-color";
+import FontFamily from "@tiptap/extension-font-family";
 import Heading from "@tiptap/extension-heading";
 import HorizontalRule from "@tiptap/extension-horizontal-rule";
 import Strike from "@tiptap/extension-strike";
@@ -52,7 +53,7 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import TurndownService from "turndown";
 import { gfm } from "turndown-plugin-gfm";
-import { SketchPicker } from "react-color";
+import ComprehensiveColorPicker from "./components/ComprehensiveColorPicker.jsx";
 import configService from "./configService.js";
 
 // Initialize markdown converter
@@ -63,7 +64,7 @@ const turndownService = new TurndownService({
 turndownService.use(gfm);
 
 // TipTap Editor Component
-const TipTapEditor = ({ note, onSave, onContentChange, userId }) => {
+const TipTapEditor = ({ note, onSave, onContentChange, userId, availableTags = [], onTagsUpdate }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState(note?.attachments || []);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -210,6 +211,9 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId }) => {
       // Advanced text formatting
       TextStyle,
       Color.configure({
+        types: ["textStyle"],
+      }),
+      FontFamily.configure({
         types: ["textStyle"],
       }),
       Highlight.configure({
@@ -412,6 +416,15 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId }) => {
     setColorPickerPosition({ x: rect.left, y: rect.bottom + 10 });
     setShowColorPicker(true);
     setShowHighlightPicker(false);
+  };
+
+  // Font family action
+  const setFontFamily = (fontFamily) => {
+    if (fontFamily === 'default') {
+      editor?.chain().focus().unsetFontFamily().run();
+    } else {
+      editor?.chain().focus().setFontFamily(fontFamily).run();
+    }
   };
 
   const setHighlightColor = (event) => {
@@ -720,6 +733,27 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId }) => {
             </button>
           </div>
 
+          {/* Font Family */}
+          <div className="border-r pr-2 mr-2">
+            <select
+              onChange={(e) => setFontFamily(e.target.value)}
+              value={editor?.getAttributes('textStyle').fontFamily || 'default'}
+              className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              title="Font Family"
+            >
+              <option value="default">Default</option>
+              <option value="Inter, system-ui, sans-serif">Inter</option>
+              <option value="Helvetica, Arial, sans-serif">Helvetica</option>
+              <option value="Times, serif">Times</option>
+              <option value="Georgia, serif">Georgia</option>
+              <option value="'Courier New', monospace">Courier New</option>
+              <option value="Monaco, 'Lucida Console', monospace">Monaco</option>
+              <option value="'Comic Sans MS', cursive">Comic Sans</option>
+              <option value="Impact, sans-serif">Impact</option>
+              <option value="Verdana, sans-serif">Verdana</option>
+            </select>
+          </div>
+
           {/* Headings */}
           <div className="flex space-x-1 border-r pr-2 mr-2">
             <button
@@ -997,10 +1031,14 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId }) => {
               transform: "translateX(-50%)",
             }}
           >
-            <SketchPicker
+            <ComprehensiveColorPicker
+              title="Text Color"
               color="#000000"
               onChange={handleColorChange}
-              onChangeComplete={handleColorChange}
+              onChangeComplete={(color) => {
+                handleColorChange(color);
+                setShowColorPicker(false);
+              }}
             />
           </div>
         </>
@@ -1020,10 +1058,14 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId }) => {
               transform: "translateX(-50%)",
             }}
           >
-            <SketchPicker
+            <ComprehensiveColorPicker
+              title="Highlight Color"
               color="#ffff00"
               onChange={handleHighlightChange}
-              onChangeComplete={handleHighlightChange}
+              onChangeComplete={(color) => {
+                handleHighlightChange(color);
+                setShowHighlightPicker(false);
+              }}
             />
           </div>
         </>
@@ -1050,8 +1092,8 @@ class NoteStorageService {
       // In production, assume backend is on same host, port 3001
       return `${window.location.protocol}//${window.location.hostname}:3001/api`;
     } else {
-      // In development, use configured backend port
-      return "http://localhost:3003/api";
+      // In development, use configured backend port (3004 per config.json)
+      return "http://localhost:3004/api";
     }
   }
 
@@ -1513,4 +1555,5 @@ const AdminSettings = ({ isOpen, onClose, currentPath, onPathChange }) => {
   );
 };
 
-export { TipTapEditor, NoteStorageService, AdminSettings };
+export default TipTapEditor;
+export { NoteStorageService, AdminSettings };

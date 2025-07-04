@@ -42,7 +42,12 @@ class ConfigService {
   }
 
   getEnvironment() {
-    return import.meta.env.MODE || "development";
+    // Check if we're in a browser/Vite environment or Node.js
+    if (typeof import.meta !== "undefined" && import.meta.env) {
+      return import.meta.env.MODE || "development";
+    }
+    // Fallback for Node.js environment (test scripts)
+    return process.env.NODE_ENV || "development";
   }
 
   async getBackendConfig() {

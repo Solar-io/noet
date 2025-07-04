@@ -27,6 +27,7 @@ const NoteEditor = ({
   onContentChange,
   onDelete,
   onNoteUpdate,
+  availableTags = [], // Receive tags as props instead of loading them
   children,
 }) => {
   const [noteTags, setNoteTags] = useState(note?.tags || []);
@@ -38,7 +39,6 @@ const NoteEditor = ({
   const [backendUrl, setBackendUrl] = useState("");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editingTitle, setEditingTitle] = useState(note?.title || "");
-  const [availableTags, setAvailableTags] = useState([]);
   const [showTagDropdown, setShowTagDropdown] = useState(false);
 
   // Close tag dropdown when clicking outside
@@ -62,12 +62,6 @@ const NoteEditor = ({
         const url = await configService.getBackendUrl();
         setBackendUrl(url);
         console.log("NoteEditor: Backend URL set to", url);
-
-        // Load available tags for display
-        if (userId) {
-          console.log("NoteEditor: Loading tags for user", userId);
-          loadTags(url);
-        }
       } catch (error) {
         console.error("Failed to get backend URL:", error);
         setBackendUrl("http://localhost:3004"); // fallback
@@ -76,50 +70,35 @@ const NoteEditor = ({
     initBackendUrl();
   }, [userId]);
 
-  // Load available tags
-  const loadTags = async (url) => {
-    if (!url || !userId) return;
-
-    try {
-      console.log(
-        "NoteEditor: Fetching tags from",
-        `${url}/api/${userId}/tags`
-      );
-      const response = await fetch(`${url}/api/${userId}/tags`);
-      if (response.ok) {
-        const tags = await response.json();
-        console.log("NoteEditor: Loaded tags:", tags);
-        setAvailableTags(tags);
-      } else {
-        console.error(
-          "NoteEditor: Failed to load tags, status:",
-          response.status
-        );
-      }
-    } catch (error) {
-      console.error("Error loading tags:", error);
-    }
+  // Helper function to filter out UUID tags
+  const filterUUIDTags = (tagIds) => {
+    if (!tagIds || !Array.isArray(tagIds)) return [];
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return tagIds.filter(tagId => !UUID_REGEX.test(tagId));
   };
 
-  // Helper function to get tag names from IDs
   const getTagNames = (tagIds) => {
-    if (!tagIds || !Array.isArray(tagIds)) return [];
+    const filteredTagIds = filterUUIDTags(tagIds);
+    
     console.log(
       "NoteEditor: Getting tag names for IDs:",
-      tagIds,
+      filteredTagIds,
       "from available tags:",
-      availableTags
+      availableTags,
+      "(filtered out UUIDs from:",
+      tagIds,
+      ")"
     );
 
     if (availableTags.length === 0) {
       // If tags haven't loaded yet, show loading state or just the IDs temporarily
-      return tagIds.map((tagId) => `Loading...`);
+      return filteredTagIds.map((tagId) => `Loading...`);
     }
 
-    return tagIds.map((tagId) => {
+    return filteredTagIds.map((tagId) => {
       const tag = availableTags.find((t) => t.id === tagId);
       console.log("NoteEditor: Tag ID", tagId, "mapped to:", tag);
-      return tag ? tag.name : `Tag ${tagId.substring(0, 8)}...`;
+      return tag ? tag.name : tagId; // Use the tagId directly if no tag object found
     });
   };
 
@@ -130,16 +109,8 @@ const NoteEditor = ({
       setNoteFolder(note.folder || null);
       setEditingTitle(note.title || "");
       setIsEditingTitle(false);
-
-      // Reload tags if they aren't loaded yet
-      if (availableTags.length === 0 && backendUrl && userId) {
-        console.log(
-          "NoteEditor: Reloading tags because availableTags is empty"
-        );
-        loadTags(backendUrl);
-      }
     }
-  }, [note, availableTags.length, backendUrl, userId]);
+  }, [note]);
 
   const handleSave = async () => {
     if (!note || saving) return;
@@ -390,7 +361,7 @@ const NoteEditor = ({
 
           {/* Quick tag display and management */}
           <div className="flex items-center space-x-2">
-            {noteTags.length > 0 && (
+            {filterUUIDTags(noteTags).length > 0 && (
               <div className="flex items-center space-x-2 text-sm">
                 <Hash size={14} className="text-gray-400" />
                 <div className="flex flex-wrap gap-1">
@@ -410,9 +381,9 @@ const NoteEditor = ({
                         {tagName}
                       </span>
                     ))}
-                  {noteTags.length > 3 && (
+                  {filterUUIDTags(noteTags).length > 3 && (
                     <span className="text-xs text-gray-600">
-                      +{noteTags.length - 3} more
+                      +{filterUUIDTags(noteTags).length - 3} more
                     </span>
                   )}
                 </div>
@@ -474,12 +445,14 @@ const NoteEditor = ({
                         </div>
                       )}
                     </div>
-                    {noteTags.length > 0 && (
+                    {filterUUIDTags(noteTags).length > 0 && (
                       <div className="pt-2 mt-2 border-t border-gray-200">
                         <button
                           onClick={() => {
-                            setNoteTags([]);
-                            updateNoteMetadata({ tags: [] });
+                            // Keep UUID tags but clear non-UUID tags
+                            const UUIDTags = noteTags.filter(tagId => !filterUUIDTags([tagId]).length);
+                            setNoteTags(UUIDTags);
+                            updateNoteMetadata({ tags: UUIDTags });
                           }}
                           className="text-sm text-red-600 hover:text-red-700"
                         >

@@ -110,6 +110,8 @@ const ImprovedSidebar = ({
       if (response.ok) {
         const data = await response.json();
         setTags(data);
+      } else {
+        console.error("ImprovedSidebar: Failed to load tags:", response.status, response.statusText);
       }
     } catch (error) {
       console.error("Error loading tags:", error);
@@ -954,9 +956,9 @@ const ImprovedSidebar = ({
                 onClick={(e) => e.stopPropagation()}
               />
             ) : (
-              <span className="text-sm">{tag.name}</span>
+              <span className="text-sm" title={`Tag ID: ${tag.id}, Name: ${tag.name}`}>{tag.name || tag.id}</span>
             )}
-            {tag.noteCount > 0 && (
+            {(tag.noteCount || 0) > 0 && (
               <span className="text-xs text-gray-500">({tag.noteCount})</span>
             )}
           </div>

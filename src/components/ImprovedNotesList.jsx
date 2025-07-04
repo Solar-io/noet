@@ -842,9 +842,11 @@ const ImprovedNotesList = ({
               )}
 
               {/* Content preview */}
-              <p className="text-sm text-gray-600 mt-1 line-clamp-2">
-                {note.content?.replace(/<[^>]*>/g, "") || "No content"}
-              </p>
+              {note.content && (
+                <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                  {note.content.replace(/<[^>]*>/g, "")}
+                </p>
+              )}
 
               {/* Tags */}
               {note.tags && note.tags.length > 0 && (

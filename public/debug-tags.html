@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Tag Loading</title>
+</head>
+<body>
+    <h1>Debug Tag Loading</h1>
+    <div id="output"></div>
+
+    <script>
+        async function debugTagLoading() {
+            const output = document.getElementById('output');
+            
+            try {
+                // Test 1: Check if config service works
+                output.innerHTML += '<h2>1. Checking Config Service</h2>';
+                
+                const configResponse = await fetch('/config.json');
+                if (configResponse.ok) {
+                    const config = await configResponse.json();
+                    output.innerHTML += `<p>✅ Config loaded: ${JSON.stringify(config, null, 2)}</p>`;
+                    
+                    const backendUrl = `http://${config.development.backend.host}:${config.development.backend.port}`;
+                    output.innerHTML += `<p>Backend URL: ${backendUrl}</p>`;
+                    
+                    // Test 2: Load tags
+                    output.innerHTML += '<h2>2. Loading Tags</h2>';
+                    const tagsResponse = await fetch(`${backendUrl}/api/demo-user/tags`);
+                    
+                    if (tagsResponse.ok) {
+                        const tags = await tagsResponse.json();
+                        output.innerHTML += `<p>✅ Tags loaded: ${tags.length} tags</p>`;
+                        output.innerHTML += '<h3>Tag Details:</h3>';
+                        output.innerHTML += '<pre>' + JSON.stringify(tags, null, 2) + '</pre>';
+                    } else {
+                        output.innerHTML += `<p>❌ Failed to load tags: ${tagsResponse.status}</p>`;
+                    }
+                } else {
+                    output.innerHTML += `<p>❌ Failed to load config: ${configResponse.status}</p>`;
+                }
+                
+            } catch (error) {
+                output.innerHTML += `<p>❌ Error: ${error.message}</p>`;
+            }
+        }
+        
+        // Run the debug when page loads
+        debugTagLoading();
+    </script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TipTap Font Size Test</title>
+</head>
+<body>
+    <h1>Font Size Issue Debugging</h1>
+    
+    <h2>Steps to test:</h2>
+    <ol>
+        <li>Go to the Noet app at <a href="http://localhost:3001" target="_blank">http://localhost:3001</a></li>
+        <li>Create or open a note</li>
+        <li>Type some text</li>
+        <li>Select the text</li>
+        <li>Try changing the font size using the dropdown</li>
+        <li>Check the browser developer tools console for any errors</li>
+        <li>Check if the HTML shows inline styles being applied</li>
+    </ol>
+    
+    <h2>Expected behavior:</h2>
+    <p>When you select text and change the font size, you should see:</p>
+    <ul>
+        <li>The text visually change size</li>
+        <li>HTML like: <code>&lt;span style="font-size: 18px"&gt;text&lt;/span&gt;</code></li>
+    </ul>
+    
+    <h2>Debugging tips:</h2>
+    <ul>
+        <li>Check if TextStyle extension is loaded</li>
+        <li>Verify the font size function is being called</li>
+        <li>Look for JavaScript errors in console</li>
+        <li>Inspect the generated HTML structure</li>
+    </ul>
+</body>
+</html>

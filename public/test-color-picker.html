@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Picker Test</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root" class="p-8">
+        <h1 class="text-2xl font-bold mb-4">Color Picker Component Test</h1>
+        <p class="mb-4">✅ New comprehensive color picker component has been created!</p>
+        
+        <div class="bg-gray-50 p-4 rounded-lg">
+            <h2 class="text-lg font-semibold mb-2">Features:</h2>
+            <ul class="list-disc list-inside space-y-1 text-sm">
+                <li>Grid layout with 8 rows of 10 colors each</li>
+                <li>Grayscale, basic colors, and multiple shades</li>
+                <li>Custom color section with "+" button</li>
+                <li>"None" option for transparent/no color</li>
+                <li>Compact design that matches your screenshot</li>
+                <li>Color preview with hex code display</li>
+                <li>Hover effects and selected state styling</li>
+            </ul>
+        </div>
+        
+        <div class="mt-6 bg-blue-50 p-4 rounded-lg">
+            <h2 class="text-lg font-semibold mb-2">Implementation:</h2>
+            <ul class="list-disc list-inside space-y-1 text-sm">
+                <li>✅ Created <code class="bg-gray-200 px-1 rounded">ComprehensiveColorPicker.jsx</code></li>
+                <li>✅ Updated <code class="bg-gray-200 px-1 rounded">TipTapEditor.jsx</code> to use new picker</li>
+                <li>✅ Replaced SketchPicker with comprehensive grid layout</li>
+                <li>✅ Added separate titles for "Text Color" and "Highlight Color"</li>
+                <li>✅ Auto-close on color selection for better UX</li>
+            </ul>
+        </div>
+        
+        <div class="mt-6">
+            <p class="text-sm text-gray-600">
+                The new color picker is now active in the text editor. Click the font color (A) or highlight (highlighter) buttons in the editor toolbar to test it!
+            </p>
+        </div>
+    </div>
+</body>
+</html>

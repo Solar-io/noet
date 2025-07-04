@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import {
-  TipTapEditor,
+import TipTapEditor, {
   NoteStorageService,
   AdminSettings,
 } from "./TipTapEditor.jsx";
@@ -754,6 +753,8 @@ const NoetTipTapApp = () => {
       }
       const tagsData = await response.json();
       console.log(`✅ Loaded ${tagsData.length} tags`);
+      console.log('Raw tags data from backend:', tagsData);
+      console.log('First tag details:', tagsData[0]);
       setTags(tagsData);
     } catch (error) {
       console.error("Error loading tags:", error);
@@ -944,6 +945,9 @@ const NoetTipTapApp = () => {
         prev.map((n) => (n.id === updatedNote.id ? updatedNote : n))
       );
       setSelectedNote(updatedNote);
+
+      // Refresh tags since note tags may have changed (temporarily disabled)
+      // await refreshTags();
 
       console.log("✅ Note saved successfully");
     } catch (error) {
@@ -1200,6 +1204,7 @@ const NoetTipTapApp = () => {
               onContentChange={handleNoteContentChange}
               onDelete={handleNoteDelete}
               onNoteUpdate={handleNoteUpdate}
+              availableTags={tags}
             >
               <RobustErrorBoundary
                 fallbackMessage="The note editor encountered an error. Your note content is safe."
@@ -1210,6 +1215,8 @@ const NoetTipTapApp = () => {
                   userId={user?.id}
                   onSave={handleNoteSave}
                   onContentChange={handleNoteContentChange}
+                  availableTags={tags}
+                  onTagsUpdate={loadTags}
                 />
               </RobustErrorBoundary>
             </NoteEditor>

@@ -6,6 +6,7 @@ import multer from "multer";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import fs from "fs/promises";
+import fsSync from "fs";
 import { v4 as uuidv4 } from "uuid";
 import PortManager from "./portManager.js";
 
@@ -201,6 +202,76 @@ async function writeNoteContent(userId, noteId, content) {
   await ensureDir(notePath);
   const contentPath = join(notePath, "note.md");
   await fs.writeFile(contentPath, content);
+}
+
+// Helper function to get tags file path
+function getTagsFilePath(userId) {
+  return join(NOTES_BASE_PATH, userId, "tags.json");
+}
+
+// Helper function to load tags from disk
+async function loadUserTags(userId) {
+  try {
+    const tagsFilePath = getTagsFilePath(userId);
+    const data = await fs.readFile(tagsFilePath, "utf8");
+    const userTags = JSON.parse(data);
+    
+    // Load tags into the global tags Map
+    userTags.forEach(tag => {
+      tags.set(tag.id, tag);
+    });
+    
+    console.log(`📂 Loaded ${userTags.length} tags for user ${userId} from disk`);
+    return userTags;
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      console.log(`📂 No tags file found for user ${userId}, starting fresh`);
+      return [];
+    }
+    console.error(`❌ Error loading tags for user ${userId}:`, error);
+    return [];
+  }
+}
+
+// Helper function to save tags to disk
+async function saveUserTags(userId) {
+  try {
+    const userTags = Array.from(tags.values()).filter(tag => tag.userId === userId);
+    const tagsFilePath = getTagsFilePath(userId);
+    
+    // Ensure the user directory exists
+    await ensureDir(join(NOTES_BASE_PATH, userId));
+    
+    await fs.writeFile(tagsFilePath, JSON.stringify(userTags, null, 2));
+    console.log(`💾 Saved ${userTags.length} tags for user ${userId} to disk`);
+  } catch (error) {
+    console.error(`❌ Error saving tags for user ${userId}:`, error);
+  }
+}
+
+// Helper function to load all users' tags on startup
+async function loadAllTags() {
+  try {
+    if (!fsSync.existsSync(NOTES_BASE_PATH)) {
+      console.log(`📂 Notes base path doesn't exist yet: ${NOTES_BASE_PATH}`);
+      return;
+    }
+    
+    const userDirs = await fs.readdir(NOTES_BASE_PATH, { withFileTypes: true });
+    let totalTagsLoaded = 0;
+    
+    for (const dirent of userDirs) {
+      if (dirent.isDirectory()) {
+        const userId = dirent.name;
+        const userTags = await loadUserTags(userId);
+        totalTagsLoaded += userTags.length;
+      }
+    }
+    
+    console.log(`🏷️ Loaded ${totalTagsLoaded} total tags from disk across all users`);
+  } catch (error) {
+    console.error("❌ Error loading tags on startup:", error);
+  }
 }
 
 // API Routes
@@ -677,42 +748,45 @@ app.get("/api/:userId/notebooks", async (req, res) => {
     const userNotebooks = Array.from(notebooks.values())
       .filter((nb) => nb.userId === userId)
       .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
-    
+
     // Add note count to each notebook
     const notebooksWithCounts = await Promise.all(
       userNotebooks.map(async (notebook) => {
-        const notebookPath = join(NOTES_BASE_PATH, userId);
+        const userNotesPath = join(NOTES_BASE_PATH, userId);
         let noteCount = 0;
-        
         try {
-          const files = await fs.readdir(notebookPath);
-          const jsonFiles = files.filter(file => file.endsWith('.json'));
-          
-          // Count notes that belong to this notebook
-          for (const file of jsonFiles) {
-            try {
-              const filePath = join(notebookPath, file);
-              const content = await fs.readFile(filePath, 'utf8');
-              const noteData = JSON.parse(content);
-              if (noteData.notebookId === notebook.id) {
-                noteCount++;
+          const noteDirs = await fs.readdir(userNotesPath, {
+            withFileTypes: true,
+          });
+          for (const dirent of noteDirs) {
+            if (dirent.isDirectory()) {
+              const metadataPath = join(
+                userNotesPath,
+                dirent.name,
+                "metadata.json"
+              );
+              try {
+                const content = await fs.readFile(metadataPath, "utf8");
+                const noteData = JSON.parse(content);
+                if (noteData.notebook === notebook.id && !noteData.deleted) {
+                  noteCount++;
+                }
+              } catch (err) {
+                // Skip if metadata.json doesn't exist or can't be read
+                continue;
               }
-            } catch (err) {
-              // Skip files that can't be read or parsed
-              continue;
             }
           }
         } catch (err) {
           // Directory doesn't exist or can't be read, count remains 0
         }
-        
         return {
           ...notebook,
-          noteCount
+          noteCount,
         };
       })
     );
-    
+
     res.json(notebooksWithCounts);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -832,11 +906,137 @@ app.post("/api/:userId/notebooks/reorder", async (req, res) => {
 app.get("/api/:userId/tags", async (req, res) => {
   try {
     const { userId } = req.params;
-    const userTags = Array.from(tags.values())
-      .filter((tag) => tag.userId === userId)
+
+    // Get explicitly created tags (filter out any with missing names)
+    const explicitTags = Array.from(tags.values())
+      .filter((tag) => tag.userId === userId && tag.name && tag.name.trim())
       .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
-    res.json(userTags);
+
+    // Generate dynamic tags from notes
+    const dynamicTagCounts = new Map();
+    const userNotesPath = join(NOTES_BASE_PATH, userId);
+
+    if (fsSync.existsSync(userNotesPath)) {
+      const scanForTags = (dirPath) => {
+        const entries = fsSync.readdirSync(dirPath, { withFileTypes: true });
+
+        for (const entry of entries) {
+          const fullPath = join(dirPath, entry.name);
+
+          if (entry.isDirectory()) {
+            // Recursively scan subdirectories
+            scanForTags(fullPath);
+          } else if (entry.name === "metadata.json") {
+            try {
+              const metadata = JSON.parse(fsSync.readFileSync(fullPath, "utf8"));
+              if (metadata.tags && Array.isArray(metadata.tags)) {
+                metadata.tags.forEach((tagRef) => {
+                  if (typeof tagRef === "string" && tagRef.trim()) {
+                    const tagName = tagRef.trim();
+                    
+                    // Filter out UUID tags or convert them to "unknown"
+                    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                    if (UUID_REGEX.test(tagName)) {
+                      // Skip UUID tags entirely
+                      return;
+                    }
+                    
+                    dynamicTagCounts.set(
+                      tagName,
+                      (dynamicTagCounts.get(tagName) || 0) + 1
+                    );
+                  }
+                });
+              }
+            } catch (error) {
+              // Skip invalid metadata files
+              console.warn(`Skipping invalid metadata: ${fullPath}`);
+            }
+          }
+        }
+      };
+
+      scanForTags(userNotesPath);
+    }
+
+    // Create combined tag list
+    const allTags = new Map();
+
+    // Add explicit tags with their counts
+    for (const tag of explicitTags) {
+      let noteCount = 0;
+
+      // Count notes that reference this tag (by name or ID)
+      const userNotesPath = join(NOTES_BASE_PATH, userId);
+      if (fsSync.existsSync(userNotesPath)) {
+        const countTagUsage = (dirPath) => {
+          const entries = fsSync.readdirSync(dirPath, { withFileTypes: true });
+
+          for (const entry of entries) {
+            const fullPath = join(dirPath, entry.name);
+
+            if (entry.isDirectory()) {
+              countTagUsage(fullPath);
+            } else if (entry.name === "metadata.json") {
+              try {
+                const metadata = JSON.parse(fsSync.readFileSync(fullPath, "utf8"));
+                if (metadata.tags && Array.isArray(metadata.tags)) {
+                  const hasTag = metadata.tags.some((noteTag) => {
+                    if (typeof noteTag === "string") {
+                      // Skip UUID tags when counting explicit tag usage
+                      const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                      if (UUID_REGEX.test(noteTag)) {
+                        return false;
+                      }
+                      return noteTag === tag.name || noteTag === tag.id;
+                    }
+                    return noteTag === tag.id || noteTag.id === tag.id;
+                  });
+
+                  if (hasTag) {
+                    noteCount++;
+                  }
+                }
+              } catch (error) {
+                console.warn(`Skipping invalid metadata: ${fullPath}`);
+              }
+            }
+          }
+        };
+
+        countTagUsage(userNotesPath);
+      }
+
+      allTags.set(tag.name, {
+        ...tag,
+        noteCount,
+      });
+    }
+
+    // Add dynamic tags that don't have explicit entities
+    for (const [tagName, count] of dynamicTagCounts) {
+      if (!allTags.has(tagName)) {
+        // Create a dynamic tag entity
+        allTags.set(tagName, {
+          id: tagName, // Use name as ID for string tags
+          userId,
+          name: tagName,
+          color: "#" + Math.floor(Math.random() * 16777215).toString(16), // Random color
+          created: new Date().toISOString(),
+          noteCount: count,
+          dynamic: true, // Mark as dynamically generated
+        });
+      }
+    }
+
+    // Convert to array and sort by note count (most used first)
+    const result = Array.from(allTags.values()).sort(
+      (a, b) => (b.noteCount || 0) - (a.noteCount || 0)
+    );
+
+    res.json(result);
   } catch (error) {
+    console.error("Error getting tags:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -858,6 +1058,10 @@ app.post("/api/:userId/tags", async (req, res) => {
     };
 
     tags.set(tagId, tag);
+    
+    // Persist to disk
+    await saveUserTags(userId);
+    
     res.json(tag);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -878,6 +1082,9 @@ app.put("/api/:userId/tags/:tagId", async (req, res) => {
     Object.assign(tag, updates);
     tags.set(tagId, tag);
 
+    // Persist to disk
+    await saveUserTags(userId);
+
     res.json(tag);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -895,13 +1102,17 @@ app.delete("/api/:userId/tags/:tagId", async (req, res) => {
     }
 
     tags.delete(tagId);
+    
+    // Persist to disk
+    await saveUserTags(userId);
+    
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Reorder tags
+    // Reorder tags
 app.post("/api/:userId/tags/reorder", async (req, res) => {
   try {
     const { userId } = req.params;
@@ -955,6 +1166,9 @@ app.post("/api/:userId/tags/reorder", async (req, res) => {
         tags.set(tag.id, tag);
       });
     }
+
+    // Persist to disk
+    await saveUserTags(userId);
 
     res.json({ success: true });
   } catch (error) {
@@ -1278,9 +1492,12 @@ async function startServer() {
       console.error(
         `💡 Kill the process using port ${PORT} with: lsof -ti:${PORT} | xargs kill -9`
       );
-      console.error(`� Or change the port in config.json`);
+      console.error(`📝 Or change the port in config.json`);
       process.exit(1);
     }
+
+    // Load existing tags from disk before starting the server
+    await loadAllTags();
 
     app.listen(PORT, HOST, () => {
       console.log(`🚀 Noet server running on http://${HOST}:${PORT}`);

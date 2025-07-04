@@ -23,6 +23,11 @@ code {
   min-height: 200px;
 }
 
+/* Ensure font-size styles are applied with high specificity */
+.ProseMirror span[style*="font-size"] {
+  line-height: 1.4;
+}
+
 /* List Styles */
 .ProseMirror ul.bullet-list {
   list-style-type: disc;

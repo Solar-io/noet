@@ -1,11 +1,13 @@
 #!/bin/bash
 
-# Noet App - Simple Script Wrapper
-# Uses simple config approach for directory management
+# Noet App - Smart Script Wrapper
+# This wrapper ensures ALL scripts run from the correct directory
 
-# Source simple config and switch to project directory
-source "$(dirname "${BASH_SOURCE[0]}")/simple-config.sh"
-cd "$NOET_PROJECT_PATH"
+# Get the directory of this script (should be project root)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source the comprehensive guard
+source "$SCRIPT_DIR/noet-guard.sh"
 
 # Main execution
 if [[ $# -eq 0 ]]; then
@@ -27,8 +29,6 @@ if [[ $# -eq 0 ]]; then
     echo "  $0 npm install"
     echo "  $0 test test-note-counts.js"
     echo "  $0 start-dev"
-    echo ""
-    echo "Project: $NOET_PROJECT_PATH"
     exit 0
 fi
 
@@ -37,30 +37,26 @@ shift
 
 case "$command" in
     "validate"|"check")
-        echo "✅ Project directory: $(pwd)"
-        echo "✅ Package.json exists: $(test -f package.json && echo 'Yes' || echo 'No')"
-        echo "✅ Server directory exists: $(test -d server && echo 'Yes' || echo 'No')"
-        echo "✅ Source directory exists: $(test -d src && echo 'Yes' || echo 'No')"
+        validate_environment
         ;;
     "npm")
-        echo "🚀 Running npm $@ in $(pwd)"
-        npm "$@"
+        safe_npm "$@"
         ;;
     "node")
-        echo "🚀 Running node $@ in $(pwd)"
-        node "$@"
+        safe_node "$@"
         ;;
     "test")
         if [[ $# -eq 0 ]]; then
             echo "Available tests:"
+            ensure_project_directory
             ls -1 test-*.js 2>/dev/null | sed 's/^/  /' || echo "  No test scripts found"
         else
-            echo "🧪 Running test: $@ in $(pwd)"
-            node "$@"
+            safe_test "$@"
         fi
         ;;
     "start-dev")
         echo "🚀 Starting development environment..."
+        ensure_project_directory
         echo "📋 Starting both backend and frontend..."
         echo "   Backend: npm run backend"
         echo "   Frontend: npm run dev"
@@ -71,14 +67,13 @@ case "$command" in
         ;;
     "start-backend")
         echo "🚀 Starting backend only..."
-        npm run backend
+        safe_npm run backend
         ;;
     "start-frontend")
         echo "🚀 Starting frontend only..."
-        npm run dev
+        safe_npm run dev
         ;;
     *)
-        echo "🚀 Running: $command $@ in $(pwd)"
-        "$command" "$@"
+        safe_run "$command" "$@"
         ;;
 esac

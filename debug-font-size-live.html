@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Font Size Debug - Live Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .test-area {
+            border: 2px solid #ddd;
+            padding: 20px;
+            margin: 20px 0;
+            background: #f9f9f9;
+        }
+        
+        .debug-info {
+            background: #e1f5fe;
+            padding: 10px;
+            margin: 10px 0;
+            border-left: 4px solid #2196f3;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .controls {
+            margin: 20px 0;
+        }
+        
+        button {
+            margin: 5px;
+            padding: 10px 15px;
+            border: none;
+            background: #2196f3;
+            color: white;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        
+        button:hover {
+            background: #1976d2;
+        }
+    </style>
+</head>
+<body>
+    <h1>Font Size Debug - Live Test</h1>
+    
+    <div class="debug-info">
+        This test checks if inline font-size styles work correctly.<br>
+        Open this in a browser while the Noet app is running to compare behavior.
+    </div>
+    
+    <div class="controls">
+        <button onclick="setSize('12px')">12px</button>
+        <button onclick="setSize('16px')">16px</button>
+        <button onclick="setSize('24px')">24px</button>
+        <button onclick="setSize('32px')">32px</button>
+        <button onclick="setSize('48px')">48px</button>
+        <button onclick="setSize('default')">Default</button>
+    </div>
+    
+    <div class="test-area">
+        <h3>Test Content:</h3>
+        <div id="testContent" contenteditable="true">
+            <p>This is test content for font size testing.</p>
+            <p><span style="font-size: 24px;">This span should be 24px.</span></p>
+            <p>This text will have its font size changed by the buttons above.</p>
+        </div>
+    </div>
+    
+    <div class="debug-info">
+        <strong>HTML Output:</strong><br>
+        <div id="htmlOutput"></div>
+    </div>
+    
+    <div class="debug-info">
+        <strong>Current Styles:</strong><br>
+        <div id="styleOutput"></div>
+    </div>
+    
+    <script>
+        function setSize(size) {
+            const content = document.getElementById('testContent');
+            const selection = window.getSelection();
+            
+            if (selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                if (range.toString()) {
+                    // Apply to selection
+                    const span = document.createElement('span');
+                    if (size === 'default') {
+                        span.style.fontSize = '';
+                    } else {
+                        span.style.fontSize = size;
+                    }
+                    
+                    try {
+                        range.surroundContents(span);
+                    } catch (e) {
+                        // If can't surround, create new span with content
+                        const text = range.toString();
+                        span.textContent = text;
+                        range.deleteContents();
+                        range.insertNode(span);
+                    }
+                } else {
+                    // Apply to entire content
+                    if (size === 'default') {
+                        content.style.fontSize = '';
+                    } else {
+                        content.style.fontSize = size;
+                    }
+                }
+            } else {
+                // No selection, apply to entire content
+                if (size === 'default') {
+                    content.style.fontSize = '';
+                } else {
+                    content.style.fontSize = size;
+                }
+            }
+            
+            updateDebugInfo();
+        }
+        
+        function updateDebugInfo() {
+            const content = document.getElementById('testContent');
+            document.getElementById('htmlOutput').textContent = content.innerHTML;
+            
+            const styles = window.getComputedStyle(content);
+            document.getElementById('styleOutput').innerHTML = 
+                `font-size: ${styles.fontSize}<br>` +
+                `font-family: ${styles.fontFamily}<br>` +
+                `line-height: ${styles.lineHeight}`;
+        }
+        
+        // Update debug info on content change
+        document.getElementById('testContent').addEventListener('input', updateDebugInfo);
+        
+        // Initial update
+        updateDebugInfo();
+    </script>
+</body>
+</html>
