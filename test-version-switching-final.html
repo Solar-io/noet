@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Version Switching Final Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .test-section {
+        margin-bottom: 30px;
+        padding: 20px;
+        background: #f9f9f9;
+        border-radius: 5px;
+      }
+      .test-section h3 {
+        color: #333;
+        margin-top: 0;
+      }
+      .result {
+        margin-top: 10px;
+        padding: 10px;
+        border-radius: 4px;
+        font-weight: bold;
+      }
+      .success {
+        background-color: #d4edda;
+        color: #155724;
+      }
+      .error {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+      .warning {
+        background-color: #fff3cd;
+        color: #856404;
+      }
+      button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-right: 10px;
+        margin-bottom: 10px;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      .code {
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        font-family: monospace;
+        margin: 10px 0;
+      }
+      .log {
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        max-height: 200px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      .instructions {
+        background-color: #e7f3ff;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🔄 Version Switching Final Test</h1>
+      <p>
+        This test validates that version switching now works correctly with
+        proper content restoration.
+      </p>
+
+      <div class="instructions">
+        <h3>📋 Test Instructions</h3>
+        <ol>
+          <li>Open the main app (should already be open)</li>
+          <li>Select a note that has multiple versions</li>
+          <li>Open the version history panel (click version indicator)</li>
+          <li>Click on different versions and observe content changes</li>
+          <li>
+            Click "Current Version" and verify it shows the actual current
+            content
+          </li>
+          <li>Repeat with different versions</li>
+        </ol>
+      </div>
+
+      <div class="test-section">
+        <h3>🔍 Version API Test</h3>
+        <p>First, let's verify that the version API is working correctly:</p>
+        <button onclick="testVersionAPI()">Test Version API</button>
+        <div id="apiResult"></div>
+      </div>
+
+      <div class="test-section">
+        <h3>🎯 Expected Behavior</h3>
+        <ul>
+          <li>
+            <strong>✅ Version Preview:</strong> Clicking versions should show
+            their content in the editor
+          </li>
+          <li>
+            <strong>✅ Current Version:</strong> Clicking "Current Version"
+            should show the actual current content
+          </li>
+          <li>
+            <strong>✅ Content Preservation:</strong> Original content should be
+            preserved during preview
+          </li>
+          <li>
+            <strong>✅ State Management:</strong> Version preview shouldn't
+            modify main note state
+          </li>
+          <li>
+            <strong>✅ Visual Feedback:</strong> Selected version should be
+            highlighted with "Active" badge
+          </li>
+        </ul>
+      </div>
+
+      <div class="test-section">
+        <h3>🐛 Previous Issues (Should Be Fixed)</h3>
+        <ul>
+          <li>
+            <strike
+              >Current version showing wrong content after version
+              switches</strike
+            >
+          </li>
+          <li><strike>Version preview corrupting main note state</strike></li>
+          <li>
+            <strike>Version numbers jumping due to race conditions</strike>
+          </li>
+          <li>
+            <strike
+              >Both current and historical versions appearing selected</strike
+            >
+          </li>
+        </ul>
+      </div>
+
+      <div class="test-section">
+        <h3>📊 Console Log Monitor</h3>
+        <p>Monitor the browser console for these key logs:</p>
+        <ul>
+          <li><code>🔄 switchToVersion called with versionId</code></li>
+          <li>
+            <code>🔍 Version preview detected - updating editor only</code>
+          </li>
+          <li>
+            <code>✅ Exited version preview and restored original content</code>
+          </li>
+          <li><code>💾 Normal content update - updating main state</code></li>
+        </ul>
+      </div>
+
+      <div class="test-section">
+        <h3>🎮 Quick Test Actions</h3>
+        <button onclick="openMainApp()">Open Main App</button>
+        <button onclick="showConsole()">Show Console</button>
+        <button onclick="checkVersionNumbers()">Check Version Numbers</button>
+        <div id="testResults"></div>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE = "http://localhost:3004/api/user-1/notes";
+
+      async function testVersionAPI() {
+        const resultDiv = document.getElementById("apiResult");
+        resultDiv.innerHTML =
+          '<div class="warning">Testing version API...</div>';
+
+        try {
+          // Get all notes
+          const notesResponse = await fetch(API_BASE);
+          const notes = await notesResponse.json();
+
+          if (notes.length === 0) {
+            resultDiv.innerHTML =
+              '<div class="error">No notes found. Please create some notes first.</div>';
+            return;
+          }
+
+          // Find a note with versions
+          let noteWithVersions = null;
+          for (const note of notes) {
+            if (note.version > 1) {
+              noteWithVersions = note;
+              break;
+            }
+          }
+
+          if (!noteWithVersions) {
+            resultDiv.innerHTML =
+              '<div class="warning">No notes with versions found. Please make some changes to create versions.</div>';
+            return;
+          }
+
+          // Test version history API
+          const versionsResponse = await fetch(
+            `${API_BASE}/${noteWithVersions.id}/versions`
+          );
+          const versions = await versionsResponse.json();
+
+          if (versions.length === 0) {
+            resultDiv.innerHTML =
+              '<div class="error">No versions found in API response.</div>';
+            return;
+          }
+
+          // Test individual version API
+          const versionResponse = await fetch(
+            `${API_BASE}/${noteWithVersions.id}/versions/${versions[0].id}`
+          );
+          const version = await versionResponse.json();
+
+          resultDiv.innerHTML = `
+                    <div class="success">
+                        ✅ Version API Working!<br>
+                        📝 Note: ${noteWithVersions.title} (v${noteWithVersions.version})<br>
+                        📚 Versions: ${versions.length}<br>
+                        📄 Sample version: v${version.version} (${version.changeDescription})
+                    </div>
+                `;
+        } catch (error) {
+          resultDiv.innerHTML = `<div class="error">❌ API Error: ${error.message}</div>`;
+        }
+      }
+
+      function openMainApp() {
+        window.open("http://localhost:3001/", "_blank");
+      }
+
+      function showConsole() {
+        alert(
+          "Press F12 or Cmd+Option+I to open Developer Console and monitor logs"
+        );
+      }
+
+      async function checkVersionNumbers() {
+        const resultDiv = document.getElementById("testResults");
+        resultDiv.innerHTML =
+          '<div class="warning">Checking version numbers...</div>';
+
+        try {
+          const response = await fetch(API_BASE);
+          const notes = await response.json();
+
+          let versionInfo =
+            '<div class="success">📊 Version Numbers:</div><div class="code">';
+          for (const note of notes) {
+            versionInfo += `${note.title}: v${note.version}<br>`;
+          }
+          versionInfo += "</div>";
+
+          resultDiv.innerHTML = versionInfo;
+        } catch (error) {
+          resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+        }
+      }
+
+      // Auto-run version API test on page load
+      window.onload = function () {
+        setTimeout(testVersionAPI, 1000);
+      };
+    </script>
+  </body>
+</html>

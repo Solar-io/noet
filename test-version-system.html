@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Note Versioning System - Test Plan</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 2rem;
+            line-height: 1.6;
+        }
+        .test-section {
+            margin: 2rem 0;
+            padding: 1.5rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        .test-case {
+            margin: 1rem 0;
+            padding: 1rem;
+            border-left: 4px solid #007acc;
+            background: white;
+        }
+        .pass { border-left-color: #10b981; }
+        .fail { border-left-color: #ef4444; }
+        .pending { border-left-color: #f59e0b; }
+        
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 1rem;
+            margin: 0.5rem 0;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+        }
+        
+        .ui-mockup {
+            border: 2px solid #ddd;
+            padding: 1rem;
+            margin: 1rem 0;
+            background: white;
+        }
+        
+        h2 { color: #333; border-bottom: 2px solid #007acc; padding-bottom: 0.5rem; }
+        h3 { color: #555; }
+        
+        .requirement { background: #e8f4fd; padding: 0.5rem; margin: 0.5rem 0; border-radius: 4px; }
+        .trigger { background: #fff3cd; padding: 0.5rem; margin: 0.5rem 0; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>📝 Note Versioning System - Comprehensive Test Plan</h1>
+    
+    <div class="test-section">
+        <h2>🎯 Requirements Validation</h2>
+        
+        <div class="requirement">
+            <strong>R1:</strong> Admin configurable version limit (default: 100 versions per note)
+        </div>
+        <div class="requirement">
+            <strong>R2:</strong> Version creation triggers:
+            <ul>
+                <li>5% or greater content change</li>
+                <li>Major changes (title, tags, folder, notebook)</li>
+                <li>Focus switch to another note</li>
+            </ul>
+        </div>
+        <div class="requirement">
+            <strong>R3:</strong> UI: Version indicator "v[number]" left of Tags dropdown</li>
+        </div>
+        <div class="requirement">
+            <strong>R4:</strong> Right-side version history panel with scrollable list</li>
+        </div>
+        <div class="requirement">
+            <strong>R5:</strong> Version preview, copy/paste, and restore functionality</li>
+        </div>
+        <div class="requirement">
+            <strong>R6:</strong> Remove "Manage" button and associated sidebar</li>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🏗️ System Architecture Test Plan</h2>
+        
+        <h3>Backend Storage Design</h3>
+        <div class="code-block">
+notes/
+├── user-1/
+│   ├── note-uuid/
+│   │   ├── metadata.json          (current note info)
+│   │   ├── note.md                (current content)
+│   │   ├── versions/              
+│   │   │   ├── v1.json            (version metadata + content)
+│   │   │   ├── v2.json
+│   │   │   └── v3.json
+│   │   └── attachments/
+        </div>
+        
+        <h3>API Endpoints to Test</h3>
+        <div class="test-case pending">
+            <strong>GET /api/:userId/notes/:noteId/versions</strong><br>
+            Returns list of all versions for a note (newest first)
+        </div>
+        <div class="test-case pending">
+            <strong>GET /api/:userId/notes/:noteId/versions/:versionId</strong><br>
+            Returns specific version content
+        </div>
+        <div class="test-case pending">
+            <strong>POST /api/:userId/notes/:noteId/restore/:versionId</strong><br>
+            Restores note to specific version
+        </div>
+        <div class="test-case pending">
+            <strong>DELETE /api/:userId/notes/:noteId/versions/:versionId</strong><br>
+            Deletes specific version
+        </div>
+        <div class="test-case pending">
+            <strong>GET /api/admin/config/versions</strong><br>
+            Admin: Get version limit configuration
+        </div>
+        <div class="test-case pending">
+            <strong>POST /api/admin/config/versions</strong><br>
+            Admin: Set version limit configuration
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>⚡ Version Trigger Testing</h2>
+        
+        <h3>Content Change Detection</h3>
+        <div class="test-case pending">
+            <strong>TC-1:</strong> 5% Content Change Trigger<br>
+            <em>Test:</em> Type 100 characters, then add 5+ more characters<br>
+            <em>Expected:</em> New version created<br>
+            <div class="code-block">
+calculateChangePercentage(oldContent, newContent) {
+  const oldLength = oldContent.replace(/<[^>]*>/g, '').length;
+  const newLength = newContent.replace(/<[^>]*>/g, '').length;
+  const changeRatio = Math.abs(newLength - oldLength) / Math.max(oldLength, 1);
+  return changeRatio >= 0.05; // 5%
+}
+            </div>
+        </div>
+        
+        <div class="test-case pending">
+            <strong>TC-2:</strong> Title Change Trigger<br>
+            <em>Test:</em> Change note title<br>
+            <em>Expected:</em> New version created immediately
+        </div>
+        
+        <div class="test-case pending">
+            <strong>TC-3:</strong> Tag Addition/Removal Trigger<br>
+            <em>Test:</em> Add or remove tags<br>
+            <em>Expected:</em> New version created immediately
+        </div>
+        
+        <div class="test-case pending">
+            <strong>TC-4:</strong> Folder/Notebook Change Trigger<br>
+            <em>Test:</em> Move note to different folder/notebook<br>
+            <em>Expected:</em> New version created immediately
+        </div>
+        
+        <div class="test-case pending">
+            <strong>TC-5:</strong> Focus Switch Trigger<br>
+            <em>Test:</em> Edit note, then click on different note<br>
+            <em>Expected:</em> Version created before focus switches
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🎨 UI Component Testing</h2>
+        
+        <h3>Version Indicator Placement</h3>
+        <div class="ui-mockup">
+            <div style="display: flex; align-items: center; gap: 12px; padding: 8px; border: 1px solid #ddd;">
+                <button style="background: #e5e7eb; padding: 4px 8px; border: none; border-radius: 4px;">
+                    v23
+                </button>
+                <button style="background: #e5e7eb; padding: 4px 8px; border: none; border-radius: 4px;">
+                    # Tags ▼
+                </button>
+                <div style="flex: 1; text-align: center; color: #888;">
+                    [Note Title Here]
+                </div>
+            </div>
+            <p><em>Version indicator "v23" should appear to the left of Tags dropdown</em></p>
+        </div>
+        
+        <div class="test-case pending">
+            <strong>UI-1:</strong> Version Indicator Visibility<br>
+            <em>Test:</em> Open note with multiple versions<br>
+            <em>Expected:</em> "v[number]" button visible left of Tags dropdown
+        </div>
+        
+        <div class="test-case pending">
+            <strong>UI-2:</strong> Version Panel Toggle<br>
+            <em>Test:</em> Click version indicator<br>
+            <em>Expected:</em> Right-side panel opens showing version history
+        </div>
+        
+        <div class="test-case pending">
+            <strong>UI-3:</strong> Manage Button Removal<br>
+            <em>Test:</em> Check note editor header<br>
+            <em>Expected:</em> "Manage" button is no longer present
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔄 Version History Panel Testing</h2>
+        
+        <h3>Version List Display</h3>
+        <div class="ui-mockup">
+            <div style="width: 300px; border: 1px solid #ddd; height: 400px; overflow-y: auto;">
+                <div style="padding: 12px; border-bottom: 1px solid #eee; background: #f8f9fa;">
+                    <strong>Version History</strong>
+                </div>
+                <div style="padding: 8px; border-bottom: 1px solid #eee; background: #e3f2fd;">
+                    <div style="font-weight: bold;">v5 - Current</div>
+                    <div style="font-size: 12px; color: #666;">2 minutes ago</div>
+                    <div style="font-size: 12px; color: #666;">Title change</div>
+                </div>
+                <div style="padding: 8px; border-bottom: 1px solid #eee;">
+                    <div style="font-weight: bold;">v4</div>
+                    <div style="font-size: 12px; color: #666;">1 hour ago</div>
+                    <div style="font-size: 12px; color: #666;">+127 characters</div>
+                </div>
+                <div style="padding: 8px; border-bottom: 1px solid #eee;">
+                    <div style="font-weight: bold;">v3</div>
+                    <div style="font-size: 12px; color: #666;">Yesterday</div>
+                    <div style="font-size: 12px; color: #666;">Tag added</div>
+                </div>
+            </div>
+            <p><em>Scrollable list with most recent at top</em></p>
+        </div>
+        
+        <div class="test-case pending">
+            <strong>VH-1:</strong> Version List Loading<br>
+            <em>Test:</em> Open version history panel<br>
+            <em>Expected:</em> All versions listed, newest first
+        </div>
+        
+        <div class="test-case pending">
+            <strong>VH-2:</strong> Version Preview<br>
+            <em>Test:</em> Click on any version in list<br>
+            <em>Expected:</em> Main editor shows that version's content
+        </div>
+        
+        <div class="test-case pending">
+            <strong>VH-3:</strong> Copy/Paste Functionality<br>
+            <em>Test:</em> Select text from old version, copy, switch to current<br>
+            <em>Expected:</em> Text can be pasted into current version
+        </div>
+        
+        <div class="test-case pending">
+            <strong>VH-4:</strong> Restore Version<br>
+            <em>Test:</em> Click restore button on old version<br>
+            <em>Expected:</em> Confirmation dialog, then note restored to that version
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>⚙️ Admin Configuration Testing</h2>
+        
+        <div class="test-case pending">
+            <strong>AC-1:</strong> Version Limit Configuration<br>
+            <em>Test:</em> Admin sets version limit to 10<br>
+            <em>Expected:</em> Notes only keep 10 most recent versions
+        </div>
+        
+        <div class="test-case pending">
+            <strong>AC-2:</strong> Version Cleanup<br>
+            <em>Test:</em> Create 15 versions when limit is 10<br>
+            <em>Expected:</em> Oldest 5 versions automatically deleted
+        </div>
+        
+        <div class="test-case pending">
+            <strong>AC-3:</strong> Default Configuration<br>
+            <em>Test:</em> Fresh installation<br>
+            <em>Expected:</em> Version limit defaults to 100
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🚀 Performance Testing</h2>
+        
+        <div class="test-case pending">
+            <strong>P-1:</strong> Large Content Versioning<br>
+            <em>Test:</em> Create versions of 10MB+ notes<br>
+            <em>Expected:</em> Version creation < 1 second
+        </div>
+        
+        <div class="test-case pending">
+            <strong>P-2:</strong> Version History Loading<br>
+            <em>Test:</em> Load version history for note with 100 versions<br>
+            <em>Expected:</em> Panel opens < 500ms
+        </div>
+        
+        <div class="test-case pending">
+            <strong>P-3:</strong> Focus Switch Performance<br>
+            <em>Test:</em> Rapidly switch between notes<br>
+            <em>Expected:</em> No lag in switching, versions created efficiently
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>📋 Implementation Checklist</h2>
+        
+        <div class="test-case pending">
+            <strong>✅ Phase 1: Backend Implementation</strong>
+            <ul>
+                <li>Create version storage system</li>
+                <li>Add version API endpoints</li>
+                <li>Implement version triggers</li>
+                <li>Add admin configuration endpoints</li>
+            </ul>
+        </div>
+        
+        <div class="test-case pending">
+            <strong>✅ Phase 2: Frontend UI</strong>
+            <ul>
+                <li>Remove "Manage" button</li>
+                <li>Add version indicator button</li>
+                <li>Create version history panel component</li>
+                <li>Integrate with existing note editor</li>
+            </ul>
+        </div>
+        
+        <div class="test-case pending">
+            <strong>✅ Phase 3: Admin Interface</strong>
+            <ul>
+                <li>Add version configuration to admin panel</li>
+                <li>Add version statistics/monitoring</li>
+            </ul>
+        </div>
+        
+        <div class="test-case pending">
+            <strong>✅ Phase 4: Testing & Validation</strong>
+            <ul>
+                <li>Run all test cases above</li>
+                <li>Performance optimization</li>
+                <li>Documentation updates</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🎯 Success Criteria</h2>
+        <ul>
+            <li>All version triggers work as specified</li>
+            <li>Version history panel functions smoothly</li>
+            <li>Admin can configure version limits</li>
+            <li>Version storage doesn't impact performance</li>
+            <li>"Manage" button successfully removed</li>
+            <li>Copy/paste and restore work between versions</li>
+            <li>Version indicator shows current version number</li>
+        </ul>
+    </div>
+
+    <script>
+        console.log("📝 Note Versioning Test Plan Loaded");
+        console.log("Next: Follow our 5-step debugging methodology to implement each component");
+    </script>
+</body>
+</html> 

@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Version Switching Debug Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .test-section {
+        margin-bottom: 30px;
+        padding: 20px;
+        background: #f9f9f9;
+        border-radius: 5px;
+      }
+      .test-section h2 {
+        color: #333;
+        margin-top: 0;
+      }
+      .step {
+        margin: 10px 0;
+        padding: 10px;
+        background: white;
+        border-radius: 3px;
+        border-left: 4px solid #007bff;
+      }
+      .result {
+        margin: 10px 0;
+        padding: 10px;
+        border-radius: 3px;
+        font-family: monospace;
+        font-size: 14px;
+      }
+      .success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      .error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+      .warning {
+        background: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+      }
+      .info {
+        background: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+      }
+      button {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      button:disabled {
+        background: #6c757d;
+        cursor: not-allowed;
+      }
+      .debug-logs {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 3px;
+        max-height: 300px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      .version-item {
+        background: white;
+        border: 1px solid #ddd;
+        padding: 10px;
+        margin: 5px 0;
+        border-radius: 3px;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .version-item:hover {
+        background: #f0f0f0;
+      }
+      .version-item.active {
+        background: #e3f2fd;
+        border-color: #2196f3;
+      }
+      .content-preview {
+        background: #fff;
+        border: 1px solid #ddd;
+        padding: 15px;
+        margin: 10px 0;
+        border-radius: 3px;
+        min-height: 100px;
+        white-space: pre-wrap;
+        font-family: monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🔍 Version Switching Debug Test</h1>
+      <p>
+        This test will help debug the version switching functionality step by
+        step.
+      </p>
+
+      <div class="test-section">
+        <h2>Step 1: Initial Setup</h2>
+        <div class="step">
+          <strong>Test API Connection:</strong>
+          <button onclick="testApiConnection()">Test Connection</button>
+          <div id="connectionResult" class="result"></div>
+        </div>
+
+        <div class="step">
+          <strong>Load Test Note:</strong>
+          <button onclick="loadTestNote()">Load Note</button>
+          <div id="noteResult" class="result"></div>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <h2>Step 2: Version History</h2>
+        <div class="step">
+          <strong>Load Version History:</strong>
+          <button onclick="loadVersionHistory()">Load Versions</button>
+          <div id="versionHistoryResult" class="result"></div>
+        </div>
+
+        <div class="step">
+          <strong>Available Versions:</strong>
+          <div id="versionsList"></div>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <h2>Step 3: Version Switching Test</h2>
+        <div class="step">
+          <strong>Current Content Preview:</strong>
+          <div id="currentContent" class="content-preview">
+            No content loaded
+          </div>
+        </div>
+
+        <div class="step">
+          <strong>Test Version Switching:</strong>
+          <button onclick="testVersionSwitching()">Test All Versions</button>
+          <div id="switchingResult" class="result"></div>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <h2>Step 4: Debug Information</h2>
+        <div class="step">
+          <strong>Debug Logs:</strong>
+          <button onclick="clearDebugLogs()">Clear Logs</button>
+          <div id="debugLogs" class="debug-logs"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE = "http://localhost:3004";
+      const USER_ID = "user-1";
+      let testNote = null;
+      let versionHistory = [];
+      let currentSelectedVersion = null;
+
+      // Debug logging
+      function addDebugLog(message, type = "info") {
+        const logs = document.getElementById("debugLogs");
+        const timestamp = new Date().toLocaleTimeString();
+        const logClass =
+          type === "error" ? "error" : type === "success" ? "success" : "info";
+        logs.innerHTML += `<div class="${logClass}">[${timestamp}] ${message}</div>`;
+        logs.scrollTop = logs.scrollHeight;
+      }
+
+      function clearDebugLogs() {
+        document.getElementById("debugLogs").innerHTML = "";
+      }
+
+      // Test API connection
+      async function testApiConnection() {
+        const resultDiv = document.getElementById("connectionResult");
+        addDebugLog("Testing API connection...");
+
+        try {
+          const response = await fetch(`${API_BASE}/api/health`);
+
+          if (response.ok) {
+            resultDiv.className = "result success";
+            resultDiv.textContent = "✅ API connection successful";
+            addDebugLog("API connection successful", "success");
+          } else {
+            resultDiv.className = "result error";
+            resultDiv.textContent = `❌ API connection failed: ${response.status}`;
+            addDebugLog(`API connection failed: ${response.status}`, "error");
+          }
+        } catch (error) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = `❌ API connection error: ${error.message}`;
+          addDebugLog(`API connection error: ${error.message}`, "error");
+        }
+      }
+
+      // Load test note
+      async function loadTestNote() {
+        const resultDiv = document.getElementById("noteResult");
+        addDebugLog("Loading test note...");
+
+        try {
+          const response = await fetch(`${API_BASE}/api/${USER_ID}/notes`);
+
+          if (!response.ok) {
+            throw new Error(`Failed to load notes: ${response.status}`);
+          }
+
+          const notes = await response.json();
+
+          if (notes.length === 0) {
+            resultDiv.className = "result warning";
+            resultDiv.textContent =
+              "⚠️ No notes found. Please create a note first.";
+            addDebugLog("No notes found", "warning");
+            return;
+          }
+
+          // Use the first note as test note
+          testNote = notes[0];
+
+          // Load full note content
+          const noteResponse = await fetch(
+            `${API_BASE}/api/${USER_ID}/notes/${testNote.id}`
+          );
+          if (noteResponse.ok) {
+            testNote = await noteResponse.json();
+          }
+
+          resultDiv.className = "result success";
+          resultDiv.innerHTML = `✅ Loaded test note: <strong>${
+            testNote.title
+          }</strong><br>
+                                       ID: ${testNote.id}<br>
+                                       Version: ${testNote.version}<br>
+                                       Content Length: ${
+                                         testNote.content?.length || 0
+                                       } characters`;
+
+          addDebugLog(
+            `Test note loaded: ${testNote.title} (v${testNote.version})`,
+            "success"
+          );
+
+          // Show current content
+          updateCurrentContent(testNote.content);
+        } catch (error) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = `❌ Failed to load test note: ${error.message}`;
+          addDebugLog(`Failed to load test note: ${error.message}`, "error");
+        }
+      }
+
+      // Load version history
+      async function loadVersionHistory() {
+        const resultDiv = document.getElementById("versionHistoryResult");
+
+        if (!testNote) {
+          resultDiv.className = "result warning";
+          resultDiv.textContent = "⚠️ Please load a test note first";
+          addDebugLog("No test note loaded", "warning");
+          return;
+        }
+
+        addDebugLog("Loading version history...");
+
+        try {
+          const response = await fetch(
+            `${API_BASE}/api/${USER_ID}/notes/${testNote.id}/versions`
+          );
+
+          if (!response.ok) {
+            throw new Error(`Failed to load versions: ${response.status}`);
+          }
+
+          versionHistory = await response.json();
+
+          resultDiv.className = "result success";
+          resultDiv.textContent = `✅ Loaded ${versionHistory.length} versions`;
+
+          addDebugLog(
+            `Version history loaded: ${versionHistory.length} versions`,
+            "success"
+          );
+
+          // Display versions
+          displayVersions();
+        } catch (error) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = `❌ Failed to load versions: ${error.message}`;
+          addDebugLog(
+            `Failed to load version history: ${error.message}`,
+            "error"
+          );
+        }
+      }
+
+      // Display versions
+      function displayVersions() {
+        const versionsList = document.getElementById("versionsList");
+
+        if (versionHistory.length === 0) {
+          versionsList.innerHTML =
+            '<div class="warning">No versions available</div>';
+          return;
+        }
+
+        versionsList.innerHTML = versionHistory
+          .map(
+            (version) => `
+                <div class="version-item" onclick="selectVersion('${
+                  version.id
+                }')" id="version-${version.id}">
+                    <strong>v${version.version}</strong> - ${
+              version.changeDescription || "No description"
+            }
+                    <br>
+                    <small>Created: ${new Date(
+                      version.createdAt
+                    ).toLocaleString()}</small>
+                    <br>
+                    <small>Size: ${version.size} characters</small>
+                </div>
+            `
+          )
+          .join("");
+      }
+
+      // Select version
+      async function selectVersion(versionId) {
+        addDebugLog(`Selecting version: ${versionId}`);
+
+        // Remove active class from all versions
+        document.querySelectorAll(".version-item").forEach((item) => {
+          item.classList.remove("active");
+        });
+
+        // Add active class to selected version
+        document.getElementById(`version-${versionId}`).classList.add("active");
+
+        try {
+          const response = await fetch(
+            `${API_BASE}/api/${USER_ID}/notes/${testNote.id}/versions/${versionId}`
+          );
+
+          if (!response.ok) {
+            throw new Error(`Failed to load version: ${response.status}`);
+          }
+
+          const versionData = await response.json();
+          currentSelectedVersion = versionData;
+
+          addDebugLog(
+            `Version data loaded: v${versionData.version}`,
+            "success"
+          );
+          addDebugLog(
+            `Content preview: ${versionData.content?.substring(0, 100)}...`
+          );
+
+          // Update content preview
+          updateCurrentContent(versionData.content);
+        } catch (error) {
+          addDebugLog(`Failed to load version: ${error.message}`, "error");
+        }
+      }
+
+      // Update current content display
+      function updateCurrentContent(content) {
+        const contentDiv = document.getElementById("currentContent");
+
+        if (!content) {
+          contentDiv.textContent = "No content";
+          return;
+        }
+
+        // Remove HTML tags for preview
+        const textContent = content.replace(/<[^>]*>/g, "");
+        contentDiv.textContent =
+          textContent.substring(0, 500) +
+          (textContent.length > 500 ? "..." : "");
+      }
+
+      // Test version switching
+      async function testVersionSwitching() {
+        const resultDiv = document.getElementById("switchingResult");
+
+        if (versionHistory.length === 0) {
+          resultDiv.className = "result warning";
+          resultDiv.textContent = "⚠️ No versions available for testing";
+          addDebugLog("No versions available for testing", "warning");
+          return;
+        }
+
+        resultDiv.className = "result info";
+        resultDiv.textContent = "🔄 Testing version switching...";
+        addDebugLog("Starting version switching test...");
+
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const version of versionHistory) {
+          try {
+            addDebugLog(`Testing version v${version.version}...`);
+
+            const response = await fetch(
+              `${API_BASE}/api/${USER_ID}/notes/${testNote.id}/versions/${version.id}`
+            );
+
+            if (!response.ok) {
+              throw new Error(
+                `Failed to load version v${version.version}: ${response.status}`
+              );
+            }
+
+            const versionData = await response.json();
+
+            // Verify version data
+            if (!versionData.content) {
+              throw new Error(`Version v${version.version} has no content`);
+            }
+
+            addDebugLog(
+              `✅ Version v${version.version} loaded successfully`,
+              "success"
+            );
+            successCount++;
+
+            // Brief delay to simulate real usage
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          } catch (error) {
+            addDebugLog(
+              `❌ Version v${version.version} failed: ${error.message}`,
+              "error"
+            );
+            errorCount++;
+          }
+        }
+
+        // Final result
+        if (errorCount === 0) {
+          resultDiv.className = "result success";
+          resultDiv.textContent = `✅ All ${successCount} versions loaded successfully!`;
+          addDebugLog(
+            `Version switching test completed: ${successCount} success, ${errorCount} errors`,
+            "success"
+          );
+        } else {
+          resultDiv.className = "result error";
+          resultDiv.textContent = `⚠️ ${successCount} versions loaded, ${errorCount} failed`;
+          addDebugLog(
+            `Version switching test completed: ${successCount} success, ${errorCount} errors`,
+            "error"
+          );
+        }
+      }
+
+      // Initialize
+      addDebugLog("Version switching debug test initialized");
+
+      // Auto-test on page load
+      setTimeout(async () => {
+        await testApiConnection();
+        await loadTestNote();
+        await loadVersionHistory();
+      }, 1000);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Note Versioning System - Implementation Test</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+        max-width: 1200px;
+        margin: 2rem auto;
+        padding: 2rem;
+        line-height: 1.6;
+      }
+      .test-section {
+        margin: 2rem 0;
+        padding: 1.5rem;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        background: #fafafa;
+      }
+      .test-case {
+        margin: 1rem 0;
+        padding: 1rem;
+        border-left: 4px solid #007acc;
+        background: white;
+      }
+      .pass {
+        border-left-color: #10b981;
+        background: #f0fdf4;
+      }
+      .fail {
+        border-left-color: #ef4444;
+        background: #fef2f2;
+      }
+      .pending {
+        border-left-color: #f59e0b;
+        background: #fffbeb;
+      }
+
+      .api-test {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 4px;
+        padding: 1rem;
+        margin: 0.5rem 0;
+        font-family: "Courier New", monospace;
+      }
+
+      h2 {
+        color: #333;
+        border-bottom: 2px solid #007acc;
+        padding-bottom: 0.5rem;
+      }
+      h3 {
+        color: #555;
+      }
+
+      button {
+        background: #007acc;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 0.25rem;
+      }
+      button:hover {
+        background: #005999;
+      }
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+
+      .status {
+        font-weight: bold;
+      }
+      .status.pass {
+        color: #10b981;
+      }
+      .status.fail {
+        color: #ef4444;
+      }
+      .status.pending {
+        color: #f59e0b;
+      }
+
+      .checklist {
+        background: white;
+        padding: 1rem;
+        border-radius: 4px;
+        margin: 1rem 0;
+      }
+
+      .checklist li {
+        margin: 0.5rem 0;
+        display: flex;
+        align-items: center;
+      }
+
+      .checklist input[type="checkbox"] {
+        margin-right: 0.5rem;
+        transform: scale(1.2);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>📝 Note Versioning System - Implementation Validation</h1>
+
+    <div class="test-section">
+      <h2>🎯 Implementation Checklist</h2>
+
+      <div class="checklist">
+        <h3>Backend Implementation</h3>
+        <ul>
+          <li>
+            <input type="checkbox" checked /> Version storage system
+            (server/server.js)
+          </li>
+          <li>
+            <input type="checkbox" checked /> Admin configuration endpoints
+          </li>
+          <li><input type="checkbox" checked /> Version API endpoints</li>
+          <li><input type="checkbox" checked /> Automatic version triggers</li>
+          <li><input type="checkbox" checked /> Version cleanup mechanism</li>
+          <li>
+            <input type="checkbox" checked /> Change percentage calculation
+          </li>
+        </ul>
+
+        <h3>Frontend Implementation</h3>
+        <ul>
+          <li>
+            <input type="checkbox" checked /> Removed "Manage" button
+            (NoteEditor.jsx)
+          </li>
+          <li>
+            <input type="checkbox" checked /> Added version indicator
+            "v[number]"
+          </li>
+          <li>
+            <input type="checkbox" checked /> Version history panel structure
+          </li>
+          <li>
+            <input type="checkbox" checked /> Admin version configuration UI
+          </li>
+          <li><input type="checkbox" /> Version list with API integration</li>
+          <li><input type="checkbox" /> Version preview functionality</li>
+          <li><input type="checkbox" /> Restore version functionality</li>
+          <li><input type="checkbox" /> Focus switch version triggers</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="test-section">
+      <h2>🧪 API Testing</h2>
+
+      <div class="test-case pending">
+        <h3>Test Backend API Endpoints</h3>
+        <p>
+          Status:
+          <span class="status pending" id="api-status">Ready to test</span>
+        </p>
+
+        <div class="api-test">
+          <h4>1. Test Admin Version Configuration</h4>
+          <button onclick="testVersionConfig()">
+            GET /api/admin/config/versions
+          </button>
+          <button onclick="updateVersionConfig()">
+            POST /api/admin/config/versions
+          </button>
+          <div id="config-result"></div>
+        </div>
+
+        <div class="api-test">
+          <h4>2. Test Version History</h4>
+          <button onclick="testVersionHistory()">
+            GET /api/user-1/notes/[noteId]/versions
+          </button>
+          <div id="history-result"></div>
+        </div>
+
+        <div class="api-test">
+          <h4>3. Test Version Creation</h4>
+          <button onclick="testVersionCreation()">
+            PUT /api/user-1/notes/[noteId]
+          </button>
+          <div id="creation-result"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="test-section">
+      <h2>🎨 UI Testing</h2>
+
+      <div class="test-case pending">
+        <h3>Version Indicator Placement</h3>
+        <p>
+          Status: <span class="status pending">Manual testing required</span>
+        </p>
+        <ol>
+          <li>Open a note in the application</li>
+          <li>Verify "v[number]" button appears left of Tags dropdown</li>
+          <li>Verify "Manage" button is no longer present</li>
+          <li>Click version indicator to open version history panel</li>
+        </ol>
+      </div>
+
+      <div class="test-case pending">
+        <h3>Admin Configuration</h3>
+        <p>
+          Status: <span class="status pending">Manual testing required</span>
+        </p>
+        <ol>
+          <li>Open Admin Interface as admin user</li>
+          <li>Navigate to "Version Control" tab</li>
+          <li>Verify all configuration options are present</li>
+          <li>Test changing max versions and update</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="test-section">
+      <h2>⚡ Version Trigger Testing</h2>
+
+      <div class="test-case pending">
+        <h3>Content Change Trigger (5%+)</h3>
+        <p>
+          Status:
+          <span class="status pending">Needs implementation validation</span>
+        </p>
+        <div id="content-test">
+          <h4>Test Content Change Calculation</h4>
+          <button onclick="testChangeCalculation()">
+            Test Change Percentage Logic
+          </button>
+          <div id="change-result"></div>
+        </div>
+      </div>
+
+      <div class="test-case pending">
+        <h3>Metadata Change Triggers</h3>
+        <p>
+          Status: <span class="status pending">Manual testing required</span>
+        </p>
+        <ol>
+          <li>Change note title → Should create version</li>
+          <li>Add/remove tags → Should create version</li>
+          <li>Change folder → Should create version</li>
+          <li>Change notebook → Should create version</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="test-section">
+      <h2>🔧 Next Steps</h2>
+
+      <div class="checklist">
+        <h3>Immediate Tasks</h3>
+        <ul>
+          <li>
+            <input type="checkbox" /> Implement full version history panel with
+            API integration
+          </li>
+          <li><input type="checkbox" /> Add version preview functionality</li>
+          <li><input type="checkbox" /> Add restore version functionality</li>
+          <li>
+            <input type="checkbox" /> Add focus switch trigger integration
+          </li>
+          <li>
+            <input type="checkbox" /> Test all version triggers thoroughly
+          </li>
+        </ul>
+
+        <h3>Future Enhancements</h3>
+        <ul>
+          <li><input type="checkbox" /> Version diff visualization</li>
+          <li><input type="checkbox" /> Version statistics in admin panel</li>
+          <li><input type="checkbox" /> Version export functionality</li>
+          <li><input type="checkbox" /> Bulk version operations</li>
+        </ul>
+      </div>
+    </div>
+
+    <script>
+      const BACKEND_URL = "http://localhost:3004";
+
+      async function testVersionConfig() {
+        try {
+          const response = await fetch(
+            `${BACKEND_URL}/api/admin/config/versions`,
+            {
+              headers: {
+                Authorization: "Bearer user-1", // Mock auth for testing
+              },
+            }
+          );
+
+          const result = await response.json();
+          document.getElementById(
+            "config-result"
+          ).innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+
+          if (response.ok) {
+            document.getElementById("api-status").textContent = "API Working";
+            document.getElementById("api-status").className = "status pass";
+          } else {
+            throw new Error("API Error");
+          }
+        } catch (error) {
+          document.getElementById(
+            "config-result"
+          ).innerHTML = `<span style="color: red;">Error: ${error.message}</span>`;
+          document.getElementById("api-status").textContent = "API Error";
+          document.getElementById("api-status").className = "status fail";
+        }
+      }
+
+      async function updateVersionConfig() {
+        try {
+          const response = await fetch(
+            `${BACKEND_URL}/api/admin/config/versions`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: "Bearer user-1",
+              },
+              body: JSON.stringify({
+                maxVersionsPerNote: 50,
+                autoVersionOnChange: true,
+                minChangePercentage: 10,
+                enableFocusSwitch: true,
+              }),
+            }
+          );
+
+          const result = await response.json();
+          document.getElementById(
+            "config-result"
+          ).innerHTML = `<strong>Update Result:</strong><br><pre>${JSON.stringify(
+            result,
+            null,
+            2
+          )}</pre>`;
+        } catch (error) {
+          document.getElementById(
+            "config-result"
+          ).innerHTML = `<span style="color: red;">Update Error: ${error.message}</span>`;
+        }
+      }
+
+      async function testVersionHistory() {
+        // This would need a real note ID
+        const mockNoteId = "test-note-123";
+        try {
+          const response = await fetch(
+            `${BACKEND_URL}/api/user-1/notes/${mockNoteId}/versions`
+          );
+          const result = await response.json();
+          document.getElementById(
+            "history-result"
+          ).innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+        } catch (error) {
+          document.getElementById(
+            "history-result"
+          ).innerHTML = `<span style="color: red;">Error: ${error.message}<br>Note: This is expected if no test note exists</span>`;
+        }
+      }
+
+      async function testVersionCreation() {
+        document.getElementById("creation-result").innerHTML =
+          '<span style="color: orange;">This test requires creating a real note first</span>';
+      }
+
+      function testChangeCalculation() {
+        // Test the change percentage calculation logic
+        function calculateChangePercentage(oldContent, newContent) {
+          if (!oldContent && !newContent) return 0;
+          if (!oldContent) return 100;
+          if (!newContent) return 100;
+
+          const oldText = oldContent.replace(/<[^>]*>/g, "");
+          const newText = newContent.replace(/<[^>]*>/g, "");
+
+          const oldLength = oldText.length;
+          const newLength = newText.length;
+
+          if (oldLength === 0 && newLength === 0) return 0;
+          if (oldLength === 0) return 100;
+
+          const changeRatio = Math.abs(newLength - oldLength) / oldLength;
+          return changeRatio * 100;
+        }
+
+        const tests = [
+          { old: "Hello world", new: "Hello world!", expected: "≈8.3%" },
+          {
+            old: "Short",
+            new: "This is much longer content",
+            expected: "≈440%",
+          },
+          { old: "Same content", new: "Same content", expected: "0%" },
+          { old: "", new: "New content", expected: "100%" },
+          {
+            old: "100 characters long text that should trigger version when 5 or more characters are added to it",
+            new: "100 characters long text that should trigger version when 5 or more characters are added to it plus",
+            expected: "≈4.7%",
+          },
+        ];
+
+        let results = "<h4>Change Percentage Tests:</h4>";
+        tests.forEach((test, index) => {
+          const actual = calculateChangePercentage(test.old, test.new);
+          const shouldTrigger = actual >= 5;
+          results += `<div style="margin: 0.5rem 0; padding: 0.5rem; background: ${
+            shouldTrigger ? "#f0fdf4" : "#fef2f2"
+          };">
+                    Test ${index + 1}: ${actual.toFixed(1)}% (Expected: ${
+            test.expected
+          })
+                    ${
+                      shouldTrigger
+                        ? "✅ Would trigger version"
+                        : "❌ Would not trigger version"
+                    }
+                </div>`;
+        });
+
+        document.getElementById("change-result").innerHTML = results;
+      }
+
+      // Auto-run change calculation test on load
+      window.onload = () => {
+        testChangeCalculation();
+      };
+    </script>
+  </body>
+</html>

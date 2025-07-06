@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Version Numbering Fix Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .test-section {
+        margin-bottom: 30px;
+        padding: 20px;
+        background: #f9f9f9;
+        border-radius: 5px;
+      }
+      .test-section h3 {
+        color: #333;
+        margin-top: 0;
+      }
+      .button {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      .button:hover {
+        background: #0056b3;
+      }
+      .status {
+        margin-top: 10px;
+        padding: 10px;
+        border-radius: 5px;
+        font-weight: bold;
+      }
+      .success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      .error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+      .info {
+        background: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+      }
+      .log {
+        background: #f8f9fa;
+        padding: 15px;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        margin-top: 10px;
+        font-family: monospace;
+        font-size: 12px;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+      .version-list {
+        margin-top: 10px;
+      }
+      .version-item {
+        padding: 5px 10px;
+        margin: 2px 0;
+        background: #e9ecef;
+        border-radius: 3px;
+        font-family: monospace;
+        font-size: 11px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🔧 Version Numbering Fix Test</h1>
+      <p>
+        This test verifies that the version numbering race condition has been
+        fixed.
+      </p>
+
+      <div class="test-section">
+        <h3>Test 1: Rapid Version Creation</h3>
+        <p>Creates multiple versions rapidly to test for race conditions.</p>
+        <button class="button" onclick="testRapidVersionCreation()">
+          Run Rapid Version Test
+        </button>
+        <div id="rapidTest"></div>
+      </div>
+
+      <div class="test-section">
+        <h3>Test 2: Focus Switch Version Creation</h3>
+        <p>
+          Tests the focus switch trigger that was causing duplicate versions.
+        </p>
+        <button class="button" onclick="testFocusSwitchVersions()">
+          Run Focus Switch Test
+        </button>
+        <div id="focusTest"></div>
+      </div>
+
+      <div class="test-section">
+        <h3>Test 3: Version Sequence Validation</h3>
+        <p>Validates that version numbers are sequential without gaps.</p>
+        <button class="button" onclick="testVersionSequence()">
+          Run Sequence Test
+        </button>
+        <div id="sequenceTest"></div>
+      </div>
+
+      <div class="test-section">
+        <h3>Console Output</h3>
+        <div id="consoleLog" class="log"></div>
+      </div>
+    </div>
+
+    <script>
+      const BACKEND_URL = "http://localhost:3004";
+      const TEST_USER_ID = "user-1";
+      let testNoteId = null;
+      let logDiv = document.getElementById("consoleLog");
+
+      function log(message) {
+        console.log(message);
+        logDiv.innerHTML += message + "<br>";
+        logDiv.scrollTop = logDiv.scrollHeight;
+      }
+
+      function showStatus(elementId, message, type = "info") {
+        const element = document.getElementById(elementId);
+        element.innerHTML = `<div class="status ${type}">${message}</div>`;
+      }
+
+      async function createTestNote() {
+        if (testNoteId) return testNoteId;
+
+        try {
+          const response = await fetch(
+            `${BACKEND_URL}/api/${TEST_USER_ID}/notes`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                title: "Version Numbering Test Note",
+                content: "Initial content for version testing",
+              }),
+            }
+          );
+
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+          const note = await response.json();
+          testNoteId = note.id;
+          log(`✅ Created test note: ${testNoteId}`);
+          return testNoteId;
+        } catch (error) {
+          log(`❌ Error creating test note: ${error.message}`);
+          throw error;
+        }
+      }
+
+      async function updateNoteContent(noteId, content) {
+        try {
+          const response = await fetch(
+            `${BACKEND_URL}/api/${TEST_USER_ID}/notes/${noteId}`,
+            {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ content }),
+            }
+          );
+
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return await response.json();
+        } catch (error) {
+          log(`❌ Error updating note: ${error.message}`);
+          throw error;
+        }
+      }
+
+      async function createFocusSwitch(noteId) {
+        try {
+          const response = await fetch(
+            `${BACKEND_URL}/api/${TEST_USER_ID}/notes/${noteId}/version-checkpoint`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({}),
+            }
+          );
+
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return await response.json();
+        } catch (error) {
+          log(`❌ Error creating focus switch: ${error.message}`);
+          throw error;
+        }
+      }
+
+      async function getVersions(noteId) {
+        try {
+          const response = await fetch(
+            `${BACKEND_URL}/api/${TEST_USER_ID}/notes/${noteId}/versions`
+          );
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return await response.json();
+        } catch (error) {
+          log(`❌ Error getting versions: ${error.message}`);
+          throw error;
+        }
+      }
+
+      async function testRapidVersionCreation() {
+        showStatus(
+          "rapidTest",
+          "Running rapid version creation test...",
+          "info"
+        );
+        log("🚀 Starting rapid version creation test");
+
+        try {
+          const noteId = await createTestNote();
+          const startTime = Date.now();
+
+          // Create 5 rapid content updates
+          const promises = [];
+          for (let i = 1; i <= 5; i++) {
+            promises.push(
+              updateNoteContent(noteId, `Rapid update ${i} - ${Date.now()}`)
+            );
+          }
+
+          await Promise.all(promises);
+
+          // Wait a bit for versions to be created
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+
+          const versions = await getVersions(noteId);
+          const versionNumbers = versions
+            .map((v) => v.version)
+            .sort((a, b) => a - b);
+
+          log(
+            `📊 Created ${
+              versions.length
+            } versions with numbers: ${versionNumbers.join(", ")}`
+          );
+
+          // Check for duplicates
+          const duplicates = versionNumbers.filter(
+            (v, i) => versionNumbers.indexOf(v) !== i
+          );
+
+          if (duplicates.length > 0) {
+            showStatus(
+              "rapidTest",
+              `❌ FAILED: Found duplicate version numbers: ${duplicates.join(
+                ", "
+              )}`,
+              "error"
+            );
+            log(`❌ RAPID TEST FAILED: Duplicate versions found`);
+          } else {
+            showStatus(
+              "rapidTest",
+              `✅ PASSED: No duplicate version numbers found`,
+              "success"
+            );
+            log(`✅ RAPID TEST PASSED: All versions unique`);
+          }
+
+          // Show version details
+          const versionDetails = versions
+            .map((v) => `v${v.version} (${v.changeDescription})`)
+            .join(", ");
+          document.getElementById(
+            "rapidTest"
+          ).innerHTML += `<div class="version-list">Versions: ${versionDetails}</div>`;
+        } catch (error) {
+          showStatus("rapidTest", `❌ ERROR: ${error.message}`, "error");
+          log(`❌ RAPID TEST ERROR: ${error.message}`);
+        }
+      }
+
+      async function testFocusSwitchVersions() {
+        showStatus("focusTest", "Running focus switch test...", "info");
+        log("🔄 Starting focus switch test");
+
+        try {
+          const noteId = await createTestNote();
+
+          // Create multiple rapid focus switches
+          const promises = [];
+          for (let i = 1; i <= 3; i++) {
+            promises.push(createFocusSwitch(noteId));
+          }
+
+          await Promise.all(promises);
+
+          // Wait a bit for versions to be created
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+
+          const versions = await getVersions(noteId);
+          const focusVersions = versions.filter(
+            (v) => v.trigger === "focus_switch"
+          );
+          const versionNumbers = focusVersions
+            .map((v) => v.version)
+            .sort((a, b) => a - b);
+
+          log(
+            `📊 Created ${
+              focusVersions.length
+            } focus switch versions with numbers: ${versionNumbers.join(", ")}`
+          );
+
+          // Check for duplicates
+          const duplicates = versionNumbers.filter(
+            (v, i) => versionNumbers.indexOf(v) !== i
+          );
+
+          if (duplicates.length > 0) {
+            showStatus(
+              "focusTest",
+              `❌ FAILED: Found duplicate focus switch versions: ${duplicates.join(
+                ", "
+              )}`,
+              "error"
+            );
+            log(`❌ FOCUS TEST FAILED: Duplicate versions found`);
+          } else {
+            showStatus(
+              "focusTest",
+              `✅ PASSED: No duplicate focus switch versions`,
+              "success"
+            );
+            log(`✅ FOCUS TEST PASSED: All focus switch versions unique`);
+          }
+
+          // Show version details
+          const versionDetails = focusVersions
+            .map((v) => `v${v.version} (${v.changeDescription})`)
+            .join(", ");
+          document.getElementById(
+            "focusTest"
+          ).innerHTML += `<div class="version-list">Focus Versions: ${versionDetails}</div>`;
+        } catch (error) {
+          showStatus("focusTest", `❌ ERROR: ${error.message}`, "error");
+          log(`❌ FOCUS TEST ERROR: ${error.message}`);
+        }
+      }
+
+      async function testVersionSequence() {
+        showStatus("sequenceTest", "Running version sequence test...", "info");
+        log("🔢 Starting version sequence test");
+
+        try {
+          const noteId = await createTestNote();
+          const versions = await getVersions(noteId);
+
+          if (versions.length === 0) {
+            showStatus(
+              "sequenceTest",
+              `❌ No versions found for note`,
+              "error"
+            );
+            return;
+          }
+
+          const versionNumbers = versions
+            .map((v) => v.version)
+            .sort((a, b) => a - b);
+          log(
+            `📊 Found ${versions.length} versions: ${versionNumbers.join(", ")}`
+          );
+
+          // Check for sequential numbering
+          let isSequential = true;
+          let gaps = [];
+
+          for (let i = 1; i < versionNumbers.length; i++) {
+            const current = versionNumbers[i];
+            const previous = versionNumbers[i - 1];
+
+            if (current !== previous + 1) {
+              isSequential = false;
+              gaps.push(`Gap between v${previous} and v${current}`);
+            }
+          }
+
+          if (isSequential) {
+            showStatus(
+              "sequenceTest",
+              `✅ PASSED: All versions are sequential`,
+              "success"
+            );
+            log(`✅ SEQUENCE TEST PASSED: Versions are sequential`);
+          } else {
+            showStatus(
+              "sequenceTest",
+              `❌ FAILED: Found gaps in version sequence: ${gaps.join(", ")}`,
+              "error"
+            );
+            log(`❌ SEQUENCE TEST FAILED: Gaps found`);
+          }
+
+          // Show all versions
+          const versionDetails = versions.map(
+            (v) => `v${v.version} (${v.trigger}: ${v.changeDescription})`
+          );
+          document.getElementById(
+            "sequenceTest"
+          ).innerHTML += `<div class="version-list">${versionDetails.join(
+            "<br>"
+          )}</div>`;
+        } catch (error) {
+          showStatus("sequenceTest", `❌ ERROR: ${error.message}`, "error");
+          log(`❌ SEQUENCE TEST ERROR: ${error.message}`);
+        }
+      }
+
+      // Auto-run tests when page loads
+      window.addEventListener("load", () => {
+        log("🔧 Version Numbering Fix Test Page Loaded");
+        log(
+          "📋 Ready to run tests. Click the buttons above to test the fixes."
+        );
+      });
+    </script>
+  </body>
+</html>

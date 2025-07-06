@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Noet Attachment Test</title>
+    <!-- Use a working PDF.js CDN version that has global variables -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+      // Wait for PDF.js to load - try multiple possible global names
+      function waitForPDFJS() {
+        return new Promise((resolve, reject) => {
+          let attempts = 0;
+          const maxAttempts = 50; // 5 seconds max
+
+          function checkPDFJS() {
+            attempts++;
+
+            // Try different possible global names
+            if (window.pdfjsLib && window.pdfjsLib.version) {
+              resolve();
+              return;
+            } else if (window.pdfjs && window.pdfjs.version) {
+              window.pdfjsLib = window.pdfjs;
+              resolve();
+              return;
+            } else if (window.PDFJS && window.PDFJS.version) {
+              window.pdfjsLib = window.PDFJS;
+              resolve();
+              return;
+            }
+
+            if (attempts >= maxAttempts) {
+              reject(new Error("PDF.js failed to load after 5 seconds"));
+              return;
+            }
+
+            setTimeout(checkPDFJS, 100);
+          }
+
+          checkPDFJS();
+        });
+      }
+    </script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      .test-section {
+        margin-bottom: 30px;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      .test-section h2 {
+        color: #333;
+        margin-top: 0;
+      }
+      .status {
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 4px;
+        font-weight: bold;
+      }
+      .success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      .error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+      .info {
+        background-color: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+      }
+      .warning {
+        background-color: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+      }
+      button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      #test-image {
+        max-width: 300px;
+        max-height: 200px;
+        border: 1px solid #ddd;
+        margin: 10px 0;
+        display: block;
+      }
+      #pdf-canvas {
+        border: 1px solid #ddd;
+        margin: 10px 0;
+        display: block;
+      }
+      .log {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 12px;
+        max-height: 200px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🧪 Noet Attachment Test Suite</h1>
+      <p>Testing image and PDF loading with the Noet backend server.</p>
+
+      <!-- Backend Connection Test -->
+      <div class="test-section">
+        <h2>📡 Backend Connection Test</h2>
+        <div id="backend-status" class="status info">
+          Testing backend connection...
+        </div>
+        <button onclick="testBackendConnection()">Test Backend</button>
+      </div>
+
+      <!-- Image Loading Test -->
+      <div class="test-section">
+        <h2>🖼️ Image Loading Test</h2>
+        <div id="image-status" class="status info">
+          Ready to test image loading...
+        </div>
+        <button onclick="testImageLoading()">Test Image</button>
+        <br />
+        <img id="test-image" style="display: none" />
+      </div>
+
+      <!-- PDF.js Worker Test -->
+      <div class="test-section">
+        <h2>⚙️ PDF.js Worker Test</h2>
+        <div id="worker-status" class="status info">
+          Testing PDF.js worker availability...
+        </div>
+        <button onclick="testPDFWorker()">Test PDF Worker</button>
+        <div id="worker-log" class="log"></div>
+      </div>
+
+      <!-- PDF Loading Test -->
+      <div class="test-section">
+        <h2>📄 PDF Loading Test</h2>
+        <div id="pdf-status" class="status info">
+          Ready to test PDF loading...
+        </div>
+        <button onclick="testPDFLoading()">Test PDF</button>
+        <br />
+        <canvas id="pdf-canvas" style="display: none"></canvas>
+      </div>
+
+      <!-- Console Log -->
+      <div class="test-section">
+        <h2>📋 Console Log</h2>
+        <div id="console-log" class="log">
+          Console output will appear here...
+        </div>
+        <button onclick="clearLog()">Clear Log</button>
+      </div>
+    </div>
+
+    <script>
+      // Override console.log to capture output
+      const originalLog = console.log;
+      const originalError = console.error;
+      const originalWarn = console.warn;
+
+      function logToPage(message, type = "log") {
+        const logDiv = document.getElementById("console-log");
+        const timestamp = new Date().toLocaleTimeString();
+        const prefix = type === "error" ? "❌" : type === "warn" ? "⚠️" : "📝";
+        logDiv.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+        logDiv.scrollTop = logDiv.scrollHeight;
+      }
+
+      console.log = function (...args) {
+        originalLog.apply(console, args);
+        logToPage(args.join(" "), "log");
+      };
+
+      console.error = function (...args) {
+        originalError.apply(console, args);
+        logToPage(args.join(" "), "error");
+      };
+
+      console.warn = function (...args) {
+        originalWarn.apply(console, args);
+        logToPage(args.join(" "), "warn");
+      };
+
+      // Test backend connection
+      async function testBackendConnection() {
+        const statusDiv = document.getElementById("backend-status");
+        statusDiv.textContent = "Testing backend connection...";
+        statusDiv.className = "status info";
+
+        try {
+          const response = await fetch("http://localhost:3004/api/health");
+          if (response.ok) {
+            const data = await response.json();
+            statusDiv.textContent = `✅ Backend connected successfully! Status: ${data.status}`;
+            statusDiv.className = "status success";
+            console.log("Backend connection successful");
+          } else {
+            statusDiv.textContent = `❌ Backend responded with status: ${response.status}`;
+            statusDiv.className = "status error";
+            console.error("Backend connection failed:", response.status);
+          }
+        } catch (error) {
+          statusDiv.textContent = `❌ Backend connection failed: ${error.message}`;
+          statusDiv.className = "status error";
+          console.error("Backend connection error:", error);
+        }
+      }
+
+      // Test image loading
+      async function testImageLoading() {
+        const statusDiv = document.getElementById("image-status");
+        const imgElement = document.getElementById("test-image");
+
+        statusDiv.textContent = "Testing image loading...";
+        statusDiv.className = "status info";
+
+        // First test if backend has any image files
+        try {
+          const response = await fetch("http://localhost:3004/api/attachments");
+          if (!response.ok) {
+            throw new Error(`API responded with status: ${response.status}`);
+          }
+
+          const attachments = await response.json();
+          const imageFile = attachments.find(
+            (file) => file.mimeType && file.mimeType.startsWith("image/")
+          );
+
+          if (!imageFile) {
+            statusDiv.textContent = "⚠️ No image files found on backend";
+            statusDiv.className = "status warning";
+            console.warn("No image files found for testing");
+            return;
+          }
+
+          const imageUrl = `http://localhost:3004/attachments/${imageFile.filename}`;
+          console.log("Testing image URL:", imageUrl);
+
+          // Test image loading
+          imgElement.onload = function () {
+            statusDiv.textContent = `✅ Image loaded successfully! (${imageFile.filename})`;
+            statusDiv.className = "status success";
+            imgElement.style.display = "block";
+            console.log("Image loaded successfully");
+          };
+
+          imgElement.onerror = function () {
+            statusDiv.textContent = `❌ Image failed to load: ${imageFile.filename}`;
+            statusDiv.className = "status error";
+            console.error("Image loading failed");
+          };
+
+          imgElement.src = imageUrl;
+        } catch (error) {
+          statusDiv.textContent = `❌ Image test failed: ${error.message}`;
+          statusDiv.className = "status error";
+          console.error("Image test error:", error);
+        }
+      }
+
+      // Test PDF.js worker
+      async function testPDFWorker() {
+        const statusDiv = document.getElementById("worker-status");
+        const logDiv = document.getElementById("worker-log");
+
+        statusDiv.textContent = "Testing PDF.js worker...";
+        statusDiv.className = "status info";
+        logDiv.textContent = "";
+
+        try {
+          // Wait for PDF.js to load
+          await waitForPDFJS();
+
+          // Check if pdfjsLib is available
+          if (!window.pdfjsLib || !window.pdfjsLib.version) {
+            throw new Error("PDF.js library not loaded properly");
+          }
+
+          // Test worker URLs for the older version
+          const workerUrls = [
+            `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`,
+            `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`,
+            `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`,
+          ];
+
+          logDiv.textContent += `PDF.js version: ${pdfjsLib.version}\n`;
+          logDiv.textContent += `Testing ${workerUrls.length} worker URLs...\n\n`;
+
+          let workerFound = false;
+          for (const workerUrl of workerUrls) {
+            try {
+              const workerResponse = await fetch(workerUrl, { method: "HEAD" });
+              if (workerResponse.ok) {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+                logDiv.textContent += `✅ Worker found: ${workerUrl}\n`;
+                workerFound = true;
+                break;
+              } else {
+                logDiv.textContent += `❌ Worker failed (${workerResponse.status}): ${workerUrl}\n`;
+              }
+            } catch (error) {
+              logDiv.textContent += `❌ Worker error: ${workerUrl} - ${error.message}\n`;
+            }
+          }
+
+          if (workerFound) {
+            statusDiv.textContent = "✅ PDF.js worker configured successfully!";
+            statusDiv.className = "status success";
+            logDiv.textContent += `\nWorker configured: ${pdfjsLib.GlobalWorkerOptions.workerSrc}\n`;
+          } else {
+            statusDiv.textContent = "❌ No PDF.js worker URLs accessible";
+            statusDiv.className = "status error";
+            logDiv.textContent += "\n❌ All worker URLs failed\n";
+          }
+        } catch (error) {
+          statusDiv.textContent = `❌ PDF.js worker test failed: ${error.message}`;
+          statusDiv.className = "status error";
+          logDiv.textContent += `\n❌ Worker test error: ${error.message}\n`;
+        }
+      }
+
+      // Test PDF loading
+      async function testPDFLoading() {
+        const statusDiv = document.getElementById("pdf-status");
+        const canvas = document.getElementById("pdf-canvas");
+
+        statusDiv.textContent = "Testing PDF loading...";
+        statusDiv.className = "status info";
+
+        try {
+          // Wait for PDF.js to load
+          await waitForPDFJS();
+
+          // Check if pdfjsLib is available
+          if (!window.pdfjsLib || !window.pdfjsLib.version) {
+            throw new Error("PDF.js library not loaded properly");
+          }
+
+          // First test if backend has any PDF files
+          const response = await fetch("http://localhost:3004/api/attachments");
+          if (!response.ok) {
+            throw new Error(`API responded with status: ${response.status}`);
+          }
+
+          const attachments = await response.json();
+          const pdfFile = attachments.find(
+            (file) => file.mimeType && file.mimeType === "application/pdf"
+          );
+
+          if (!pdfFile) {
+            statusDiv.textContent = "⚠️ No PDF files found on backend";
+            statusDiv.className = "status warning";
+            console.warn("No PDF files found for testing");
+            return;
+          }
+
+          const pdfUrl = `http://localhost:3004/attachments/${pdfFile.filename}`;
+          console.log("Testing PDF URL:", pdfUrl);
+
+          // Configure PDF.js worker if not already done
+          if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+          }
+
+          // Load PDF
+          const loadingTask = pdfjsLib.getDocument(pdfUrl);
+          const pdf = await loadingTask.promise;
+
+          console.log("PDF loaded successfully, pages:", pdf.numPages);
+
+          // Render first page
+          const page = await pdf.getPage(1);
+          const viewport = page.getViewport({ scale: 1.0 });
+
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          canvas.style.display = "block";
+
+          const renderContext = {
+            canvasContext: canvas.getContext("2d"),
+            viewport: viewport,
+          };
+
+          await page.render(renderContext).promise;
+
+          statusDiv.textContent = `✅ PDF loaded and rendered successfully! (${pdfFile.filename}, ${pdf.numPages} pages)`;
+          statusDiv.className = "status success";
+          console.log("PDF rendered successfully");
+        } catch (error) {
+          statusDiv.textContent = `❌ PDF test failed: ${error.message}`;
+          statusDiv.className = "status error";
+          console.error("PDF test error:", error);
+        }
+      }
+
+      // Clear log
+      function clearLog() {
+        document.getElementById("console-log").textContent =
+          "Console output will appear here...";
+      }
+
+      // Run initial tests
+      window.addEventListener("load", async function () {
+        console.log("🧪 Noet Attachment Test Suite loaded");
+        testBackendConnection();
+
+        // Wait a bit for PDF.js to load, then test
+        setTimeout(async () => {
+          try {
+            // Debug: Show what's available globally
+            console.log("Available globals:", {
+              pdfjsLib: !!window.pdfjsLib,
+              pdfjs: !!window.pdfjs,
+              PDFJS: !!window.PDFJS,
+              "pdfjsLib.version": window.pdfjsLib?.version,
+              "pdfjs.version": window.pdfjs?.version,
+              "PDFJS.version": window.PDFJS?.version,
+            });
+
+            await waitForPDFJS();
+            testPDFWorker();
+          } catch (error) {
+            console.error("Failed to load PDF.js:", error);
+            const statusDiv = document.getElementById("worker-status");
+            statusDiv.textContent = `❌ PDF.js failed to load: ${error.message}`;
+            statusDiv.className = "status error";
+          }
+        }, 1000);
+      });
+    </script>
+  </body>
+</html>

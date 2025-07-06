@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Version Creation Throttling Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .test-section {
+        margin-bottom: 30px;
+        padding: 20px;
+        background: #f9f9f9;
+        border-radius: 5px;
+      }
+      .result {
+        margin-top: 10px;
+        padding: 10px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 14px;
+        white-space: pre-wrap;
+      }
+      .success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      .error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+      .info {
+        background-color: #e2f3ff;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+      }
+      button {
+        padding: 10px 20px;
+        margin: 5px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .btn-primary {
+        background-color: #007bff;
+        color: white;
+      }
+      .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+      }
+      .btn-success {
+        background-color: #28a745;
+        color: white;
+      }
+      .countdown {
+        font-weight: bold;
+        color: #007bff;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🔧 Version Creation Throttling Test</h1>
+      <p>
+        This test verifies that the version creation throttling fixes work
+        correctly.
+      </p>
+
+      <div class="test-section">
+        <h2>📊 Current Configuration</h2>
+        <button onclick="checkConfig()" class="btn-primary">
+          Check Version Config
+        </button>
+        <div id="config-result" class="result"></div>
+      </div>
+
+      <div class="test-section">
+        <h2>⏱️ Throttling Test</h2>
+        <p>
+          This test will rapidly trigger version creation to verify throttling
+          works:
+        </p>
+        <button onclick="startThrottleTest()" class="btn-primary">
+          Start Throttling Test
+        </button>
+        <div id="throttle-result" class="result"></div>
+      </div>
+
+      <div class="test-section">
+        <h2>📝 Content Change Test</h2>
+        <p>Test content change threshold (now 10% instead of 5%):</p>
+        <button onclick="testContentChangeThreshold()" class="btn-primary">
+          Test Content Change
+        </button>
+        <div id="content-result" class="result"></div>
+      </div>
+
+      <div class="test-section">
+        <h2>🔄 Focus Switch Test</h2>
+        <p>Test focus switch throttling (now 2 seconds instead of 1 second):</p>
+        <button onclick="testFocusSwitch()" class="btn-primary">
+          Test Focus Switch
+        </button>
+        <div id="focus-result" class="result"></div>
+      </div>
+
+      <div class="test-section">
+        <h2>📈 Version History Analysis</h2>
+        <button onclick="analyzeVersionHistory()" class="btn-success">
+          Analyze Current Versions
+        </button>
+        <div id="history-result" class="result"></div>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE = "http://localhost:3004/api";
+      const userId = "user-1";
+
+      // Test note ID - you can change this to test with different notes
+      let testNoteId = null;
+
+      async function checkConfig() {
+        const resultDiv = document.getElementById("config-result");
+        resultDiv.className = "result info";
+        resultDiv.textContent = "Checking configuration...";
+
+        try {
+          const response = await fetch(`${API_BASE}/admin/config/versions`, {
+            headers: {
+              Authorization: "Bearer admin-token",
+            },
+          });
+
+          if (response.ok) {
+            const config = await response.json();
+            resultDiv.className = "result success";
+            resultDiv.textContent = `✅ Version Configuration:
+📊 Max versions per note: ${config.maxVersionsPerNote}
+🔄 Auto-version on change: ${config.autoVersionOnChange}
+📈 Min change percentage: ${config.minChangePercentage}% (was 5%)
+🎯 Focus switch enabled: ${config.enableFocusSwitch}`;
+          } else {
+            resultDiv.className = "result error";
+            resultDiv.textContent = `❌ Failed to fetch config: ${response.status}`;
+          }
+        } catch (error) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = `❌ Error: ${error.message}`;
+        }
+      }
+
+      async function getOrCreateTestNote() {
+        if (testNoteId) return testNoteId;
+
+        try {
+          // Create a test note
+          const response = await fetch(`${API_BASE}/${userId}/notes`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              title: "Throttling Test Note",
+              content: "<p>Initial content for throttling test</p>",
+            }),
+          });
+
+          if (response.ok) {
+            const note = await response.json();
+            testNoteId = note.id;
+            return testNoteId;
+          } else {
+            throw new Error(`Failed to create test note: ${response.status}`);
+          }
+        } catch (error) {
+          throw new Error(`Error creating test note: ${error.message}`);
+        }
+      }
+
+      async function startThrottleTest() {
+        const resultDiv = document.getElementById("throttle-result");
+        resultDiv.className = "result info";
+        resultDiv.textContent = "Starting throttling test...";
+
+        try {
+          const noteId = await getOrCreateTestNote();
+
+          // Get initial version count
+          const initialVersions = await getVersionCount(noteId);
+
+          resultDiv.textContent = `🔄 Starting throttle test with note ${noteId}
+Initial versions: ${initialVersions}
+
+Sending 10 rapid content updates...`;
+
+          // Send 10 rapid updates
+          const promises = [];
+          for (let i = 0; i < 10; i++) {
+            promises.push(
+              fetch(`${API_BASE}/${userId}/notes/${noteId}`, {
+                method: "PUT",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  content: `<p>Update ${i + 1} - ${Date.now()}</p>`,
+                }),
+              })
+            );
+          }
+
+          await Promise.all(promises);
+
+          // Wait 2 seconds then check version count
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+
+          const finalVersions = await getVersionCount(noteId);
+          const versionsCreated = finalVersions - initialVersions;
+
+          resultDiv.className = "result success";
+          resultDiv.textContent = `✅ Throttling test complete!
+Initial versions: ${initialVersions}
+Final versions: ${finalVersions}
+Versions created: ${versionsCreated}
+
+📊 Result: ${
+            versionsCreated < 10
+              ? "THROTTLING WORKING"
+              : "THROTTLING NOT WORKING"
+          }
+Expected: Much less than 10 versions due to throttling`;
+        } catch (error) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = `❌ Error: ${error.message}`;
+        }
+      }
+
+      async function testContentChangeThreshold() {
+        const resultDiv = document.getElementById("content-result");
+        resultDiv.className = "result info";
+        resultDiv.textContent = "Testing content change threshold...";
+
+        try {
+          const noteId = await getOrCreateTestNote();
+
+          // Get initial version count
+          const initialVersions = await getVersionCount(noteId);
+
+          // First update - small change (should not trigger version)
+          await fetch(`${API_BASE}/${userId}/notes/${noteId}`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              content: "<p>Small change test</p>",
+            }),
+          });
+
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          const afterSmallChange = await getVersionCount(noteId);
+
+          // Second update - large change (should trigger version)
+          const largeContent =
+            "<p>" + "Large content change test. ".repeat(50) + "</p>";
+          await fetch(`${API_BASE}/${userId}/notes/${noteId}`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              content: largeContent,
+            }),
+          });
+
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          const afterLargeChange = await getVersionCount(noteId);
+
+          resultDiv.className = "result success";
+          resultDiv.textContent = `✅ Content change threshold test:
+Initial versions: ${initialVersions}
+After small change: ${afterSmallChange}
+After large change: ${afterLargeChange}
+
+📊 Small change versions: ${afterSmallChange - initialVersions}
+📊 Large change versions: ${afterLargeChange - afterSmallChange}
+
+Expected: Small change = 0, Large change = 1`;
+        } catch (error) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = `❌ Error: ${error.message}`;
+        }
+      }
+
+      async function testFocusSwitch() {
+        const resultDiv = document.getElementById("focus-result");
+        resultDiv.className = "result info";
+        resultDiv.textContent = "Testing focus switch throttling...";
+
+        try {
+          const noteId = await getOrCreateTestNote();
+
+          // Get initial version count
+          const initialVersions = await getVersionCount(noteId);
+
+          // Send 5 rapid focus switch requests
+          const promises = [];
+          for (let i = 0; i < 5; i++) {
+            promises.push(
+              fetch(
+                `${API_BASE}/${userId}/notes/${noteId}/version-checkpoint`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                }
+              )
+            );
+          }
+
+          await Promise.all(promises);
+
+          // Wait 1 second then check version count
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+
+          const finalVersions = await getVersionCount(noteId);
+          const versionsCreated = finalVersions - initialVersions;
+
+          resultDiv.className = "result success";
+          resultDiv.textContent = `✅ Focus switch throttling test:
+Initial versions: ${initialVersions}
+Final versions: ${finalVersions}
+Versions created: ${versionsCreated}
+
+📊 Result: ${
+            versionsCreated <= 1
+              ? "THROTTLING WORKING"
+              : "THROTTLING NOT WORKING"
+          }
+Expected: 0-1 versions due to 2-second throttling`;
+        } catch (error) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = `❌ Error: ${error.message}`;
+        }
+      }
+
+      async function analyzeVersionHistory() {
+        const resultDiv = document.getElementById("history-result");
+        resultDiv.className = "result info";
+        resultDiv.textContent = "Analyzing version history...";
+
+        try {
+          // Get all notes for the user
+          const notesResponse = await fetch(`${API_BASE}/${userId}/notes`);
+          const notes = await notesResponse.json();
+
+          let analysis = "📊 Version History Analysis:\n\n";
+
+          for (const note of notes.slice(0, 5)) {
+            // Analyze first 5 notes
+            try {
+              const versionsResponse = await fetch(
+                `${API_BASE}/${userId}/notes/${note.id}/versions`
+              );
+              if (versionsResponse.ok) {
+                const versions = await versionsResponse.json();
+
+                analysis += `📝 Note: ${note.title} (${note.id})\n`;
+                analysis += `   Versions: ${versions.length}\n`;
+
+                if (versions.length > 0) {
+                  const triggers = {};
+                  versions.forEach((v) => {
+                    triggers[v.trigger] = (triggers[v.trigger] || 0) + 1;
+                  });
+
+                  analysis += `   Triggers: ${Object.entries(triggers)
+                    .map(([k, v]) => `${k}:${v}`)
+                    .join(", ")}\n`;
+                }
+                analysis += "\n";
+              }
+            } catch (error) {
+              analysis += `   ❌ Error loading versions: ${error.message}\n\n`;
+            }
+          }
+
+          resultDiv.className = "result info";
+          resultDiv.textContent = analysis;
+        } catch (error) {
+          resultDiv.className = "result error";
+          resultDiv.textContent = `❌ Error: ${error.message}`;
+        }
+      }
+
+      async function getVersionCount(noteId) {
+        try {
+          const response = await fetch(
+            `${API_BASE}/${userId}/notes/${noteId}/versions`
+          );
+          if (response.ok) {
+            const versions = await response.json();
+            return versions.length;
+          } else {
+            return 0;
+          }
+        } catch (error) {
+          return 0;
+        }
+      }
+
+      // Auto-load config on page load
+      window.addEventListener("load", () => {
+        checkConfig();
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Version History Complete</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .test-section {
+        margin-bottom: 30px;
+        padding: 15px;
+        border: 1px solid #e0e0e0;
+        border-radius: 5px;
+      }
+      .test-header {
+        color: #333;
+        border-bottom: 2px solid #4a90e2;
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+      }
+      button {
+        background-color: #4a90e2;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      button:hover {
+        background-color: #357abd;
+      }
+      .success {
+        color: #28a745;
+        font-weight: bold;
+      }
+      .error {
+        color: #dc3545;
+        font-weight: bold;
+      }
+      .info {
+        color: #17a2b8;
+      }
+      .result {
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        margin-top: 10px;
+        white-space: pre-wrap;
+      }
+      .version-item {
+        background-color: #e9ecef;
+        padding: 10px;
+        margin: 5px 0;
+        border-radius: 4px;
+        border-left: 4px solid #4a90e2;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Version History Complete - Test Suite</h1>
+      <p>
+        This test verifies that the complete version history functionality is
+        working correctly.
+      </p>
+
+      <div class="test-section">
+        <h2 class="test-header">📋 Test 1: Load Version History</h2>
+        <p>Test loading version history for a note.</p>
+        <button onclick="testLoadVersionHistory()">
+          Test Load Version History
+        </button>
+        <div id="loadVersionResult" class="result"></div>
+      </div>
+
+      <div class="test-section">
+        <h2 class="test-header">🔍 Test 2: Preview Version</h2>
+        <p>Test previewing a specific version.</p>
+        <input
+          type="text"
+          id="previewVersionId"
+          placeholder="Enter version ID to preview"
+          style="width: 300px; padding: 5px; margin: 5px"
+        />
+        <button onclick="testPreviewVersion()">Test Preview Version</button>
+        <div id="previewVersionResult" class="result"></div>
+      </div>
+
+      <div class="test-section">
+        <h2 class="test-header">🔄 Test 3: Restore Version</h2>
+        <p>Test restoring to a specific version.</p>
+        <input
+          type="text"
+          id="restoreVersionId"
+          placeholder="Enter version ID to restore"
+          style="width: 300px; padding: 5px; margin: 5px"
+        />
+        <button onclick="testRestoreVersion()">Test Restore Version</button>
+        <div id="restoreVersionResult" class="result"></div>
+      </div>
+
+      <div class="test-section">
+        <h2 class="test-header">📊 Test 4: Version System Integration</h2>
+        <p>Test the complete version system integration.</p>
+        <button onclick="testVersionIntegration()">
+          Test Version Integration
+        </button>
+        <div id="integrationResult" class="result"></div>
+      </div>
+
+      <div class="test-section">
+        <h2 class="test-header">🎯 Test 5: Frontend Version Panel</h2>
+        <p>Instructions for testing the frontend version panel.</p>
+        <div class="info">
+          <h3>Manual Test Steps:</h3>
+          <ol>
+            <li>Open the Noet app in your browser</li>
+            <li>Create or open a note</li>
+            <li>
+              Click the version indicator button (v[number]) next to the Tags
+              dropdown
+            </li>
+            <li>The version history panel should open on the right side</li>
+            <li>
+              You should see:
+              <ul>
+                <li>Current version at the top (blue background)</li>
+                <li>Previous versions listed below (if any exist)</li>
+                <li>
+                  Each version shows: version number, date, change description,
+                  size
+                </li>
+                <li>Preview and Restore buttons for each version</li>
+              </ul>
+            </li>
+            <li>Click "Preview" on any version to see its content</li>
+            <li>Click "Restore" on any version to restore to that version</li>
+            <li>Confirm the restore operation</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE = "http://localhost:3004";
+      const TEST_USER_ID = "user-1";
+      let testNoteId = null;
+
+      // Get the first available note for testing
+      async function getTestNote() {
+        try {
+          const response = await fetch(`${API_BASE}/api/${TEST_USER_ID}/notes`);
+          if (!response.ok) throw new Error("Failed to get notes");
+          const notes = await response.json();
+          if (notes.length > 0) {
+            testNoteId = notes[0].id;
+            return notes[0];
+          }
+          throw new Error("No notes found for testing");
+        } catch (error) {
+          console.error("Error getting test note:", error);
+          throw error;
+        }
+      }
+
+      async function testLoadVersionHistory() {
+        const resultDiv = document.getElementById("loadVersionResult");
+        resultDiv.innerHTML = "Testing version history loading...";
+
+        try {
+          const testNote = await getTestNote();
+
+          const response = await fetch(
+            `${API_BASE}/api/${TEST_USER_ID}/notes/${testNote.id}/versions`
+          );
+
+          if (!response.ok) {
+            throw new Error(
+              `HTTP ${response.status}: ${await response.text()}`
+            );
+          }
+
+          const versions = await response.json();
+
+          let result = `<div class="success">✅ Version history loaded successfully!</div>`;
+          result += `<div class="info">Note: ${testNote.title} (${testNote.id})</div>`;
+          result += `<div class="info">Found ${versions.length} versions</div>`;
+
+          if (versions.length > 0) {
+            result += `<div class="info">Versions:</div>`;
+            versions.forEach((version) => {
+              result += `<div class="version-item">
+                            <strong>v${version.version}</strong> - ${
+                version.changeDescription
+              }<br>
+                            <small>Created: ${new Date(
+                              version.createdAt
+                            ).toLocaleString()}</small><br>
+                            <small>Size: ${version.size} characters</small><br>
+                            <small>ID: ${version.id}</small>
+                        </div>`;
+            });
+          } else {
+            result += `<div class="info">No version history found. This is expected for notes that haven't been modified yet.</div>`;
+          }
+
+          resultDiv.innerHTML = result;
+        } catch (error) {
+          resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+        }
+      }
+
+      async function testPreviewVersion() {
+        const resultDiv = document.getElementById("previewVersionResult");
+        const versionId = document
+          .getElementById("previewVersionId")
+          .value.trim();
+
+        if (!versionId) {
+          resultDiv.innerHTML =
+            '<div class="error">❌ Please enter a version ID</div>';
+          return;
+        }
+
+        resultDiv.innerHTML = "Testing version preview...";
+
+        try {
+          const testNote = await getTestNote();
+
+          const response = await fetch(
+            `${API_BASE}/api/${TEST_USER_ID}/notes/${testNote.id}/versions/${versionId}`
+          );
+
+          if (!response.ok) {
+            throw new Error(
+              `HTTP ${response.status}: ${await response.text()}`
+            );
+          }
+
+          const version = await response.json();
+
+          let result = `<div class="success">✅ Version preview loaded successfully!</div>`;
+          result += `<div class="info">Version: v${version.version}</div>`;
+          result += `<div class="info">Change: ${version.changeDescription}</div>`;
+          result += `<div class="info">Created: ${new Date(
+            version.createdAt
+          ).toLocaleString()}</div>`;
+          result += `<div class="info">Content Preview:</div>`;
+          result += `<div class="version-item">${
+            version.content
+              ? version.content.substring(0, 200) + "..."
+              : "No content"
+          }</div>`;
+
+          resultDiv.innerHTML = result;
+        } catch (error) {
+          resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+        }
+      }
+
+      async function testRestoreVersion() {
+        const resultDiv = document.getElementById("restoreVersionResult");
+        const versionId = document
+          .getElementById("restoreVersionId")
+          .value.trim();
+
+        if (!versionId) {
+          resultDiv.innerHTML =
+            '<div class="error">❌ Please enter a version ID</div>';
+          return;
+        }
+
+        if (
+          !confirm(
+            "Are you sure you want to restore this version? This will modify the test note."
+          )
+        ) {
+          resultDiv.innerHTML =
+            '<div class="info">Restore cancelled by user</div>';
+          return;
+        }
+
+        resultDiv.innerHTML = "Testing version restore...";
+
+        try {
+          const testNote = await getTestNote();
+
+          const response = await fetch(
+            `${API_BASE}/api/${TEST_USER_ID}/notes/${testNote.id}/restore/${versionId}`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(
+              `HTTP ${response.status}: ${await response.text()}`
+            );
+          }
+
+          const restoredNote = await response.json();
+
+          let result = `<div class="success">✅ Version restored successfully!</div>`;
+          result += `<div class="info">Note now at version: v${restoredNote.version}</div>`;
+          result += `<div class="info">Restored from version ID: ${versionId}</div>`;
+          result += `<div class="info">Updated: ${new Date(
+            restoredNote.updated
+          ).toLocaleString()}</div>`;
+
+          resultDiv.innerHTML = result;
+        } catch (error) {
+          resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+        }
+      }
+
+      async function testVersionIntegration() {
+        const resultDiv = document.getElementById("integrationResult");
+        resultDiv.innerHTML = "Testing complete version system integration...";
+
+        try {
+          const testNote = await getTestNote();
+          let result = `<div class="success">✅ Version system integration test</div>`;
+          result += `<div class="info">Testing with note: ${testNote.title}</div>`;
+
+          // Test 1: Load versions
+          const versionsResponse = await fetch(
+            `${API_BASE}/api/${TEST_USER_ID}/notes/${testNote.id}/versions`
+          );
+          if (!versionsResponse.ok) throw new Error("Failed to load versions");
+          const versions = await versionsResponse.json();
+
+          result += `<div class="info">✅ Version loading: ${versions.length} versions found</div>`;
+
+          // Test 2: Version triggers (simulate content change)
+          const updateResponse = await fetch(
+            `${API_BASE}/api/${TEST_USER_ID}/notes/${testNote.id}`,
+            {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                content: `Test content update at ${new Date().toISOString()}`,
+                metadata: { title: testNote.title },
+              }),
+            }
+          );
+
+          if (!updateResponse.ok) throw new Error("Failed to update note");
+          const updatedNote = await updateResponse.json();
+
+          result += `<div class="info">✅ Version trigger: Note updated, version is now v${updatedNote.version}</div>`;
+
+          // Test 3: Version creation verification
+          const newVersionsResponse = await fetch(
+            `${API_BASE}/api/${TEST_USER_ID}/notes/${testNote.id}/versions`
+          );
+          if (!newVersionsResponse.ok)
+            throw new Error("Failed to reload versions");
+          const newVersions = await newVersionsResponse.json();
+
+          result += `<div class="info">✅ Version creation: ${newVersions.length} versions now exist</div>`;
+
+          if (newVersions.length > versions.length) {
+            result += `<div class="success">✅ New version created successfully!</div>`;
+          } else {
+            result += `<div class="info">ℹ️ No new version created (may be due to insufficient change threshold)</div>`;
+          }
+
+          resultDiv.innerHTML = result;
+        } catch (error) {
+          resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+        }
+      }
+
+      // Initialize test
+      document.addEventListener("DOMContentLoaded", function () {
+        console.log("Version History Complete Test Suite loaded");
+      });
+    </script>
+  </body>
+</html>

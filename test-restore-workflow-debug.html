@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Restore Workflow Debug Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background: #f5f5f5;
+      }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .test-section {
+        margin: 20px 0;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      .test-section h3 {
+        margin-top: 0;
+        color: #333;
+      }
+      button {
+        padding: 8px 16px;
+        margin: 5px;
+        border: none;
+        border-radius: 4px;
+        background: #007bff;
+        color: white;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+      .success {
+        color: green;
+        font-weight: bold;
+      }
+      .error {
+        color: red;
+        font-weight: bold;
+      }
+      .warning {
+        color: orange;
+        font-weight: bold;
+      }
+      .info {
+        color: blue;
+        font-weight: bold;
+      }
+      .log {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 4px;
+        font-family: monospace;
+        white-space: pre-wrap;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+      .status {
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 4px;
+      }
+      .status.success {
+        background: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+      }
+      .status.error {
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+      }
+      .status.warning {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        color: #856404;
+      }
+      .step {
+        padding: 10px;
+        margin: 5px 0;
+        border-left: 4px solid #007bff;
+        background: #f8f9fa;
+      }
+      .step.completed {
+        border-left-color: #28a745;
+        background: #d4edda;
+      }
+      .step.failed {
+        border-left-color: #dc3545;
+        background: #f8d7da;
+      }
+      .step.current {
+        border-left-color: #ffc107;
+        background: #fff3cd;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🔧 Restore Workflow Debug Test</h1>
+      <p>
+        This test systematically verifies the version restore workflow to
+        identify issues.
+      </p>
+
+      <div class="test-section">
+        <h3>📋 Test Configuration</h3>
+        <label>
+          Backend URL:
+          <input
+            type="text"
+            id="backendUrl"
+            value="http://localhost:3004"
+            style="margin-left: 10px; padding: 5px"
+          /> </label
+        ><br /><br />
+        <label>
+          User ID:
+          <input
+            type="text"
+            id="userId"
+            value="user-1"
+            style="margin-left: 10px; padding: 5px"
+          /> </label
+        ><br /><br />
+        <label>
+          Test Note ID:
+          <input
+            type="text"
+            id="noteId"
+            value="80b983c3-db7e-4322-af51-8ec65ad5026e"
+            style="margin-left: 10px; padding: 5px"
+          /> </label
+        ><br /><br />
+        <button onclick="initializeTest()">🚀 Initialize Test</button>
+        <button onclick="runFullWorkflowTest()">
+          🔄 Run Full Workflow Test
+        </button>
+        <button onclick="clearLogs()">🧹 Clear Logs</button>
+      </div>
+
+      <div class="test-section">
+        <h3>📊 Test Status</h3>
+        <div id="testStatus" class="status">Ready to test</div>
+        <div id="testSteps"></div>
+      </div>
+
+      <div class="test-section">
+        <h3>📋 Current Note State</h3>
+        <div id="noteState" class="log">Note not loaded</div>
+      </div>
+
+      <div class="test-section">
+        <h3>📋 Available Versions</h3>
+        <div id="versionsList" class="log">Versions not loaded</div>
+      </div>
+
+      <div class="test-section">
+        <h3>🔧 Manual Test Actions</h3>
+        <button onclick="loadNote()">📝 Load Note</button>
+        <button onclick="loadVersions()">📋 Load Versions</button>
+        <button onclick="testRestoreWorkflow()">
+          🔄 Test Restore Workflow
+        </button>
+        <button onclick="testVersionPreview()">👁️ Test Version Preview</button>
+        <button onclick="simulateStateFlow()">🧪 Simulate State Flow</button>
+      </div>
+
+      <div class="test-section">
+        <h3>📝 Test Logs</h3>
+        <div id="testLogs" class="log">Test logs will appear here...</div>
+      </div>
+    </div>
+
+    <script>
+      let currentNote = null;
+      let versions = [];
+      let testSteps = [];
+
+      function log(message, type = "info") {
+        const timestamp = new Date().toLocaleTimeString();
+        const logElement = document.getElementById("testLogs");
+        const colorClass =
+          type === "error"
+            ? "error"
+            : type === "success"
+            ? "success"
+            : type === "warning"
+            ? "warning"
+            : "info";
+        logElement.innerHTML += `<span class="${colorClass}">[${timestamp}] ${message}</span>\n`;
+        logElement.scrollTop = logElement.scrollHeight;
+        console.log(`[${timestamp}] ${message}`);
+      }
+
+      function updateStatus(message, type = "info") {
+        const statusElement = document.getElementById("testStatus");
+        statusElement.textContent = message;
+        statusElement.className = `status ${type}`;
+      }
+
+      function updateNoteState() {
+        const noteStateElement = document.getElementById("noteState");
+        if (currentNote) {
+          noteStateElement.textContent = JSON.stringify(
+            {
+              id: currentNote.id,
+              title: currentNote.title,
+              version: currentNote.version,
+              contentLength: currentNote.content?.length || 0,
+              contentPreview: currentNote.content?.substring(0, 100) + "...",
+            },
+            null,
+            2
+          );
+        } else {
+          noteStateElement.textContent = "Note not loaded";
+        }
+      }
+
+      function updateVersionsList() {
+        const versionsElement = document.getElementById("versionsList");
+        if (versions.length > 0) {
+          versionsElement.textContent = versions
+            .map(
+              (v) =>
+                `v${v.version}: ${v.content?.substring(0, 50)}... (${
+                  v.content?.length
+                } chars)`
+            )
+            .join("\n");
+        } else {
+          versionsElement.textContent = "Versions not loaded";
+        }
+      }
+
+      function addTestStep(description, status = "pending") {
+        testSteps.push({ description, status, timestamp: Date.now() });
+        updateTestSteps();
+      }
+
+      function updateTestStep(index, status, details = "") {
+        if (testSteps[index]) {
+          testSteps[index].status = status;
+          testSteps[index].details = details;
+          updateTestSteps();
+        }
+      }
+
+      function updateTestSteps() {
+        const stepsElement = document.getElementById("testSteps");
+        stepsElement.innerHTML = testSteps
+          .map((step, index) => {
+            const statusClass =
+              step.status === "completed"
+                ? "completed"
+                : step.status === "failed"
+                ? "failed"
+                : step.status === "current"
+                ? "current"
+                : "";
+            return `<div class="step ${statusClass}">
+                    ${index + 1}. ${
+              step.description
+            } - ${step.status.toUpperCase()}
+                    ${step.details ? `<br><small>${step.details}</small>` : ""}
+                </div>`;
+          })
+          .join("");
+      }
+
+      function clearLogs() {
+        document.getElementById("testLogs").innerHTML =
+          "Test logs cleared...\n";
+        testSteps = [];
+        updateTestSteps();
+      }
+
+      function getConfig() {
+        return {
+          backendUrl: document.getElementById("backendUrl").value,
+          userId: document.getElementById("userId").value,
+          noteId: document.getElementById("noteId").value,
+        };
+      }
+
+      async function loadNote() {
+        const config = getConfig();
+        try {
+          log("Loading note...", "info");
+          const response = await fetch(
+            `${config.backendUrl}/api/${config.userId}/notes/${config.noteId}`
+          );
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+          currentNote = await response.json();
+          log(
+            `✅ Note loaded: ${currentNote.title} (v${currentNote.version}, ${currentNote.content?.length} chars)`,
+            "success"
+          );
+          updateNoteState();
+          return currentNote;
+        } catch (error) {
+          log(`❌ Failed to load note: ${error.message}`, "error");
+          throw error;
+        }
+      }
+
+      async function loadVersions() {
+        const config = getConfig();
+        try {
+          log("Loading versions...", "info");
+          const response = await fetch(
+            `${config.backendUrl}/api/${config.userId}/notes/${config.noteId}/versions`
+          );
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+          versions = await response.json();
+          log(`✅ Loaded ${versions.length} versions`, "success");
+          updateVersionsList();
+          return versions;
+        } catch (error) {
+          log(`❌ Failed to load versions: ${error.message}`, "error");
+          throw error;
+        }
+      }
+
+      async function restoreVersion(versionId) {
+        const config = getConfig();
+        try {
+          log(`Restoring version ${versionId}...`, "info");
+          const response = await fetch(
+            `${config.backendUrl}/api/${config.userId}/notes/${config.noteId}/restore/${versionId}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+          const restoredNote = await response.json();
+          log(
+            `✅ Version restored: created new version ${restoredNote.version}`,
+            "success"
+          );
+          return restoredNote;
+        } catch (error) {
+          log(`❌ Failed to restore version: ${error.message}`, "error");
+          throw error;
+        }
+      }
+
+      async function getVersion(versionId) {
+        const config = getConfig();
+        try {
+          log(`Fetching version ${versionId}...`, "info");
+          const response = await fetch(
+            `${config.backendUrl}/api/${config.userId}/notes/${config.noteId}/versions/${versionId}`
+          );
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+          const versionData = await response.json();
+          log(
+            `✅ Version data loaded: v${versionData.version} (${versionData.content?.length} chars)`,
+            "success"
+          );
+          return versionData;
+        } catch (error) {
+          log(`❌ Failed to fetch version: ${error.message}`, "error");
+          throw error;
+        }
+      }
+
+      async function initializeTest() {
+        try {
+          updateStatus("Initializing test...", "warning");
+          await loadNote();
+          await loadVersions();
+          updateStatus("Test initialized successfully", "success");
+        } catch (error) {
+          updateStatus("Test initialization failed", "error");
+        }
+      }
+
+      async function testRestoreWorkflow() {
+        try {
+          updateStatus("Testing restore workflow...", "warning");
+
+          addTestStep("Load initial note state");
+          const initialNote = await loadNote();
+          updateTestStep(
+            0,
+            "completed",
+            `Note: ${initialNote.title} v${initialNote.version}`
+          );
+
+          addTestStep("Load version history");
+          const versionHistory = await loadVersions();
+          updateTestStep(
+            1,
+            "completed",
+            `Found ${versionHistory.length} versions`
+          );
+
+          if (versionHistory.length < 2) {
+            throw new Error(
+              "Need at least 2 versions to test restore workflow"
+            );
+          }
+
+          // Test restore oldest version
+          const oldestVersion = versionHistory[versionHistory.length - 1];
+          addTestStep(`Restore oldest version (v${oldestVersion.version})`);
+          const restoredNote = await restoreVersion(oldestVersion.id);
+          updateTestStep(
+            2,
+            "completed",
+            `Created new version ${restoredNote.version}`
+          );
+
+          // Wait and check note state
+          addTestStep("Wait 200ms for state propagation");
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          updateTestStep(3, "completed");
+
+          addTestStep("Reload note to verify state");
+          const noteAfterRestore = await loadNote();
+          const stateMatches =
+            noteAfterRestore.content === oldestVersion.content;
+          updateTestStep(
+            4,
+            stateMatches ? "completed" : "failed",
+            `Content match: ${stateMatches ? "YES" : "NO"} (expected: ${
+              oldestVersion.content?.length
+            } chars, got: ${noteAfterRestore.content?.length} chars)`
+          );
+
+          // Test version preview after restore
+          addTestStep("Test version preview after restore");
+          const newestVersion = versionHistory[0];
+          const versionData = await getVersion(newestVersion.id);
+          updateTestStep(
+            5,
+            "completed",
+            `Preview: v${versionData.version} (${versionData.content?.length} chars)`
+          );
+
+          updateStatus("Restore workflow test completed", "success");
+        } catch (error) {
+          log(`❌ Restore workflow test failed: ${error.message}`, "error");
+          updateStatus("Restore workflow test failed", "error");
+        }
+      }
+
+      async function testVersionPreview() {
+        try {
+          updateStatus("Testing version preview...", "warning");
+
+          if (versions.length < 2) {
+            await loadVersions();
+          }
+
+          log("Testing version preview workflow:", "info");
+
+          // Step 1: Get current note content
+          const currentNote = await loadNote();
+          log(
+            `📝 Current note content: "${currentNote.content?.substring(
+              0,
+              50
+            )}..." (${currentNote.content?.length} chars)`,
+            "info"
+          );
+
+          // Step 2: Preview an older version
+          const targetVersion = versions[versions.length - 1];
+          log(`👁️ Previewing version ${targetVersion.version}...`, "info");
+          const versionData = await getVersion(targetVersion.id);
+          log(
+            `📦 Version data: "${versionData.content?.substring(0, 50)}..." (${
+              versionData.content?.length
+            } chars)`,
+            "info"
+          );
+
+          // Step 3: Simulate state that would be stored as "original"
+          const wouldStoreAsOriginal = {
+            content: currentNote.content,
+            contentLength: currentNote.content?.length || 0,
+            hasValidContent:
+              !!currentNote.content && currentNote.content.trim().length > 0,
+          };
+
+          log(
+            `💾 Would store as original: ${JSON.stringify(
+              wouldStoreAsOriginal
+            )}`,
+            wouldStoreAsOriginal.hasValidContent ? "success" : "error"
+          );
+
+          updateStatus("Version preview test completed", "success");
+        } catch (error) {
+          log(`❌ Version preview test failed: ${error.message}`, "error");
+          updateStatus("Version preview test failed", "error");
+        }
+      }
+
+      async function simulateStateFlow() {
+        try {
+          updateStatus("Simulating state flow...", "warning");
+
+          log("🧪 Simulating the exact restore workflow:", "info");
+
+          // Step 1: Load initial state
+          const initialNote = await loadNote();
+          log(
+            `1️⃣ Initial note: "${initialNote.content?.substring(0, 50)}..." (${
+              initialNote.content?.length
+            } chars)`,
+            "info"
+          );
+
+          // Step 2: Restore a version
+          const oldVersion = versions[versions.length - 1];
+          log(`2️⃣ Restoring version ${oldVersion.version}...`, "info");
+          const restoredNote = await restoreVersion(oldVersion.id);
+          log(
+            `✅ Restore API returned: v${
+              restoredNote.version
+            } with "${restoredNote.content?.substring(0, 50)}..." (${
+              restoredNote.content?.length
+            } chars)`,
+            "success"
+          );
+
+          // Step 3: Immediate state check (simulating what happens when user clicks another version)
+          log(
+            `3️⃣ Immediate state check (simulating user clicking version immediately):`,
+            "warning"
+          );
+          const immediateNote = await loadNote();
+          log(
+            `📝 Note content immediately after restore: "${immediateNote.content?.substring(
+              0,
+              50
+            )}..." (${immediateNote.content?.length} chars)`,
+            immediateNote.content?.length > 0 ? "success" : "error"
+          );
+
+          // Step 4: Check what would be stored as "original"
+          const wouldStore = {
+            content: immediateNote.content,
+            length: immediateNote.content?.length || 0,
+            hasValidContent:
+              !!immediateNote.content &&
+              immediateNote.content.trim().length > 0,
+            isEmpty:
+              !immediateNote.content ||
+              immediateNote.content.trim().length === 0,
+          };
+
+          log(
+            `4️⃣ What would be stored as "original": ${JSON.stringify(
+              wouldStore
+            )}`,
+            wouldStore.hasValidContent ? "success" : "error"
+          );
+
+          if (!wouldStore.hasValidContent) {
+            log(
+              `⚠️ PROBLEM IDENTIFIED: Note content is empty immediately after restore!`,
+              "error"
+            );
+            log(
+              `This explains why "Start writing your note..." appears when clicking current version.`,
+              "error"
+            );
+
+            // Test with delays
+            log(`🔧 Testing with delays:`, "warning");
+            for (const delay of [100, 200, 500, 1000]) {
+              await new Promise((resolve) => setTimeout(resolve, delay));
+              const delayedNote = await loadNote();
+              const hasContent =
+                delayedNote.content && delayedNote.content.trim().length > 0;
+              log(
+                `   After ${delay}ms: ${
+                  hasContent ? "✅" : "❌"
+                } Content present (${delayedNote.content?.length || 0} chars)`,
+                hasContent ? "success" : "error"
+              );
+              if (hasContent) break;
+            }
+          }
+
+          updateStatus("State flow simulation completed", "success");
+        } catch (error) {
+          log(`❌ State flow simulation failed: ${error.message}`, "error");
+          updateStatus("State flow simulation failed", "error");
+        }
+      }
+
+      async function runFullWorkflowTest() {
+        try {
+          clearLogs();
+          updateStatus("Running full workflow test...", "warning");
+
+          log("🚀 Starting comprehensive restore workflow test", "info");
+
+          await initializeTest();
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+
+          await testRestoreWorkflow();
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+
+          await testVersionPreview();
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+
+          await simulateStateFlow();
+
+          updateStatus("Full workflow test completed", "success");
+          log("🎉 Full workflow test completed successfully", "success");
+        } catch (error) {
+          log(`❌ Full workflow test failed: ${error.message}`, "error");
+          updateStatus("Full workflow test failed", "error");
+        }
+      }
+
+      // Initialize on page load
+      window.addEventListener("load", () => {
+        log("🔧 Restore Workflow Debug Test loaded", "info");
+        log(
+          'Click "Initialize Test" to begin, or "Run Full Workflow Test" for complete testing',
+          "info"
+        );
+      });
+    </script>
+  </body>
+</html>

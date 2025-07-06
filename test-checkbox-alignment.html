@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Checkbox Alignment Test - Validation</title>
+    <link rel="stylesheet" href="src/index.css" />
+    <style>
+      .test-container {
+        max-width: 800px;
+        margin: 2rem auto;
+        padding: 2rem;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+      }
+      .test-section {
+        margin: 2rem 0;
+        padding: 1.5rem;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        background: #fafafa;
+      }
+      .test-title {
+        font-weight: bold;
+        margin-bottom: 1rem;
+        color: #333;
+        font-size: 1.1rem;
+      }
+      .ProseMirror {
+        border: 1px solid #ccc;
+        padding: 1.5rem;
+        border-radius: 4px;
+        background: white;
+        margin: 1rem 0;
+      }
+      .alignment-guide {
+        position: relative;
+        background: linear-gradient(
+          to right,
+          #ff000020 0%,
+          #ff000020 1px,
+          transparent 1px
+        );
+        background-size: 20px 1px;
+        background-repeat: repeat-x;
+        margin: 1rem 0;
+      }
+      .status {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        font-weight: bold;
+      }
+      .status.pass {
+        background: #d4edda;
+        color: #155724;
+      }
+      .status.fail {
+        background: #f8d7da;
+        color: #721c24;
+      }
+      .test-result {
+        margin: 0.5rem 0;
+        padding: 0.5rem;
+        border-radius: 4px;
+        border: 1px solid #ddd;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="test-container">
+      <h1>🧪 Checkbox Alignment Test</h1>
+      <p>
+        <strong>Purpose:</strong> Validate that checkboxes align horizontally
+        with bullets and numbered lists.
+      </p>
+      <p>
+        <strong>Expected Result:</strong> All list item text should start at the
+        same horizontal position.
+      </p>
+
+      <div class="test-section">
+        <div class="test-title">📐 Visual Alignment Test</div>
+        <div class="alignment-guide">Grid lines for alignment reference</div>
+
+        <div class="ProseMirror">
+          <p><strong>Bullet List (Reference)</strong></p>
+          <ul class="bullet-list">
+            <li class="list-item">This is bullet list item one</li>
+            <li class="list-item">This is bullet list item two</li>
+            <li class="list-item">
+              This is bullet list item three with longer text to test wrapping
+              behavior
+            </li>
+          </ul>
+
+          <p><strong>Numbered List (Reference)</strong></p>
+          <ol class="ordered-list">
+            <li class="list-item">This is numbered list item one</li>
+            <li class="list-item">This is numbered list item two</li>
+            <li class="list-item">
+              This is numbered list item three with longer text to test wrapping
+              behavior
+            </li>
+          </ol>
+
+          <p><strong>Task List (Testing Target)</strong></p>
+          <ul class="task-list">
+            <li class="task-item">
+              <input type="checkbox" />
+              This is checkbox item one (unchecked)
+            </li>
+            <li class="task-item">
+              <input type="checkbox" checked />
+              This is checkbox item two (checked)
+            </li>
+            <li class="task-item">
+              <input type="checkbox" />
+              This is checkbox item three with longer text to test wrapping
+              behavior and ensure consistent alignment
+            </li>
+          </ul>
+
+          <p><strong>Mixed Test</strong></p>
+          <ul class="bullet-list">
+            <li class="list-item">Bullet: Should align with others</li>
+          </ul>
+          <ol class="ordered-list">
+            <li class="list-item">Number: Should align with others</li>
+          </ol>
+          <ul class="task-list">
+            <li class="task-item">
+              <input type="checkbox" />
+              Checkbox: Should align with others
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <div class="test-title">✅ Validation Checklist</div>
+        <div id="validation-results">
+          <div class="test-result">
+            <label style="display: flex; align-items: center; gap: 0.5rem">
+              <input
+                type="checkbox"
+                class="test-checkbox"
+                data-test="bullet-align"
+              />
+              <span>Bullet text starts at consistent horizontal position</span>
+              <span class="status" id="status-bullet-align">PENDING</span>
+            </label>
+          </div>
+          <div class="test-result">
+            <label style="display: flex; align-items: center; gap: 0.5rem">
+              <input
+                type="checkbox"
+                class="test-checkbox"
+                data-test="number-align"
+              />
+              <span
+                >Numbered text starts at consistent horizontal position</span
+              >
+              <span class="status" id="status-number-align">PENDING</span>
+            </label>
+          </div>
+          <div class="test-result">
+            <label style="display: flex; align-items: center; gap: 0.5rem">
+              <input
+                type="checkbox"
+                class="test-checkbox"
+                data-test="checkbox-align"
+              />
+              <span
+                >Checkbox text starts at consistent horizontal position</span
+              >
+              <span class="status" id="status-checkbox-align">PENDING</span>
+            </label>
+          </div>
+          <div class="test-result">
+            <label style="display: flex; align-items: center; gap: 0.5rem">
+              <input
+                type="checkbox"
+                class="test-checkbox"
+                data-test="cross-align"
+              />
+              <span>All three list types align with each other</span>
+              <span class="status" id="status-cross-align">PENDING</span>
+            </label>
+          </div>
+          <div class="test-result">
+            <label style="display: flex; align-items: center; gap: 0.5rem">
+              <input
+                type="checkbox"
+                class="test-checkbox"
+                data-test="checkbox-function"
+              />
+              <span>Checkboxes can be clicked and checked/unchecked</span>
+              <span class="status" id="status-checkbox-function">PENDING</span>
+            </label>
+          </div>
+          <div class="test-result">
+            <label style="display: flex; align-items: center; gap: 0.5rem">
+              <input
+                type="checkbox"
+                class="test-checkbox"
+                data-test="text-wrap"
+              />
+              <span>Long text wraps properly without breaking alignment</span>
+              <span class="status" id="status-text-wrap">PENDING</span>
+            </label>
+          </div>
+        </div>
+
+        <div
+          style="
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: #e3f2fd;
+            border-radius: 4px;
+          "
+        >
+          <strong>Overall Test Status:</strong>
+          <span id="overall-status" class="status">PENDING</span>
+          <div
+            id="test-summary"
+            style="margin-top: 0.5rem; font-size: 0.9rem"
+          ></div>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <div class="test-title">📋 Testing Instructions</div>
+        <ol>
+          <li>
+            <strong>Visual Inspection:</strong> Look at the text alignment in
+            the test area above
+          </li>
+          <li>
+            <strong>Use the grid lines</strong> as a reference to check
+            horizontal alignment
+          </li>
+          <li>
+            <strong>Check each item</strong> in the validation checklist as you
+            verify it
+          </li>
+          <li>
+            <strong>Test interactivity:</strong> Click the checkboxes to ensure
+            they work
+          </li>
+          <li>
+            <strong>Check wrapping:</strong> Verify long text wraps without
+            breaking alignment
+          </li>
+          <li>
+            <strong>Final validation:</strong> All text should start at the same
+            horizontal position
+          </li>
+        </ol>
+      </div>
+
+      <div class="test-section">
+        <div class="test-title">🔧 Debug Information</div>
+        <details>
+          <summary>CSS Properties Applied</summary>
+          <pre
+            style="
+              background: #f8f9fa;
+              padding: 1rem;
+              border-radius: 4px;
+              overflow-x: auto;
+            "
+          >
+.ProseMirror li.task-item {
+  display: flex;
+  align-items: center;      /* Changed from flex-start */
+  margin: 0.25rem 0;
+  padding-left: 0;
+  line-height: 1.5;         /* Added for consistency */
+}
+
+.ProseMirror li.task-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin-right: 0.5rem;
+  margin-top: 0;            /* Changed from 0.125rem */
+  flex-shrink: 0;
+  display: inline-block;    /* Changed from inline-flex */
+  vertical-align: baseline; /* Changed from top */
+}
+          </pre>
+        </details>
+      </div>
+    </div>
+
+    <script>
+      // Interactive validation helper
+      document.addEventListener("DOMContentLoaded", function () {
+        const checkboxes = document.querySelectorAll(".test-checkbox");
+        const overallStatus = document.getElementById("overall-status");
+        const testSummary = document.getElementById("test-summary");
+
+        function updateStatus() {
+          const checkedCount = document.querySelectorAll(
+            ".test-checkbox:checked"
+          ).length;
+          const totalCount = checkboxes.length;
+
+          checkboxes.forEach((cb) => {
+            const testId = cb.dataset.test;
+            const statusEl = document.getElementById(`status-${testId}`);
+            if (cb.checked) {
+              statusEl.textContent = "PASS";
+              statusEl.className = "status pass";
+            } else {
+              statusEl.textContent = "FAIL";
+              statusEl.className = "status fail";
+            }
+          });
+
+          if (checkedCount === totalCount) {
+            overallStatus.textContent = "ALL TESTS PASS";
+            overallStatus.className = "status pass";
+            testSummary.textContent =
+              "✅ Checkbox alignment is working correctly!";
+          } else {
+            overallStatus.textContent = `${checkedCount}/${totalCount} TESTS PASS`;
+            overallStatus.className = "status fail";
+            testSummary.textContent = `❌ ${
+              totalCount - checkedCount
+            } alignment issues detected. Please review the failing tests.`;
+          }
+        }
+
+        checkboxes.forEach((cb) => {
+          cb.addEventListener("change", updateStatus);
+        });
+
+        // Test checkbox functionality automatically
+        const testCheckboxes = document.querySelectorAll(
+          '.ProseMirror input[type="checkbox"]'
+        );
+        let functionalityWorks = true;
+
+        testCheckboxes.forEach((cb) => {
+          cb.addEventListener("change", function () {
+            console.log("Checkbox interaction working:", this.checked);
+          });
+        });
+
+        // Initial status update
+        updateStatus();
+      });
+    </script>
+  </body>
+</html>
