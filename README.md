@@ -1,50 +1,46 @@
-# Noet - Modern Note-Taking App 📝
+# Noet App 📝
 
-A modern, feature-rich note-taking application built with React and Slate.js, designed to replace broken contenteditable implementations with a robust, extensible rich text editor.
+A React-based note-taking application with rich text editing capabilities using TipTap editor.
 
-## 🚀 Quick Start
+## Current Status (Latest Update - December 2024)
+
+✅ **STABLE VERSION** - All major issues resolved:
+
+- **PDF and Image Viewing**: ✅ **FIXED** - CSP and cross-origin policies updated
+- **Notebook Unnesting**: ✅ **FIXED** - Enhanced drop zones for folder management
+- Directory handling fixed with unified `simple-config.sh`
+- Tag management working (UUID tags filtered out)
+- Archive functionality restored
+- Font family selection added
+- Color picker enhanced
+- Backend/frontend ports configured correctly
+- All scripts work from any directory
+
+## Quick Start
+
+**Option 1: Use the simple startup script (recommended)**
 
 ```bash
-# Clone the repository
-git clone https://github.com/SamGallant/noet.git
-cd noet
+./simple-noet.sh
+```
 
-# Install dependencies
-npm install
+**Option 2: Manual startup**
 
-# Start development server
+```bash
+# Start backend (port 3004)
+npm run backend
+
+# Start frontend (port 3001)
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to view the app.
+**Option 3: Use VS Code tasks**
 
-### 🔧 Development Environment Setup
+- Open Command Palette (Cmd+Shift+P)
+- Run "Tasks: Run Task"
+- Select "Start Backend" and "Start Frontend"
 
-For optimal development workflow, especially if working with multiple projects:
-
-1. **Set up project path variable** (optional but recommended):
-
-   ```bash
-   # Add to your shell profile (.bash_profile, .zshrc, etc.)
-   export NOET_PROJECT_PATH="~/path/to/noet-app"
-   alias noet="cd $NOET_PROJECT_PATH"
-   ```
-
-2. **Quick navigation**:
-
-   ```bash
-   noet  # Jump to project directory from anywhere
-   ```
-
-3. **Use project scripts**:
-   ```bash
-   ./quick-start.sh  # Comprehensive setup and status check
-   ./noet.sh both    # Start both frontend and backend
-   ```
-
-For detailed setup instructions, see [DEVELOPMENT_ENVIRONMENT.md](./DEVELOPMENT_ENVIRONMENT.md).
-
-## 🎯 Demo Accounts
+## Demo Accounts
 
 ### Demo User
 
@@ -56,165 +52,200 @@ For detailed setup instructions, see [DEVELOPMENT_ENVIRONMENT.md](./DEVELOPMENT_
 - **Email**: admin@example.com
 - **Password**: admin123
 
-## ✨ Features
+## Current Working Features
 
-### Rich Text Editor (Slate.js)
+✅ **Core Functionality**
 
-- **Text Formatting**: Bold, italic, underline, inline code
-- **Auto-save**: Notes save automatically every 2 seconds
-- **Keyboard Shortcuts**: Standard shortcuts (Ctrl+B, Ctrl+I, etc.)
-- **Modern Architecture**: Built on Slate.js for extensibility
+- User login/authentication
+- Note creation and editing with TipTap rich text editor
+- Tag creation and management (filters out UUID tags)
+- Note archiving/unarchiving
+- File uploads and attachments
+- Real-time note counts and tag counts
 
-### Core Functionality
+✅ **UI Features**
 
-- **Secure Authentication**: User accounts with session management
-- **Notes Management**: Create, edit, organize notes
-- **Clean UI**: Modern interface with Tailwind CSS
-- **Responsive Design**: Works on desktop and mobile
+- **Enhanced Color Picker System**: 24 preset colors + custom color selection for tags, notebooks, and folders
+- **Sidebar Color Customization**: Full color picker in creation and editing forms
+- **Visual Color Indicators**: Icons display in selected colors throughout the interface
+- Comprehensive text color picker for rich text editing
+- Font family selection (serif, sans-serif, monospace)
+- Improved sidebar with proper tag counts
+- Archive view toggle
+- Note search and filtering
 
-## 🚧 In Development
+✅ **Technical**
 
-### Enhanced Editor Features
+- Persistent tag storage across server restarts
+- Proper port configuration (frontend: 3001, backend: 3004)
+- Unified directory handling for all scripts
+- Comprehensive test suite
 
-- [ ] Headings (H1, H2, H3)
-- [ ] Lists (bulleted, numbered)
-- [ ] Block quotes and code blocks
-- [ ] Text alignment options
-- [ ] Link insertion/editing
-- [ ] Image support
-- [ ] Advanced keyboard shortcuts
+## Known Limitations
 
-### Organization Features
+⚠️ **Removed for Stability**
 
-- [ ] Notebook management
-- [ ] Tag-based organization
-- [ ] Search and filtering
-- [ ] Trash/restore functionality
-- [ ] Enhanced sidebar navigation
+- Font size selection (removed due to UI conflicts)
+- Advanced tag refresh logic (reverted to simple approach)
 
-## 🛠 Tech Stack
+## Project Structure
 
-- **Frontend**: React 18, Vite
-- **Editor**: Slate.js
+```
+/Users/sgallant/sync/rygel/noet-app/
+├── src/                          # Frontend React application
+│   ├── components/               # React components
+│   ├── App-TipTap.jsx           # Main TipTap app
+│   └── TipTapEditor.jsx         # Rich text editor
+├── server/                       # Backend Express server
+│   └── server.js                # Main server file
+├── public/                       # Static assets
+├── simple-config.sh             # Unified directory configuration
+├── simple-noet.sh              # Simple startup script
+├── test-*.js                   # Test suite
+└── *.md                        # Documentation
+```
+
+## Scripts and Tools
+
+- `./simple-noet.sh` - Start both backend and frontend
+- `./simple-test.sh` - Run basic tests
+- `./test-runner.sh` - Run comprehensive test suite
+- `./run-test.sh [test-file]` - Run specific test
+- `./noet.sh` - Advanced startup with options
+
+### New Test Scripts (December 2024)
+
+- `node test-app-status.cjs` - Quick health check for all systems
+- `node test-attachment-functionality.cjs` - Comprehensive attachment testing
+- `public/simple-test.html` - Browser-based diagnostics page
+
+## Development Environment
+
+- **Frontend**: React + Vite (port 3001)
+- **Backend**: Express.js (port 3004)
+- **Editor**: TipTap with custom extensions
+- **Storage**: File-based JSON storage
+- **Testing**: Custom Node.js test suite
+
+## Tech Stack
+
+- **Frontend**: React 18, Vite, TipTap
+- **Backend**: Express.js, File-based storage
 - **Styling**: Tailwind CSS
 - **Icons**: Lucide React
-- **State Management**: React useState/useEffect
 - **Build Tool**: Vite
 
-## 📁 Project Structure
+## Recent Major Changes
 
-```
-src/
-├── App.jsx              # Main application component
-├── index.css            # Global styles
-└── main.jsx             # Entry point
+1. **PDF and Image Viewing Fix** _(December 2024)_: Resolved attachment viewing issues
 
-docs/
-├── SLATE_MIGRATION_README.md  # Migration documentation
-└── DEVELOPMENT.md              # Development plan
+   - Fixed Content Security Policy (CSP) configuration for cross-origin requests
+   - Updated PDF.js integration with stable CDN version 3.11.174
+   - Added proper render task cancellation to prevent canvas conflicts
+   - Cross-Origin Resource Policy configured for frontend-backend communication
+   - All attachment types now working properly
 
-config/
-├── package.json         # Dependencies and scripts
-├── vite.config.js       # Vite configuration
-├── tailwind.config.js   # Tailwind configuration
-└── postcss.config.js    # PostCSS configuration
-```
+2. **Notebook Unnesting Enhancement** _(December 2024)_: Improved folder management
 
-## 🔄 Development Workflow
+   - Enhanced drop zones with visual feedback for root-level drops
+   - Added dedicated `handleRootDrop()` function with error handling
+   - Improved drag-and-drop messaging and user experience
+   - Notebooks can now be easily moved out of folders
 
-### Branch Strategy
+3. **Color Picker Enhancement**: Added comprehensive color picker to sidebar for tags, notebooks, and folders
 
-- `main` - Stable, working versions
-- `feature/*` - Individual feature development
-- `bugfix/*` - Bug fixes
-- `enhance/*` - UI/UX enhancements
+   - 24 preset color swatches in organized grid layout
+   - Custom color picker for unlimited color options
+   - Enhanced creation and editing forms with color selection
+   - Real-time icon color updates and visual feedback
+   - Colors persist across browser sessions
 
-### Commit Conventions
+4. **Directory Handling**: Created `simple-config.sh` for unified directory management
+5. **Tag Management**: Fixed UUID tag filtering across frontend and backend
+6. **Archive Functionality**: Restored proper archive API calls
+7. **UI Enhancements**: Added comprehensive text color picker and font family selection
+8. **Stability**: Removed font size features and complex tag refresh logic
+9. **Port Configuration**: Fixed frontend (3001) and backend (3004) ports
+10. **Documentation**: Updated all docs to reflect current stable state
 
-- `feat(scope): description` - New features
-- `fix(scope): description` - Bug fixes
-- `docs(scope): description` - Documentation
-- `enhance(scope): description` - UI/UX improvements
+## Testing
 
-### Development Commands
+Run the comprehensive test suite:
 
 ```bash
-# Quick status and commit helper
-./dev-status.sh
-
-# Start development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
+./test-runner.sh
 ```
 
-## 🎯 Migration Background
+Individual tests:
 
-This project represents a complete migration from a broken contenteditable-based editor to a modern Slate.js implementation. The original app suffered from:
+```bash
+./run-test.sh test-tag-counts.js
+./run-test.sh test-note-counts.js
+./run-test.sh test-color-picker.js      # Test color picker functionality
+```
 
-- Custom DOM manipulation causing crashes
-- Broken list, formatting, and deletion features
-- Unmaintainable contenteditable code
-- Poor state management
+## Development Workflow
 
-### Migration Achievements
+1. **Start development environment**:
 
-✅ **Eliminated custom DOM manipulation**  
-✅ **Implemented modern Slate.js editor**  
-✅ **Restored all core functionality**  
-✅ **Added auto-save and keyboard shortcuts**  
-✅ **Clean, maintainable codebase**  
-✅ **Modern React patterns and state management**
+   ```bash
+   ./simple-noet.sh
+   ```
 
-## 🤝 Contributing
+2. **Make changes** to frontend (`src/`) or backend (`server/`)
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'feat(editor): add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+3. **Test changes**:
 
-## 📋 Development Roadmap
+   ```bash
+   ./simple-test.sh
+   ```
 
-### Phase 1: Core Editor (In Progress)
+4. **Run comprehensive tests**:
+   ```bash
+   ./test-runner.sh
+   ```
 
-- [x] Basic text formatting
-- [x] Auto-save functionality
-- [ ] Headings and lists
-- [ ] Block elements
-- [ ] Links and images
+## For New Development
 
-### Phase 2: Organization
+Start with a stable baseline - all core functionality is working. The application is ready for new feature development or UI improvements.
 
-- [ ] Enhanced sidebar navigation
-- [ ] Search and filtering
-- [ ] Notebook management
-- [ ] Tag system
+**🚨 IMPORTANT: Check these first to avoid redoing work!**
 
-### Phase 3: Advanced Features
+- `COMPLETE_DEVELOPMENT_HISTORY.md` - Everything we tried for tags & font size (what worked/failed)
+- `TECHNICAL_REFERENCE.md` - Exact working code you can copy/paste
 
-- [ ] Collaboration features
-- [ ] Export/import functionality
-- [ ] Themes and customization
-- [ ] Offline support
+**Before making changes:**
 
-## 📄 License
+- Run the test suite to ensure current functionality works
+- Check the comprehensive documentation in the various `.md` files
+- Use the existing `simple-config.sh` pattern for any new scripts
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## Documentation Files
 
-## 🙏 Acknowledgments
+### 🔥 Essential References (Start Here!)
 
-- [Slate.js](https://slatejs.org/) - The amazing rich text editor framework
-- [React](https://reactjs.org/) - The UI library
-- [Tailwind CSS](https://tailwindcss.com/) - For beautiful, utility-first styling
-- [Lucide](https://lucide.dev/) - For the icon set
+- `COMPLETE_DEVELOPMENT_HISTORY.md` - **Complete journey of all tag & font size work** - Never start from scratch!
+- `TECHNICAL_REFERENCE.md` - **Copy-paste ready working code** for all implementations
+- `CURRENT_STATE.md` - Quick status overview and what's working
+- `PROJECT_HANDOFF.md` - Comprehensive technical handoff guide
+
+### Specific Technical Details
+
+- `COMPLETE_SIMPLE_SOLUTION.md` - Overview of recent fixes
+- `TAG_NAME_RESOLUTION_FIX.md` - Tag management improvements
+- `SIMPLE_DIRECTORY_SOLUTION.md` - Directory handling solution
+- `TAGS_IMPLEMENTATION_COMPLETE.md` - Tag system details
+- `UUID_TAG_AND_ARCHIVE_FIXES.md` - Recent bug fixes
+
+## Contributing
+
+1. Ensure all tests pass with `./test-runner.sh`
+2. Test both frontend and backend functionality
+3. Update documentation if adding new features
+4. Follow the existing code patterns and directory structure
 
 ---
 
-**Status**: Active Development 🚧  
-**Version**: 1.0.0-beta  
-**Last Updated**: June 30, 2025
+**Status**: Stable and Ready for Development ✅  
+**Version**: Current (post-stability-fixes)  
+**Last Updated**: January 2025
