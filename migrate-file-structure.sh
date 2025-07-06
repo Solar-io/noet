@@ -3,7 +3,7 @@
 # File Structure Migration Script for Noet App
 # This script reorganizes files while preserving git history
 
-set -e  # Exit on any error
+# Removed 'set -e' to allow continuation despite individual file move failures
 
 # Color codes for output
 RED='\033[0;31m'
@@ -53,9 +53,20 @@ move_file() {
     
     if [[ -f "$src" ]]; then
         echo "Moving: $src → $dest"
-        git mv "$src" "$dest"
+        if git mv "$src" "$dest" 2>/dev/null; then
+            echo "  ✅ Success"
+        else
+            echo -e "  ${YELLOW}⚠️  Warning: Failed to move $src (file may have special characters or git issues)${NC}"
+            echo "  Attempting manual move..."
+            if mkdir -p "$(dirname "$dest")" && mv "$src" "$dest" 2>/dev/null; then
+                git add "$dest" 2>/dev/null || true
+                echo "  ✅ Manual move successful"
+            else
+                echo -e "  ${RED}❌ Failed to move $src${NC}"
+            fi
+        fi
     else
-        echo -e "${RED}⚠️  File not found: $src${NC}"
+        echo -e "${YELLOW}⚠️  File not found: $src${NC}"
     fi
 }
 
