@@ -30,9 +30,31 @@ export default defineConfig({
     host: process.env.VITE_HOST || config.frontend.host,
     strictPort: true, // Fail if port is in use instead of finding alternative
     open: false, // Don't auto-open browser since we'll control this
+    proxy: {
+      "/api": {
+        target: `http://${config.backend.host}:${config.backend.port}`,
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
   preview: {
     port: parseInt(process.env.VITE_PREVIEW_PORT) || 3000,
     host: process.env.VITE_HOST || config.frontend.host,
+  },
+  optimizeDeps: {
+    include: ["pdfjs-dist"],
+  },
+  assetsInclude: ["**/*.pdf"],
+  define: {
+    global: "globalThis",
+  },
+  worker: {
+    format: "es",
+  },
+  build: {
+    rollupOptions: {
+      external: [],
+    },
   },
 });

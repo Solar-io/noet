@@ -40,6 +40,12 @@ const NoteEditor = ({
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editingTitle, setEditingTitle] = useState(note?.title || "");
   const [showTagDropdown, setShowTagDropdown] = useState(false);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [versions, setVersions] = useState([]);
+  const [loadingVersions, setLoadingVersions] = useState(false);
+  const [selectedVersion, setSelectedVersion] = useState(null);
+  const [originalCurrentContent, setOriginalCurrentContent] = useState(null); // Store original content for version preview
+  const [isVersionPreview, setIsVersionPreview] = useState(false); // Track if we're in preview mode
 
   // Close tag dropdown when clicking outside
   useEffect(() => {
@@ -73,13 +79,14 @@ const NoteEditor = ({
   // Helper function to filter out UUID tags
   const filterUUIDTags = (tagIds) => {
     if (!tagIds || !Array.isArray(tagIds)) return [];
-    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    return tagIds.filter(tagId => !UUID_REGEX.test(tagId));
+    const UUID_REGEX =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return tagIds.filter((tagId) => !UUID_REGEX.test(tagId));
   };
 
   const getTagNames = (tagIds) => {
     const filteredTagIds = filterUUIDTags(tagIds);
-    
+
     console.log(
       "NoteEditor: Getting tag names for IDs:",
       filteredTagIds,
@@ -225,6 +232,259 @@ const NoteEditor = ({
     const date = new Date(dateString);
     return date.toLocaleString();
   };
+
+  // Load version history from API
+  const loadVersionHistory = async () => {
+    if (!note || !backendUrl) return;
+
+    try {
+      setLoadingVersions(true);
+      const response = await fetch(
+        `${backendUrl}/api/${userId}/notes/${note.id}/versions`
+      );
+
+      if (!response.ok) throw new Error("Failed to load versions");
+
+      const versionData = await response.json();
+      setVersions(versionData);
+    } catch (error) {
+      console.error("Error loading version history:", error);
+      alert("Failed to load version history");
+    } finally {
+      setLoadingVersions(false);
+    }
+  };
+
+  // Store original content when first switching to version preview
+  const enterVersionPreview = (currentNote) => {
+    if (!isVersionPreview) {
+      const contentToStore = {
+        content: currentNote.content,
+        markdown: currentNote.markdown,
+        title: currentNote.title,
+        tags: currentNote.tags,
+        notebook: currentNote.notebook,
+        folder: currentNote.folder,
+      };
+
+      console.log("💾 Storing original content for version preview:", {
+        contentLength: contentToStore.content?.length || 0,
+        title: contentToStore.title,
+        hasValidContent:
+          !!contentToStore.content && contentToStore.content.trim().length > 0,
+      });
+
+      // Don't store empty content as "original" - this prevents restore issues
+      if (
+        !contentToStore.content ||
+        contentToStore.content.trim().length === 0
+      ) {
+        console.warn(
+          "⚠️ Attempted to store empty content as original - using fallback"
+        );
+        // Use a fallback that indicates this is a restored/empty state
+        contentToStore.content = "<p>Start writing your note...</p>";
+      }
+
+      setOriginalCurrentContent(contentToStore);
+      setIsVersionPreview(true);
+    }
+  };
+
+  // Clear version preview state when note changes
+  useEffect(() => {
+    if (note?.id) {
+      // Clear version preview state when switching to a different note
+      setIsVersionPreview(false);
+      setSelectedVersion(null);
+      setOriginalCurrentContent(null);
+    }
+  }, [note?.id]);
+
+  // Exit version preview and restore original content
+  const exitVersionPreview = () => {
+    if (isVersionPreview && originalCurrentContent) {
+      console.log("🔄 Restoring original content:", {
+        originalContentLength: originalCurrentContent.content?.length || 0,
+        originalTitle: originalCurrentContent.title,
+      });
+
+      setIsVersionPreview(false);
+      setSelectedVersion(null);
+
+      // Restore original content to the editor
+      if (onContentChange && note) {
+        const currentNote = {
+          ...note,
+          content: originalCurrentContent.content,
+          title: originalCurrentContent.title,
+          tags: originalCurrentContent.tags,
+          notebook: originalCurrentContent.notebook,
+          folder: originalCurrentContent.folder,
+          // Ensure version preview flags are cleared
+          tempVersionPreview: false,
+          previewingVersion: null,
+        };
+
+        onContentChange(
+          currentNote,
+          originalCurrentContent.content,
+          originalCurrentContent.markdown
+        );
+      }
+
+      setOriginalCurrentContent(null);
+      console.log("✅ Exited version preview and restored original content");
+    } else {
+      // Even if we're not in version preview, clear the selected version
+      setSelectedVersion(null);
+      console.log("✅ Cleared version selection");
+    }
+  };
+
+  // Switch back to current version (exit preview mode)
+  const switchToCurrentVersion = () => {
+    console.log("🔄 Switching back to current version");
+
+    // If we have stored original content, use exitVersionPreview
+    if (isVersionPreview && originalCurrentContent) {
+      exitVersionPreview();
+    } else {
+      // Otherwise, directly restore to the current note content
+      setIsVersionPreview(false);
+      setSelectedVersion(null);
+      setOriginalCurrentContent(null);
+
+      if (onContentChange && note) {
+        const currentNote = {
+          ...note,
+          tempVersionPreview: false,
+          previewingVersion: null,
+        };
+
+        onContentChange(currentNote, note.content, note.markdown);
+        console.log("✅ Restored to current note content directly");
+      }
+    }
+  };
+
+  // Switch to a specific version (enter preview mode)
+  const switchToVersion = async (versionId) => {
+    console.log("🔄 switchToVersion called with versionId:", versionId);
+
+    if (!note || !backendUrl) {
+      console.error("❌ Missing note or backendUrl:", {
+        note: !!note,
+        backendUrl: !!backendUrl,
+      });
+      return;
+    }
+
+    try {
+      console.log("📡 Fetching version data...");
+      const response = await fetch(
+        `${backendUrl}/api/${userId}/notes/${note.id}/versions/${versionId}`
+      );
+
+      if (!response.ok) throw new Error("Failed to load version content");
+
+      const versionData = await response.json();
+      console.log("📦 Version data loaded:", versionData);
+
+      // Store original content if not already in preview mode
+      if (!isVersionPreview) {
+        enterVersionPreview(note);
+      }
+
+      // Create a preview note with version content but don't update main state
+      const previewNote = {
+        ...note,
+        content: versionData.content,
+        title: versionData.metadata.title,
+        tags: versionData.metadata.tags || [],
+        notebook: versionData.metadata.notebook,
+        folder: versionData.metadata.folder,
+        tempVersionPreview: true,
+        previewingVersion: versionData.version,
+      };
+
+      console.log("🔄 Calling onContentChange with version preview:", {
+        note: previewNote,
+        content: versionData.content,
+        markdown: versionData.markdown,
+      });
+
+      // Update only the editor content, not the main note state
+      if (onContentChange) {
+        onContentChange(previewNote, versionData.content, versionData.markdown);
+      }
+
+      // Update local state to reflect the selected version
+      setSelectedVersion(versionData);
+
+      console.log(`✅ Switched to version ${versionData.version} preview`);
+    } catch (error) {
+      console.error("❌ Error switching to version:", error);
+      alert("Failed to load version content");
+    }
+  };
+
+  // Restore a version as the current version
+  const restoreVersion = async (versionId) => {
+    if (!note || !backendUrl) return;
+
+    if (
+      !confirm(
+        "Are you sure you want to restore this version? This will create a new version with the restored content."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${backendUrl}/api/${userId}/notes/${note.id}/restore/${versionId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+
+      if (!response.ok) throw new Error("Failed to restore version");
+
+      const restoredNote = await response.json();
+
+      // Update the note state with restored data
+      if (onNoteUpdate) {
+        onNoteUpdate(restoredNote);
+      }
+
+      // Wait a moment for the note state to update before clearing preview state
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Clear ALL version preview state completely
+      setSelectedVersion(null);
+      setIsVersionPreview(false);
+      setOriginalCurrentContent(null);
+
+      // Reload version history to show new version
+      await loadVersionHistory();
+
+      console.log(
+        `✅ Restored version and created new version ${restoredNote.version}`
+      );
+    } catch (error) {
+      console.error("Error restoring version:", error);
+      alert("Failed to restore version");
+    }
+  };
+
+  // Load version history when version panel opens
+  useEffect(() => {
+    if (showVersionHistory && note) {
+      loadVersionHistory();
+    }
+  }, [showVersionHistory, note, backendUrl]);
 
   if (!note) {
     return (
@@ -390,6 +650,15 @@ const NoteEditor = ({
               </div>
             )}
 
+            {/* Version Indicator */}
+            <button
+              onClick={() => setShowVersionHistory(!showVersionHistory)}
+              className="px-3 py-1 rounded text-sm font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors flex items-center space-x-1"
+              title="Version history"
+            >
+              <span>v{note?.version || 1}</span>
+            </button>
+
             {/* Tag Dropdown */}
             <div className="relative tag-dropdown-container">
               <button
@@ -450,7 +719,9 @@ const NoteEditor = ({
                         <button
                           onClick={() => {
                             // Keep UUID tags but clear non-UUID tags
-                            const UUIDTags = noteTags.filter(tagId => !filterUUIDTags([tagId]).length);
+                            const UUIDTags = noteTags.filter(
+                              (tagId) => !filterUUIDTags([tagId]).length
+                            );
                             setNoteTags(UUIDTags);
                             updateNoteMetadata({ tags: UUIDTags });
                           }}
@@ -464,18 +735,6 @@ const NoteEditor = ({
                 </div>
               )}
             </div>
-
-            <button
-              onClick={() => setShowMetadata(!showMetadata)}
-              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                showMetadata
-                  ? "bg-blue-100 text-blue-700"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-              title="Manage tags, notebooks, and folders"
-            >
-              Manage
-            </button>
           </div>
         </div>
       </div>
@@ -483,6 +742,135 @@ const NoteEditor = ({
       <div className="flex flex-1 overflow-hidden">
         {/* Main Editor */}
         <div className="flex-1 flex flex-col">{children}</div>
+
+        {/* Version History Panel */}
+        {showVersionHistory && (
+          <div className="w-96 bg-white border-l border-gray-200 overflow-y-auto">
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Version History
+                </h3>
+                <button
+                  onClick={() => setShowVersionHistory(false)}
+                  className="p-1 hover:bg-gray-100 rounded"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="text-sm text-gray-600 mb-4">
+                Versions for "{note?.title || "Untitled"}"
+              </div>
+
+              <div className="space-y-2">
+                {/* Current Version */}
+                <div
+                  className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                    selectedVersion === null
+                      ? "border-blue-300 bg-blue-100"
+                      : "border-blue-200 bg-blue-50 hover:bg-blue-100"
+                  }`}
+                  onClick={switchToCurrentVersion}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-medium text-blue-900">
+                        v{note?.version || 1} - Current
+                      </span>
+                      {selectedVersion === null && (
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-blue-600">
+                      {formatDate(note?.updated)}
+                    </span>
+                  </div>
+                  <div className="text-xs text-blue-700">
+                    {selectedVersion === null
+                      ? "Active version"
+                      : "Click to view current version"}
+                  </div>
+                </div>
+
+                {/* Loading State */}
+                {loadingVersions && (
+                  <div className="text-center py-4 text-gray-500">
+                    <div className="text-sm">Loading version history...</div>
+                  </div>
+                )}
+
+                {/* Version History */}
+                {!loadingVersions && versions.length > 0 && (
+                  <div className="space-y-2">
+                    {versions.map((version) => (
+                      <div
+                        key={version.id}
+                        className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                          selectedVersion?.id === version.id
+                            ? "border-blue-300 bg-blue-50"
+                            : "border-gray-200 hover:bg-gray-50"
+                        }`}
+                        onClick={() => switchToVersion(version.id)}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium text-gray-900">
+                              v{version.version}
+                            </span>
+                            {selectedVersion?.id === version.id && (
+                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                                Active
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs text-gray-500">
+                            {formatDate(version.createdAt)}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-600 mb-2">
+                          {version.changeDescription}
+                        </div>
+                        <div className="text-xs text-gray-500 mb-2">
+                          {version.size} characters
+                        </div>
+                        <div className="flex justify-end">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              restoreVersion(version.id);
+                            }}
+                            className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200"
+                            title="Restore this version as current (creates new version)"
+                          >
+                            Restore
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* No Versions Message */}
+                {!loadingVersions && versions.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <div className="text-lg mb-2">🚀</div>
+                    <div className="text-sm">
+                      No version history yet. Versions will appear here once you
+                      make changes to your note.
+                    </div>
+                    <div className="text-xs mt-2 text-gray-400">
+                      Changes are automatically saved as versions based on
+                      content changes, title changes, or when switching notes.
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Metadata Sidebar */}
         {showMetadata && (
@@ -550,6 +938,13 @@ const NoteEditor = ({
                   noteId={note.id}
                   noteTags={noteTags}
                   onTagsChange={handleTagsChange}
+                  availableTags={availableTags}
+                  onTagsUpdate={() => {
+                    // Refresh tags by calling the parent component
+                    if (onNoteUpdate) {
+                      onNoteUpdate();
+                    }
+                  }}
                 />
               </div>
 

@@ -21,8 +21,37 @@ import {
   Home,
   Bookmark,
   Filter,
+  Shield,
 } from "lucide-react";
 import configService from "../configService.js";
+
+// Preset color options for quick selection
+const PRESET_COLORS = [
+  "#3b82f6",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6",
+  "#06b6d4",
+  "#84cc16",
+  "#f97316",
+  "#ec4899",
+  "#6366f1",
+  "#14b8a6",
+  "#eab308",
+  "#dc2626",
+  "#7c3aed",
+  "#0891b2",
+  "#65a30d",
+  "#ea580c",
+  "#db2777",
+  "#4f46e5",
+  "#059669",
+  "#d97706",
+  "#b91c1c",
+  "#7c2d12",
+  "#991b1b",
+];
 
 const ImprovedSidebar = ({
   currentView,
@@ -31,6 +60,7 @@ const ImprovedSidebar = ({
   onLogout,
   onShowSettings,
   onShowUserManagement,
+  onShowAdminInterface,
   onShowEvernoteImport,
   onNotesUpdate,
 }) => {
@@ -39,10 +69,16 @@ const ImprovedSidebar = ({
   const [notebooks, setNotebooks] = useState([]);
   const [tags, setTags] = useState([]);
   const [expandedFolders, setExpandedFolders] = useState(new Set());
-  const [editing, setEditing] = useState({ type: null, id: null, name: "" });
+  const [editing, setEditing] = useState({
+    type: null,
+    id: null,
+    name: "",
+    color: "",
+  });
   const [creating, setCreating] = useState({
     type: "",
     name: "",
+    color: "#3b82f6",
     parentId: null,
   });
   const [dragOver, setDragOver] = useState(null);
@@ -56,7 +92,7 @@ const ImprovedSidebar = ({
         setBackendUrl(url);
       } catch (error) {
         console.error("Failed to get backend URL:", error);
-        setBackendUrl("http://localhost:3003");
+        setBackendUrl("http://localhost:3004");
       }
     };
     initBackendUrl();
@@ -111,12 +147,44 @@ const ImprovedSidebar = ({
         const data = await response.json();
         setTags(data);
       } else {
-        console.error("ImprovedSidebar: Failed to load tags:", response.status, response.statusText);
+        console.error(
+          "ImprovedSidebar: Failed to load tags:",
+          response.status,
+          response.statusText
+        );
       }
     } catch (error) {
       console.error("Error loading tags:", error);
     }
   }, [backendUrl, user?.id]);
+
+  // Color picker component with presets
+  const ColorPicker = ({ value, onChange, className = "" }) => (
+    <div className={`space-y-2 ${className}`}>
+      <div className="flex items-center space-x-2">
+        <input
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-6 h-6 border border-gray-300 rounded cursor-pointer"
+        />
+        <span className="text-xs text-gray-500">Custom</span>
+      </div>
+      <div className="grid grid-cols-8 gap-1">
+        {PRESET_COLORS.map((color) => (
+          <button
+            key={color}
+            onClick={() => onChange(color)}
+            className={`w-4 h-4 rounded border transition-all hover:scale-110 ${
+              value === color ? "border-gray-800 border-2" : "border-gray-300"
+            }`}
+            style={{ backgroundColor: color }}
+            title={color}
+          />
+        ))}
+      </div>
+    </div>
+  );
 
   // Create operations
   const createFolder = async (name, parentId = null) => {
@@ -132,7 +200,7 @@ const ImprovedSidebar = ({
         body: JSON.stringify({
           name: name.trim(),
           parentId,
-          color: "#3b82f6",
+          color: creating.color,
         }),
       });
 
@@ -163,7 +231,7 @@ const ImprovedSidebar = ({
         body: JSON.stringify({
           name: name.trim(),
           folderId,
-          color: "#10b981",
+          color: creating.color,
         }),
       });
 
@@ -193,7 +261,7 @@ const ImprovedSidebar = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
-          color: "#f59e0b",
+          color: creating.color,
         }),
       });
 
@@ -344,6 +412,11 @@ const ImprovedSidebar = ({
         console.log("📚→📁 Moving notebook to folder");
         await updateItem("notebook", sourceId, { folderId: targetId });
       }
+      // Handle notebook to root drop (unnesting)
+      else if (sourceType === "notebook" && targetType === "root") {
+        console.log("📚→🏠 Moving notebook to root (unnesting)");
+        await updateItem("notebook", sourceId, { folderId: null });
+      }
       // Handle notebook reordering
       else if (sourceType === "notebook" && targetType === "notebook") {
         console.log("📚↔️📚 Reordering notebooks");
@@ -389,7 +462,7 @@ const ImprovedSidebar = ({
         position
       );
 
-      // Only handle reordering within the same type
+      // Handle reordering within the same type
       if (sourceType === targetType && sourceId !== targetId) {
         if (sourceType === "notebook") {
           await reorderNotebooks(sourceId, targetId, position);
@@ -402,8 +475,49 @@ const ImprovedSidebar = ({
         await loadAllData(); // Refresh data
         // Don't refresh notes for reordering operations - they don't affect note content
       }
+      // Handle notebook to root drop (unnesting via reorder zones)
+      else if (sourceType === "notebook" && targetType === "root") {
+        console.log("📚→🏠 Moving notebook to root (unnesting via reorder)");
+        await updateItem("notebook", sourceId, { folderId: null });
+        await loadAllData(); // Refresh data
+      }
     } catch (error) {
       console.error("❌ Reorder drop error:", error);
+    }
+  };
+
+  // Handle root-level drops (for unnesting notebooks)
+  const handleRootDrop = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    console.log("📦 Root drop");
+    setDragOver(null);
+
+    try {
+      const dragData = JSON.parse(e.dataTransfer.getData("text/plain"));
+      const { type: sourceType, id: sourceId, name } = dragData;
+
+      console.log("🎯 Root drop data:", sourceType, sourceId, name);
+
+      if (sourceType === "notebook") {
+        console.log("📚→🏠 Unnesting notebook:", name);
+
+        // Get current notebook to check if it's actually in a folder
+        const currentNotebook = notebooks.find((n) => n.id === sourceId);
+        if (currentNotebook?.folderId) {
+          console.log(`📚 Moving "${name}" from folder to root`);
+          await updateItem("notebook", sourceId, { folderId: null });
+          await loadAllData();
+          console.log("✅ Notebook unnested successfully");
+        } else {
+          console.log("⚠️ Notebook is already at root level");
+        }
+      } else {
+        console.log("❌ Only notebooks can be unnested");
+      }
+    } catch (error) {
+      console.error("❌ Root drop error:", error);
     }
   };
 
@@ -454,15 +568,43 @@ const ImprovedSidebar = ({
 
   // Editing handlers
   const startEditing = (type, id, currentName) => {
-    setEditing({ type, id, name: currentName });
+    const currentItem =
+      type === "folder"
+        ? folders.find((f) => f.id === id)
+        : type === "notebook"
+        ? notebooks.find((n) => n.id === id)
+        : type === "tag"
+        ? tags.find((t) => t.id === id)
+        : null;
+
+    setEditing({
+      type,
+      id,
+      name: currentName,
+      color: currentItem?.color || "#3b82f6",
+    });
   };
 
   const startCreating = (type, parentId = null) => {
-    setCreating({ type, name: "", parentId });
+    const defaultColor =
+      type === "folder"
+        ? "#3b82f6"
+        : type === "notebook"
+        ? "#10b981"
+        : type === "tag"
+        ? "#f59e0b"
+        : "#3b82f6";
+
+    setCreating({
+      type,
+      name: "",
+      color: defaultColor,
+      parentId,
+    });
   };
 
   const cancelCreating = () => {
-    setCreating({ type: "", name: "", parentId: null });
+    setCreating({ type: "", name: "", color: "#3b82f6", parentId: null });
   };
 
   const submitCreation = async () => {
@@ -489,12 +631,15 @@ const ImprovedSidebar = ({
   const saveEdit = async () => {
     if (!editing.name.trim()) return;
 
-    await updateItem(editing.type, editing.id, { name: editing.name.trim() });
-    setEditing({ type: null, id: null, name: "" });
+    await updateItem(editing.type, editing.id, {
+      name: editing.name.trim(),
+      color: editing.color,
+    });
+    setEditing({ type: null, id: null, name: "", color: "" });
   };
 
   const cancelEdit = () => {
-    setEditing({ type: null, id: null, name: "" });
+    setEditing({ type: null, id: null, name: "", color: "" });
   };
 
   const toggleFolder = (folderId) => {
@@ -641,39 +786,54 @@ const ImprovedSidebar = ({
         style={{ marginLeft: depth * 16 }}
         className="relative"
       >
-        {/* Drop zone above */}
-        <div
-          className={`h-3 mx-2 transition-all ${
-            isDragBefore ? "bg-blue-400 rounded-full" : "transparent"
-          }`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            e.dataTransfer.dropEffect = "move";
-            setDragOver({ type: "folder-before", id: folder.id });
-          }}
-          onDragLeave={handleDragLeave}
-          onDrop={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setDragOver(null);
-            handleReorderDrop(e, "folder", folder.id, "before");
-          }}
-        />
+        {/* Elegant drop indicator above */}
+        {isDragBefore && (
+          <div className="h-0.5 bg-blue-500 mx-2 mb-1 rounded-full shadow-sm" />
+        )}
 
         <div
-          className={`flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 cursor-pointer group ${
-            isDragTarget ? "bg-blue-100 border-2 border-blue-300" : ""
+          className={`flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 cursor-pointer group relative ${
+            isDragTarget ? "bg-blue-50" : ""
           } ${
             currentView === "folder" && currentView.folderId === folder.id
               ? "bg-blue-50"
               : ""
           }`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = "move";
+
+            // Determine if this is a before/after drop or target drop
+            const rect = e.currentTarget.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const height = rect.height;
+
+            if (y < height * 0.25) {
+              setDragOver({ type: "folder-before", id: folder.id });
+            } else if (y > height * 0.75) {
+              setDragOver({ type: "folder-after", id: folder.id });
+            } else {
+              setDragOver({ type: "folder", id: folder.id });
+            }
+          }}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const dragType = dragOver?.type;
+            setDragOver(null);
+
+            if (dragType === "folder-before") {
+              handleReorderDrop(e, "folder", folder.id, "before");
+            } else if (dragType === "folder-after") {
+              handleReorderDrop(e, "folder", folder.id, "after");
+            } else {
+              handleDrop(e, "folder", folder.id);
+            }
+          }}
           draggable
           onDragStart={(e) => handleDragStart(e, "folder", folder.id)}
-          onDragOver={(e) => handleDragOver(e, "folder", folder.id)}
-          onDragLeave={handleDragLeave}
-          onDrop={(e) => handleDrop(e, "folder", folder.id)}
           onClick={() => {
             onViewChange("folder", { folderId: folder.id });
             toggleFolder(folder.id);
@@ -697,20 +857,53 @@ const ImprovedSidebar = ({
               style={{ color: folder.color || "#3b82f6" }}
             />
             {isEditing ? (
-              <input
-                value={editing.name}
-                onChange={(e) =>
-                  setEditing((prev) => ({ ...prev, name: e.target.value }))
-                }
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") saveEdit();
-                  if (e.key === "Escape") cancelEdit();
-                }}
-                onBlur={saveEdit}
-                className="flex-1 px-1 border rounded"
-                autoFocus
-                onClick={(e) => e.stopPropagation()}
-              />
+              <div className="flex-1" onClick={(e) => e.stopPropagation()}>
+                <div
+                  className="absolute top-0 left-0 right-0 bg-white border rounded-lg shadow-lg p-3 z-10"
+                  style={{ minWidth: "300px" }}
+                >
+                  <div className="flex items-center space-x-2 mb-2">
+                    <FolderOpen size={14} style={{ color: editing.color }} />
+                    <input
+                      value={editing.name}
+                      onChange={(e) =>
+                        setEditing((prev) => ({
+                          ...prev,
+                          name: e.target.value,
+                        }))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveEdit();
+                        if (e.key === "Escape") cancelEdit();
+                      }}
+                      className="flex-1 px-2 py-1 border rounded text-sm"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="mb-2">
+                    <ColorPicker
+                      value={editing.color}
+                      onChange={(color) =>
+                        setEditing((prev) => ({ ...prev, color }))
+                      }
+                    />
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <button
+                      onClick={saveEdit}
+                      className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                    >
+                      ✓
+                    </button>
+                    <button
+                      onClick={cancelEdit}
+                      className="px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              </div>
             ) : (
               <span className="text-sm">{folder.name}</span>
             )}
@@ -749,25 +942,10 @@ const ImprovedSidebar = ({
           </div>
         )}
 
-        {/* Drop zone below */}
-        <div
-          className={`h-3 mx-2 transition-all ${
-            isDragAfter ? "bg-blue-400 rounded-full" : "transparent"
-          }`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            e.dataTransfer.dropEffect = "move";
-            setDragOver({ type: "folder-after", id: folder.id });
-          }}
-          onDragLeave={handleDragLeave}
-          onDrop={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setDragOver(null);
-            handleReorderDrop(e, "folder", folder.id, "after");
-          }}
-        />
+        {/* Elegant drop indicator below */}
+        {isDragAfter && (
+          <div className="h-0.5 bg-blue-500 mx-2 mt-1 rounded-full shadow-sm" />
+        )}
       </div>
     );
   };
@@ -787,58 +965,106 @@ const ImprovedSidebar = ({
         style={{ marginLeft: depth * 16 }}
         className="relative"
       >
-        {/* Drop zone above */}
-        <div
-          className={`h-3 mx-2 transition-all ${
-            isDragBefore ? "bg-blue-400 rounded-full" : "transparent"
-          }`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            e.dataTransfer.dropEffect = "move";
-            setDragOver({ type: "notebook-before", id: notebook.id });
-          }}
-          onDragLeave={handleDragLeave}
-          onDrop={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setDragOver(null);
-            handleReorderDrop(e, "notebook", notebook.id, "before");
-          }}
-        />
+        {/* Elegant drop indicator above */}
+        {isDragBefore && (
+          <div className="h-0.5 bg-green-500 mx-2 mb-1 rounded-full shadow-sm" />
+        )}
 
         <div
-          className={`flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 cursor-pointer group ${
-            isDragTarget ? "bg-green-100 border-2 border-green-300" : ""
+          className={`flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 cursor-pointer group relative ${
+            isDragTarget ? "bg-green-50" : ""
           } ${
             currentView === "notebook" && currentView.notebookId === notebook.id
               ? "bg-green-50"
               : ""
           }`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = "move";
+
+            // Determine if this is a before/after drop or target drop
+            const rect = e.currentTarget.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const height = rect.height;
+
+            if (y < height * 0.25) {
+              setDragOver({ type: "notebook-before", id: notebook.id });
+            } else if (y > height * 0.75) {
+              setDragOver({ type: "notebook-after", id: notebook.id });
+            } else {
+              setDragOver({ type: "notebook", id: notebook.id });
+            }
+          }}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const dragType = dragOver?.type;
+            setDragOver(null);
+
+            if (dragType === "notebook-before") {
+              handleReorderDrop(e, "notebook", notebook.id, "before");
+            } else if (dragType === "notebook-after") {
+              handleReorderDrop(e, "notebook", notebook.id, "after");
+            } else {
+              handleDrop(e, "notebook", notebook.id);
+            }
+          }}
           draggable
           onDragStart={(e) => handleDragStart(e, "notebook", notebook.id)}
-          onDragOver={(e) => handleDragOver(e, "notebook", notebook.id)}
-          onDragLeave={handleDragLeave}
-          onDrop={(e) => handleDrop(e, "notebook", notebook.id)}
           onClick={() => onViewChange("notebook", { notebookId: notebook.id })}
         >
           <div className="flex items-center space-x-2 flex-1">
             <Book size={16} style={{ color: notebook.color || "#10b981" }} />
             {isEditing ? (
-              <input
-                value={editing.name}
-                onChange={(e) =>
-                  setEditing((prev) => ({ ...prev, name: e.target.value }))
-                }
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") saveEdit();
-                  if (e.key === "Escape") cancelEdit();
-                }}
-                onBlur={saveEdit}
-                className="flex-1 px-1 border rounded"
-                autoFocus
-                onClick={(e) => e.stopPropagation()}
-              />
+              <div className="flex-1" onClick={(e) => e.stopPropagation()}>
+                <div
+                  className="absolute top-0 left-0 right-0 bg-white border rounded-lg shadow-lg p-3 z-10"
+                  style={{ minWidth: "300px" }}
+                >
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Book size={14} style={{ color: editing.color }} />
+                    <input
+                      value={editing.name}
+                      onChange={(e) =>
+                        setEditing((prev) => ({
+                          ...prev,
+                          name: e.target.value,
+                        }))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveEdit();
+                        if (e.key === "Escape") cancelEdit();
+                      }}
+                      className="flex-1 px-2 py-1 border rounded text-sm"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="mb-2">
+                    <ColorPicker
+                      value={editing.color}
+                      onChange={(color) =>
+                        setEditing((prev) => ({ ...prev, color }))
+                      }
+                    />
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <button
+                      onClick={saveEdit}
+                      className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+                    >
+                      ✓
+                    </button>
+                    <button
+                      onClick={cancelEdit}
+                      className="px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              </div>
             ) : (
               <span className="text-sm">{notebook.name}</span>
             )}
@@ -870,25 +1096,10 @@ const ImprovedSidebar = ({
           </div>
         </div>
 
-        {/* Drop zone below */}
-        <div
-          className={`h-3 mx-2 transition-all ${
-            isDragAfter ? "bg-blue-400 rounded-full" : "transparent"
-          }`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            e.dataTransfer.dropEffect = "move";
-            setDragOver({ type: "notebook-after", id: notebook.id });
-          }}
-          onDragLeave={handleDragLeave}
-          onDrop={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setDragOver(null);
-            handleReorderDrop(e, "notebook", notebook.id, "after");
-          }}
-        />
+        {/* Elegant drop indicator below */}
+        {isDragAfter && (
+          <div className="h-0.5 bg-green-500 mx-2 mt-1 rounded-full shadow-sm" />
+        )}
       </div>
     );
   };
@@ -903,60 +1114,113 @@ const ImprovedSidebar = ({
 
     return (
       <div key={tag.id} className="relative">
-        {/* Drop zone above */}
-        <div
-          className={`h-3 mx-2 transition-all ${
-            isDragBefore ? "bg-blue-400 rounded-full" : "transparent"
-          }`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            e.dataTransfer.dropEffect = "move";
-            setDragOver({ type: "tag-before", id: tag.id });
-          }}
-          onDragLeave={handleDragLeave}
-          onDrop={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setDragOver(null);
-            handleReorderDrop(e, "tag", tag.id, "before");
-          }}
-        />
+        {/* Elegant drop indicator above */}
+        {isDragBefore && (
+          <div className="h-0.5 bg-yellow-500 mx-2 mb-1 rounded-full shadow-sm" />
+        )}
 
         <div
-          className={`flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 cursor-pointer group ${
-            isDragTarget ? "bg-yellow-100 border-2 border-yellow-300" : ""
+          className={`flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 cursor-pointer group relative ${
+            isDragTarget ? "bg-yellow-50" : ""
           } ${
             currentView === "tag" && currentView.tagId === tag.id
               ? "bg-yellow-50"
               : ""
           }`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = "move";
+
+            // Determine if this is a before/after drop or target drop
+            const rect = e.currentTarget.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const height = rect.height;
+
+            if (y < height * 0.25) {
+              setDragOver({ type: "tag-before", id: tag.id });
+            } else if (y > height * 0.75) {
+              setDragOver({ type: "tag-after", id: tag.id });
+            } else {
+              setDragOver({ type: "tag", id: tag.id });
+            }
+          }}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const dragType = dragOver?.type;
+            setDragOver(null);
+
+            if (dragType === "tag-before") {
+              handleReorderDrop(e, "tag", tag.id, "before");
+            } else if (dragType === "tag-after") {
+              handleReorderDrop(e, "tag", tag.id, "after");
+            } else {
+              handleDrop(e, "tag", tag.id);
+            }
+          }}
           draggable
           onDragStart={(e) => handleDragStart(e, "tag", tag.id)}
-          onDragOver={(e) => handleDragOver(e, "tag", tag.id)}
-          onDragLeave={handleDragLeave}
-          onDrop={(e) => handleDrop(e, "tag", tag.id)}
           onClick={() => onViewChange("tag", { tagId: tag.id })}
         >
           <div className="flex items-center space-x-2 flex-1">
             <Hash size={16} style={{ color: tag.color || "#f59e0b" }} />
             {isEditing ? (
-              <input
-                value={editing.name}
-                onChange={(e) =>
-                  setEditing((prev) => ({ ...prev, name: e.target.value }))
-                }
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") saveEdit();
-                  if (e.key === "Escape") cancelEdit();
-                }}
-                onBlur={saveEdit}
-                className="flex-1 px-1 border rounded"
-                autoFocus
-                onClick={(e) => e.stopPropagation()}
-              />
+              <div className="flex-1" onClick={(e) => e.stopPropagation()}>
+                <div
+                  className="absolute top-0 left-0 right-0 bg-white border rounded-lg shadow-lg p-3 z-10"
+                  style={{ minWidth: "300px" }}
+                >
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Hash size={14} style={{ color: editing.color }} />
+                    <input
+                      value={editing.name}
+                      onChange={(e) =>
+                        setEditing((prev) => ({
+                          ...prev,
+                          name: e.target.value,
+                        }))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveEdit();
+                        if (e.key === "Escape") cancelEdit();
+                      }}
+                      className="flex-1 px-2 py-1 border rounded text-sm"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="mb-2">
+                    <ColorPicker
+                      value={editing.color}
+                      onChange={(color) =>
+                        setEditing((prev) => ({ ...prev, color }))
+                      }
+                    />
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <button
+                      onClick={saveEdit}
+                      className="px-3 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700"
+                    >
+                      ✓
+                    </button>
+                    <button
+                      onClick={cancelEdit}
+                      className="px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              </div>
             ) : (
-              <span className="text-sm" title={`Tag ID: ${tag.id}, Name: ${tag.name}`}>{tag.name || tag.id}</span>
+              <span
+                className="text-sm"
+                title={`Tag ID: ${tag.id}, Name: ${tag.name}`}
+              >
+                {tag.name || tag.id}
+              </span>
             )}
             {(tag.noteCount || 0) > 0 && (
               <span className="text-xs text-gray-500">({tag.noteCount})</span>
@@ -984,25 +1248,10 @@ const ImprovedSidebar = ({
           </div>
         </div>
 
-        {/* Drop zone below */}
-        <div
-          className={`h-3 mx-2 transition-all ${
-            isDragAfter ? "bg-blue-400 rounded-full" : "transparent"
-          }`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            e.dataTransfer.dropEffect = "move";
-            setDragOver({ type: "tag-after", id: tag.id });
-          }}
-          onDragLeave={handleDragLeave}
-          onDrop={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setDragOver(null);
-            handleReorderDrop(e, "tag", tag.id, "after");
-          }}
-        />
+        {/* Elegant drop indicator below */}
+        {isDragAfter && (
+          <div className="h-0.5 bg-yellow-500 mx-2 mt-1 rounded-full shadow-sm" />
+        )}
       </div>
     );
   };
@@ -1032,6 +1281,15 @@ const ImprovedSidebar = ({
             >
               <Settings size={16} />
             </button>
+            {user?.isAdmin && (
+              <button
+                onClick={onShowAdminInterface}
+                className="p-1 hover:bg-red-100 rounded text-red-600"
+                title="Admin Interface"
+              >
+                <Shield size={16} />
+              </button>
+            )}
             <button
               onClick={onLogout}
               className="p-1 hover:bg-gray-100 rounded text-red-600"
@@ -1125,12 +1383,12 @@ const ImprovedSidebar = ({
 
           {/* Creation Form for Folders/Notebooks */}
           {(creating.type === "folder" || creating.type === "notebook") && (
-            <div className="mb-2 p-2 bg-blue-50 rounded border">
-              <div className="flex items-center space-x-2">
+            <div className="mb-2 p-3 bg-blue-50 rounded border">
+              <div className="flex items-center space-x-2 mb-2">
                 {creating.type === "folder" ? (
-                  <FolderOpen size={14} />
+                  <FolderOpen size={14} style={{ color: creating.color }} />
                 ) : (
-                  <Book size={14} />
+                  <Book size={14} style={{ color: creating.color }} />
                 )}
                 <input
                   value={creating.name}
@@ -1147,15 +1405,25 @@ const ImprovedSidebar = ({
                   className="flex-1 px-2 py-1 border rounded text-sm"
                   autoFocus
                 />
+              </div>
+              <div className="mb-2">
+                <ColorPicker
+                  value={creating.color}
+                  onChange={(color) =>
+                    setCreating((prev) => ({ ...prev, color }))
+                  }
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
                 <button
                   onClick={submitCreation}
-                  className="px-2 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                  className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
                 >
                   ✓
                 </button>
                 <button
                   onClick={cancelCreating}
-                  className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
+                  className="px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
                 >
                   ✕
                 </button>
@@ -1163,9 +1431,65 @@ const ImprovedSidebar = ({
             </div>
           )}
 
+          {/* Root-level drop zone for unnesting notebooks */}
+          <div
+            className={`h-6 mx-2 mb-2 transition-all rounded flex items-center justify-center text-xs text-gray-500 ${
+              dragOver?.type === "root-top"
+                ? "bg-blue-400 text-white font-medium"
+                : "bg-gray-100 hover:bg-gray-200 border-2 border-dashed border-gray-300"
+            }`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              e.dataTransfer.dropEffect = "move";
+              console.log("📍 Root top drag over");
+              setDragOver({ type: "root-top", id: null });
+            }}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log("📦 Root top drop");
+              setDragOver(null);
+              handleRootDrop(e);
+            }}
+          >
+            {dragOver?.type === "root-top"
+              ? "Drop to unnest"
+              : "Drop notebooks here to unnest"}
+          </div>
+
           <div className="space-y-1">
             {rootFolders.map((folder) => renderFolder(folder))}
             {rootNotebooks.map((notebook) => renderNotebook(notebook))}
+          </div>
+
+          {/* Root-level drop zone for unnesting notebooks */}
+          <div
+            className={`h-6 mx-2 mt-2 transition-all rounded flex items-center justify-center text-xs text-gray-500 ${
+              dragOver?.type === "root-bottom"
+                ? "bg-blue-400 text-white font-medium"
+                : "bg-gray-100 hover:bg-gray-200 border-2 border-dashed border-gray-300"
+            }`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              e.dataTransfer.dropEffect = "move";
+              console.log("📍 Root bottom drag over");
+              setDragOver({ type: "root-bottom", id: null });
+            }}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log("📦 Root bottom drop");
+              setDragOver(null);
+              handleRootDrop(e);
+            }}
+          >
+            {dragOver?.type === "root-bottom"
+              ? "Drop to unnest"
+              : "Drop notebooks here to unnest"}
           </div>
         </div>
 
@@ -1184,9 +1508,9 @@ const ImprovedSidebar = ({
 
           {/* Creation Form for Tags */}
           {creating.type === "tag" && (
-            <div className="mb-2 p-2 bg-yellow-50 rounded border">
-              <div className="flex items-center space-x-2">
-                <Hash size={14} />
+            <div className="mb-2 p-3 bg-yellow-50 rounded border">
+              <div className="flex items-center space-x-2 mb-2">
+                <Hash size={14} style={{ color: creating.color }} />
                 <input
                   value={creating.name}
                   onChange={(e) =>
@@ -1200,15 +1524,25 @@ const ImprovedSidebar = ({
                   className="flex-1 px-2 py-1 border rounded text-sm"
                   autoFocus
                 />
+              </div>
+              <div className="mb-2">
+                <ColorPicker
+                  value={creating.color}
+                  onChange={(color) =>
+                    setCreating((prev) => ({ ...prev, color }))
+                  }
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
                 <button
                   onClick={submitCreation}
-                  className="px-2 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700"
+                  className="px-3 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700"
                 >
                   ✓
                 </button>
                 <button
                   onClick={cancelCreating}
-                  className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
+                  className="px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
                 >
                   ✕
                 </button>

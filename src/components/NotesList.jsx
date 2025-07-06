@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Search,
   Plus,
@@ -28,6 +28,8 @@ import {
   X,
 } from "lucide-react";
 import configService from "../configService.js";
+import BulkActionsBar from "./BulkActionsBar.jsx";
+import TagManagementDialog from "./TagManagementDialog.jsx";
 
 const NotesList = ({
   notes = [],
@@ -38,18 +40,61 @@ const NotesList = ({
   onSearchChange,
   userId,
   onNotesRefresh,
+  currentView,
+  currentViewParams,
+  availableTags = [],
   className = "",
+  selectedNotes = new Set(),
+  onSelectedNotesChange,
+  onBulkTagAction,
+  onBulkExport,
+  onBulkDelete,
+  onBulkUndo,
+  isProcessing: propIsProcessing = false,
+  processingStatus: propProcessingStatus = null,
+  deletedNotes: propDeletedNotes = [],
 }) => {
   const [viewMode, setViewMode] = useState("list"); // 'list' or 'grid'
   const [sortBy, setSortBy] = useState("updatedAt");
   const [sortOrder, setSortOrder] = useState("desc");
   const [filterBy, setFilterBy] = useState("all"); // 'all', 'starred', 'recent', 'archived'
   const [showFilters, setShowFilters] = useState(false);
-  const [selectedNotes, setSelectedNotes] = useState(new Set());
-  const [showBulkActions, setShowBulkActions] = useState(false);
   const [noteOptions, setNoteOptions] = useState(null);
   const [editingNoteTitle, setEditingNoteTitle] = useState(null);
   const [newTitle, setNewTitle] = useState("");
+  const [lastSelectedIndex, setLastSelectedIndex] = useState(-1);
+  const [showTagDialog, setShowTagDialog] = useState(false);
+
+  // Use props for selection state
+  const isProcessing = propIsProcessing;
+  const processingStatus = propProcessingStatus;
+  const deletedNotes = propDeletedNotes;
+
+  // Refs for keyboard shortcuts
+  const containerRef = useRef(null);
+  const currentViewRef = useRef(currentView);
+  const currentViewParamsRef = useRef(currentViewParams);
+  const selectedNoteRef = useRef(selectedNote);
+
+  // Update refs when props change
+  useEffect(() => {
+    currentViewRef.current = currentView;
+    currentViewParamsRef.current = currentViewParams;
+    selectedNoteRef.current = selectedNote;
+  }, [currentView, currentViewParams, selectedNote]);
+
+  // Reset selections when view changes or when a note is individually selected
+  useEffect(() => {
+    console.log("🔄 Selection reset triggered by:", {
+      currentView,
+      currentViewParams,
+      selectedNote: selectedNote?.id,
+    });
+    if (onSelectedNotesChange) {
+      onSelectedNotesChange(new Set());
+    }
+    setLastSelectedIndex(-1);
+  }, [currentView, currentViewParams, selectedNote, onSelectedNotesChange]);
 
   // Filter and sort notes
   const filteredAndSortedNotes = React.useMemo(() => {
@@ -105,28 +150,215 @@ const NotesList = ({
     return filtered;
   }, [notes, searchQuery, filterBy, sortBy, sortOrder]);
 
-  const handleNoteSelect = (note) => {
-    onSelectNote(note);
-    setSelectedNotes(new Set());
+  // Enhanced note selection with Cmd/Ctrl+click and Shift+click
+  const handleNoteSelect = (note, event) => {
+    if (event?.ctrlKey || event?.metaKey) {
+      // Cmd/Ctrl+click: Toggle selection
+      event.preventDefault();
+      handleBulkSelect(note.id, event);
+    } else if (event?.shiftKey) {
+      // Shift+click: Range selection
+      event.preventDefault();
+      handleRangeSelect(note.id, event);
+    } else {
+      // Regular click: Select note and clear bulk selection
+      onSelectNote(note);
+      if (onSelectedNotesChange) {
+        onSelectedNotesChange(new Set());
+      }
+      // Reset lastSelectedIndex only when clearing multi-selection
+      setLastSelectedIndex(-1);
+    }
   };
 
-  const handleBulkSelect = (noteId) => {
-    setSelectedNotes((prev) => {
-      const newSet = new Set(prev);
+  const handleBulkSelect = (noteId, event) => {
+    console.log("🎯 Bulk select called:", {
+      noteId,
+      currentSelection: Array.from(selectedNotes),
+    });
+
+    const noteIndex = filteredAndSortedNotes.findIndex(
+      (note) => note.id === noteId
+    );
+
+    if (onSelectedNotesChange) {
+      const newSet = new Set(selectedNotes);
       if (newSet.has(noteId)) {
+        console.log("➖ Removing from selection:", noteId);
         newSet.delete(noteId);
       } else {
+        console.log("➕ Adding to selection:", noteId);
         newSet.add(noteId);
       }
-      return newSet;
+      console.log("📊 New selection:", Array.from(newSet));
+      onSelectedNotesChange(newSet);
+    }
+
+    setLastSelectedIndex(noteIndex);
+  };
+
+  const handleRangeSelect = (noteId, event) => {
+    console.log("🔄 Range select called:", {
+      noteId,
+      lastSelectedIndex,
+      selectedNotesSize: selectedNotes.size,
     });
+
+    // Prevent text selection
+    if (event) {
+      event.preventDefault();
+      if (window.getSelection) {
+        window.getSelection().removeAllRanges();
+      }
+    }
+
+    const currentIndex = filteredAndSortedNotes.findIndex(
+      (note) => note.id === noteId
+    );
+
+    console.log(
+      "📍 Current index:",
+      currentIndex,
+      "for note:",
+      filteredAndSortedNotes[currentIndex]?.title
+    );
+
+    // If no previous multi-selection, but there's a currently selected note,
+    // create range from currently selected note to shift-clicked note
+    if (selectedNotes.size === 0 && selectedNote) {
+      const selectedNoteIndex = filteredAndSortedNotes.findIndex(
+        (note) => note.id === selectedNote.id
+      );
+
+      if (selectedNoteIndex !== -1) {
+        console.log(
+          "🎯 Creating range from currently selected note:",
+          selectedNote.title
+        );
+        const start = Math.min(selectedNoteIndex, currentIndex);
+        const end = Math.max(selectedNoteIndex, currentIndex);
+
+        const rangeNotes = filteredAndSortedNotes.slice(start, end + 1);
+        console.log(
+          "📝 Notes in range:",
+          rangeNotes.map((n) => n.title)
+        );
+
+        const newSelectedNotes = new Set(rangeNotes.map((note) => note.id));
+
+        console.log("✅ New selection set size:", newSelectedNotes.size);
+
+        if (onSelectedNotesChange) {
+          onSelectedNotesChange(newSelectedNotes);
+        }
+        setLastSelectedIndex(currentIndex);
+        return;
+      }
+    }
+
+    if (lastSelectedIndex === -1 || selectedNotes.size === 0) {
+      // No previous selection, just select current
+      console.log("🎯 No previous selection, selecting current note");
+      if (onSelectedNotesChange) {
+        onSelectedNotesChange(new Set([noteId]));
+      }
+      setLastSelectedIndex(currentIndex);
+      return;
+    }
+
+    // Select range from last selected to current
+    const start = Math.min(lastSelectedIndex, currentIndex);
+    const end = Math.max(lastSelectedIndex, currentIndex);
+
+    console.log("📊 Range selection:", {
+      start,
+      end,
+      lastSelectedIndex,
+      currentIndex,
+    });
+
+    const rangeNotes = filteredAndSortedNotes.slice(start, end + 1);
+    console.log(
+      "📝 Notes in range:",
+      rangeNotes.map((n) => n.title)
+    );
+
+    const newSelectedNotes = new Set(selectedNotes);
+
+    rangeNotes.forEach((note) => {
+      newSelectedNotes.add(note.id);
+    });
+
+    console.log("✅ New selection set size:", newSelectedNotes.size);
+
+    if (onSelectedNotesChange) {
+      onSelectedNotesChange(newSelectedNotes);
+    }
+
+    // Update the last selected index to the current one
+    setLastSelectedIndex(currentIndex);
   };
 
   const handleSelectAll = () => {
-    if (selectedNotes.size === filteredAndSortedNotes.length) {
-      setSelectedNotes(new Set());
-    } else {
-      setSelectedNotes(new Set(filteredAndSortedNotes.map((note) => note.id)));
+    if (onSelectedNotesChange) {
+      if (selectedNotes.size === filteredAndSortedNotes.length) {
+        onSelectedNotesChange(new Set());
+        setLastSelectedIndex(-1);
+      } else {
+        onSelectedNotesChange(
+          new Set(filteredAndSortedNotes.map((note) => note.id))
+        );
+        setLastSelectedIndex(-1);
+      }
+    }
+  };
+
+  const handleDeselectAll = () => {
+    if (onSelectedNotesChange) {
+      onSelectedNotesChange(new Set());
+    }
+    setLastSelectedIndex(-1);
+  };
+
+  const handleClearSelection = () => {
+    if (onSelectedNotesChange) {
+      onSelectedNotesChange(new Set());
+    }
+    setLastSelectedIndex(-1);
+  };
+
+  // Keyboard shortcuts
+  const handleKeyDown = useCallback(
+    (event) => {
+      if (
+        event.target.tagName === "INPUT" ||
+        event.target.tagName === "TEXTAREA"
+      ) {
+        return; // Don't handle shortcuts when typing
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.key === "a") {
+        event.preventDefault();
+        handleSelectAll();
+      }
+    },
+    [filteredAndSortedNotes]
+  );
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener("keydown", handleKeyDown);
+      return () => {
+        container.removeEventListener("keydown", handleKeyDown);
+      };
+    }
+  }, [handleKeyDown]);
+
+  // Bulk Actions (using props)
+  const handleBulkTagAction = (noteIds) => {
+    if (onBulkTagAction) {
+      onBulkTagAction(noteIds);
     }
   };
 
@@ -213,8 +445,8 @@ const NotesList = ({
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            metadata: { archived: !archived }
+          body: JSON.stringify({
+            metadata: { archived: !archived },
           }),
         }
       );
@@ -307,8 +539,56 @@ const NotesList = ({
     }
   }, [userId]);
 
+  const renderFirstTag = useCallback(
+    (note) => {
+      if (!note.tags || note.tags.length === 0) {
+        return null;
+      }
+
+      // Map tag IDs to tag objects - handle both string and object tags
+      const noteTags = note.tags
+        .map((tagId) => {
+          // If it's already an object, return it
+          if (typeof tagId === "object" && tagId.id) return tagId;
+          // Otherwise find by ID
+          return availableTags.find((t) => t.id === tagId);
+        })
+        .filter(Boolean);
+
+      if (noteTags.length === 0) {
+        return null;
+      }
+
+      // Sort tags by name to ensure consistent rendering
+      const sortedTags = [...noteTags].sort((a, b) =>
+        a.name.localeCompare(b.name)
+      );
+      const firstTag = sortedTags[0];
+      const totalTagsOnNote = sortedTags.length;
+
+      return (
+        <div className="flex items-center gap-2">
+          <span
+            className="note-tag inline-block px-3 py-1 text-sm font-medium rounded-full bg-blue-500 text-white truncate max-w-[120px] shadow-sm"
+            title={firstTag.name}
+          >
+            {firstTag.name}
+          </span>
+          {totalTagsOnNote > 1 && (
+            <span className="text-sm text-gray-600 font-medium">
+              +{totalTagsOnNote - 1} more
+            </span>
+          )}
+        </div>
+      );
+    },
+    [availableTags]
+  );
+
   return (
     <div
+      ref={containerRef}
+      tabIndex={0}
       className={`flex flex-col h-full bg-white border-r border-gray-200 ${className}`}
     >
       {/* Header */}
@@ -438,71 +718,14 @@ const NotesList = ({
             </div>
           </div>
         )}
-
-        {/* Bulk Actions */}
-        {selectedNotes.size > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-blue-800">
-                {selectedNotes.size} note{selectedNotes.size !== 1 ? "s" : ""}{" "}
-                selected
-              </span>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => {
-                    selectedNotes.forEach((noteId) => {
-                      const note = notes.find((n) => n.id === noteId);
-                      if (note) toggleNoteStar(noteId, note.starred);
-                    });
-                    setSelectedNotes(new Set());
-                  }}
-                  className="text-blue-600 hover:text-blue-700 p-1 rounded"
-                  title="Toggle star"
-                >
-                  <Star size={14} />
-                </button>
-                <button
-                  onClick={() => {
-                    selectedNotes.forEach((noteId) => {
-                      const note = notes.find((n) => n.id === noteId);
-                      if (note) archiveNote(noteId, note.archived);
-                    });
-                    setSelectedNotes(new Set());
-                  }}
-                  className="text-blue-600 hover:text-blue-700 p-1 rounded"
-                  title="Toggle archive"
-                >
-                  <Archive size={14} />
-                </button>
-                <button
-                  onClick={() => {
-                    if (
-                      confirm(`Delete ${selectedNotes.size} selected notes?`)
-                    ) {
-                      selectedNotes.forEach((noteId) => deleteNote(noteId));
-                      setSelectedNotes(new Set());
-                    }
-                  }}
-                  className="text-red-600 hover:text-red-700 p-1 rounded"
-                  title="Delete selected"
-                >
-                  <Trash2 size={14} />
-                </button>
-                <button
-                  onClick={() => setSelectedNotes(new Set())}
-                  className="text-gray-600 hover:text-gray-700 p-1 rounded"
-                  title="Clear selection"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Notes List */}
-      <div className="flex-1 overflow-y-auto">
+      <div
+        className={`flex-1 overflow-y-auto ${
+          selectedNotes.size > 0 ? "pb-20" : ""
+        }`}
+      >
         {filteredAndSortedNotes.length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-500">
             <div className="text-center">
@@ -530,33 +753,22 @@ const NotesList = ({
             {filteredAndSortedNotes.map((note) => (
               <div
                 key={note.id}
-                className={`relative group ${
+                className={
                   viewMode === "grid"
-                    ? "bg-white border border-gray-200 rounded-lg p-3 hover:shadow-md"
-                    : `p-3 rounded cursor-pointer transition-colors ${
-                        selectedNote?.id === note.id
-                          ? "bg-blue-50 border-l-4 border-blue-500"
+                    ? "relative group bg-white border border-gray-200 rounded-lg p-3 hover:shadow-md transition-all"
+                    : `relative group p-3 rounded cursor-pointer transition-colors ${
+                        selectedNotes.has(note.id)
+                          ? "bg-blue-50 border-l-4 border-l-blue-500"
+                          : selectedNote?.id === note.id
+                          ? "bg-blue-50 border-l-4 border-l-blue-500"
                           : "hover:bg-gray-50"
                       }`
-                } transition-all`}
+                }
               >
-                {/* Selection checkbox */}
-                <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <input
-                    type="checkbox"
-                    checked={selectedNotes.has(note.id)}
-                    onChange={() => handleBulkSelect(note.id)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                </div>
-
                 {/* Note content */}
                 <div
-                  className={`${
-                    selectedNotes.size > 0 ? "ml-6" : ""
-                  } cursor-pointer`}
-                  onClick={() => handleNoteSelect(note)}
+                  className="cursor-pointer select-none"
+                  onClick={(e) => handleNoteSelect(note, e)}
                 >
                   {/* Title */}
                   <div className="flex items-start justify-between mb-2">
@@ -616,24 +828,11 @@ const NotesList = ({
 
                   {/* Tags */}
                   {note.tags && note.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {note.tags.slice(0, 3).map((tagId) => {
-                        const tag = tags.find((t) => t.id === tagId);
-                        return tag ? (
-                          <span
-                            key={tagId}
-                            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs text-white"
-                            style={{ backgroundColor: tag.color }}
-                          >
-                            {tag.name}
-                          </span>
-                        ) : null;
-                      })}
-                      {note.tags.length > 3 && (
-                        <span className="text-xs text-gray-500">
-                          +{note.tags.length - 3} more
-                        </span>
-                      )}
+                    <div
+                      className="flex flex-wrap gap-1 mb-2"
+                      data-note-tags-container={note.id}
+                    >
+                      {renderFirstTag(note)}
                     </div>
                   )}
 
@@ -726,6 +925,22 @@ const NotesList = ({
           }}
         />
       )}
+
+      {/* Bulk Actions Bar */}
+      <BulkActionsBar
+        selectedNotes={Array.from(selectedNotes)}
+        totalNotes={filteredAndSortedNotes.length}
+        onSelectAll={handleSelectAll}
+        onDeselectAll={handleDeselectAll}
+        onClearSelection={handleClearSelection}
+        onBulkTagAction={handleBulkTagAction}
+        onBulkExport={onBulkExport}
+        onBulkDelete={onBulkDelete}
+        onBulkUndo={onBulkUndo}
+        isProcessing={isProcessing}
+        processingStatus={processingStatus}
+        deletedNotes={deletedNotes}
+      />
     </div>
   );
 };

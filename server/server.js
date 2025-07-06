@@ -20,6 +20,110 @@ const HOST = portManager.getBackendHost();
 
 // Default notes storage path - can be configured via admin UI
 let NOTES_BASE_PATH = process.env.NOTES_PATH || join(process.cwd(), "notes");
+const USERS_FILE_PATH = join(process.cwd(), "users.json");
+
+// User persistence functions
+async function saveUsers() {
+  try {
+    const usersArray = Array.from(users.entries()).map(([id, user]) => [
+      id,
+      user,
+    ]);
+    const usersData = {
+      version: 1,
+      lastSaved: new Date().toISOString(),
+      users: usersArray,
+    };
+
+    // Use atomic write to prevent corruption
+    const tempFile = USERS_FILE_PATH + ".tmp";
+    await fs.writeFile(tempFile, JSON.stringify(usersData, null, 2));
+    await fs.rename(tempFile, USERS_FILE_PATH);
+
+    console.log(`💾 Users saved to ${USERS_FILE_PATH} (${users.size} users)`);
+  } catch (error) {
+    console.error("❌ Failed to save users:", error.message);
+  }
+}
+
+async function loadUsers() {
+  try {
+    // Check if users file exists
+    try {
+      await fs.access(USERS_FILE_PATH);
+    } catch {
+      console.log(
+        "📄 No existing users file found, starting with default users"
+      );
+      await saveUsers(); // Create initial users file with defaults
+      return;
+    }
+
+    const data = await fs.readFile(USERS_FILE_PATH, "utf8");
+    const usersData = JSON.parse(data);
+
+    if (usersData.version !== 1) {
+      console.warn("⚠️ Users file version mismatch, using defaults");
+      return;
+    }
+
+    // Clear existing users and load from file
+    users.clear();
+
+    for (const [id, user] of usersData.users) {
+      users.set(id, user);
+    }
+
+    console.log(`📂 Loaded ${users.size} users from ${USERS_FILE_PATH}`);
+
+    // Ensure default users exist
+    if (
+      !Array.from(users.values()).find((u) => u.email === "demo@example.com")
+    ) {
+      console.log("🔧 Adding missing demo user");
+      users.set("user-1", {
+        id: "user-1",
+        email: "demo@example.com",
+        name: "Demo User",
+        password: "demo123",
+        isAdmin: false,
+        created: new Date().toISOString(),
+        settings: {
+          sessionTimeout: 20160 * 60 * 1000,
+          autoSave: true,
+          theme: "light",
+        },
+      });
+    }
+
+    if (
+      !Array.from(users.values()).find((u) => u.email === "admin@example.com")
+    ) {
+      console.log("🔧 Adding missing admin user");
+      users.set("admin-1", {
+        id: "admin-1",
+        email: "admin@example.com",
+        name: "Admin User",
+        password: "admin123",
+        isAdmin: true,
+        created: new Date().toISOString(),
+        settings: {
+          sessionTimeout: 20160 * 60 * 1000, // 2 weeks (20160 minutes)
+          autoSave: true,
+          theme: "light",
+        },
+      });
+    }
+
+    // Save if we added default users
+    if (users.size !== usersData.users.length) {
+      await saveUsers();
+    }
+  } catch (error) {
+    console.error("❌ Failed to load users, using defaults:", error.message);
+    // Keep the default users that are already in the Map
+  }
+}
 
 // In-memory storage for demo (in production, use a proper database)
 const users = new Map([
@@ -57,20 +161,133 @@ const users = new Map([
   ],
 ]);
 
-const notebooks = new Map();
-const tags = new Map();
-const folders = new Map();
+// All data is now loaded on-demand from disk - no more memory maps!
+
+// Initialize demo notebooks for existing notes
+const demoNotebooks = [
+  {
+    id: "3640a87b-099d-42f6-a687-d22ff79b82f3",
+    userId: "user-1",
+    name: "Work Projects",
+    description: "Professional development notes",
+    color: "#3B82F6",
+    created: new Date().toISOString(),
+    updated: new Date().toISOString(),
+    noteCount: 0,
+    sortOrder: 0,
+  },
+  {
+    id: "47e11737-778a-440d-91ae-aa423b325ae1",
+    userId: "user-1",
+    name: "Personal",
+    description: "Personal notes and ideas",
+    color: "#10B981",
+    created: new Date().toISOString(),
+    updated: new Date().toISOString(),
+    noteCount: 0,
+    sortOrder: 1,
+  },
+  {
+    id: "73de6ab4-b41e-49a9-8662-3fda18371dcb",
+    userId: "user-1",
+    name: "Learning",
+    description: "Study notes and tutorials",
+    color: "#8B5CF6",
+    created: new Date().toISOString(),
+    updated: new Date().toISOString(),
+    noteCount: 0,
+    sortOrder: 2,
+  },
+  {
+    id: "9678289f-57cf-483c-952f-b360692f7f8d",
+    userId: "user-1",
+    name: "Ideas",
+    description: "Creative ideas and brainstorming",
+    color: "#F59E0B",
+    created: new Date().toISOString(),
+    updated: new Date().toISOString(),
+    noteCount: 0,
+    sortOrder: 3,
+  },
+  {
+    id: "ab6cc683-41da-43e5-aa65-7e3e7016fb05",
+    userId: "user-1",
+    name: "Research",
+    description: "Research notes and references",
+    color: "#EF4444",
+    created: new Date().toISOString(),
+    updated: new Date().toISOString(),
+    noteCount: 0,
+    sortOrder: 4,
+  },
+  {
+    id: "bafd6479-7c7b-4c5e-8e31-7d18f85276fc",
+    userId: "user-1",
+    name: "Meeting Notes",
+    description: "Notes from meetings and discussions",
+    color: "#06B6D4",
+    created: new Date().toISOString(),
+    updated: new Date().toISOString(),
+    noteCount: 0,
+    sortOrder: 5,
+  },
+  {
+    id: "c77c52b9-32dd-446e-93c1-7c4107532126",
+    userId: "user-1",
+    name: "Archive",
+    description: "Archived notes and references",
+    color: "#6B7280",
+    created: new Date().toISOString(),
+    updated: new Date().toISOString(),
+    noteCount: 0,
+    sortOrder: 6,
+  },
+];
+
+// Demo notebooks will be created on-demand when users access their notebooks
+// This ensures we don't populate memory maps but still provide demo data
 
 // Security middleware
 app.use(
   helmet({
     crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrc: ["'self'"],
-        imgSrc: ["'self'", "data:", "blob:"],
+        scriptSrc: [
+          "'self'",
+          "'unsafe-eval'",
+          "https://cdnjs.cloudflare.com",
+          "https://unpkg.com",
+          "https://cdn.jsdelivr.net",
+          "'unsafe-inline'",
+        ],
+        imgSrc: [
+          "'self'",
+          "data:",
+          "blob:",
+          "http://localhost:3001",
+          "http://localhost:3004",
+        ],
+        workerSrc: [
+          "'self'",
+          "blob:",
+          "https://cdnjs.cloudflare.com",
+          "https://unpkg.com",
+          "https://cdn.jsdelivr.net",
+          "data:",
+        ],
+        objectSrc: ["'self'", "data:"],
+        frameSrc: ["'self'"],
+        connectSrc: [
+          "'self'",
+          "https://cdnjs.cloudflare.com",
+          "https://unpkg.com",
+          "https://cdn.jsdelivr.net",
+        ],
+        fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
       },
     },
   })
@@ -162,6 +379,14 @@ async function ensureDir(dirPath) {
   }
 }
 
+// Helper function to check if a string is a UUID
+function isUUID(str) {
+  if (typeof str !== "string") return false;
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
 // Helper function to get note path
 function getNotePath(userId, noteId) {
   return join(NOTES_BASE_PATH, userId, noteId);
@@ -209,68 +434,385 @@ function getTagsFilePath(userId) {
   return join(NOTES_BASE_PATH, userId, "tags.json");
 }
 
-// Helper function to load tags from disk
-async function loadUserTags(userId) {
+// ==========================================
+// DISK-FIRST TAG OPERATIONS
+// ==========================================
+
+// Load all tags for a user from disk
+async function loadAllUserTagsFromDisk(userId) {
   try {
     const tagsFilePath = getTagsFilePath(userId);
-    const data = await fs.readFile(tagsFilePath, "utf8");
-    const userTags = JSON.parse(data);
-    
-    // Load tags into the global tags Map
-    userTags.forEach(tag => {
-      tags.set(tag.id, tag);
-    });
-    
-    console.log(`📂 Loaded ${userTags.length} tags for user ${userId} from disk`);
-    return userTags;
-  } catch (error) {
-    if (error.code === "ENOENT") {
-      console.log(`📂 No tags file found for user ${userId}, starting fresh`);
+    if (fsSync.existsSync(tagsFilePath)) {
+      const data = await fs.readFile(tagsFilePath, "utf8");
+      const userTags = JSON.parse(data);
+      console.log(
+        `🏷️ Loaded ${userTags.length} tags for user ${userId} from disk`
+      );
+      return userTags;
+    } else {
+      console.log(`🏷️ No tags file found for user ${userId}, starting fresh`);
       return [];
     }
+  } catch (error) {
     console.error(`❌ Error loading tags for user ${userId}:`, error);
     return [];
   }
 }
 
-// Helper function to save tags to disk
-async function saveUserTags(userId) {
+// Load a specific tag from disk
+async function loadTagFromDisk(userId, tagId) {
   try {
-    const userTags = Array.from(tags.values()).filter(tag => tag.userId === userId);
-    const tagsFilePath = getTagsFilePath(userId);
-    
-    // Ensure the user directory exists
-    await ensureDir(join(NOTES_BASE_PATH, userId));
-    
-    await fs.writeFile(tagsFilePath, JSON.stringify(userTags, null, 2));
-    console.log(`💾 Saved ${userTags.length} tags for user ${userId} to disk`);
+    const userTags = await loadAllUserTagsFromDisk(userId);
+    const tag = userTags.find((t) => t.id === tagId);
+    if (!tag) {
+      throw new Error(`Tag ${tagId} not found for user ${userId}`);
+    }
+    return tag;
   } catch (error) {
-    console.error(`❌ Error saving tags for user ${userId}:`, error);
+    console.error(`Error loading tag ${tagId} for user ${userId}:`, error);
+    throw error;
   }
 }
 
-// Helper function to load all users' tags on startup
-async function loadAllTags() {
+// Save a single tag to disk
+async function saveTagToDisk(userId, tagId, tag) {
   try {
-    if (!fsSync.existsSync(NOTES_BASE_PATH)) {
-      console.log(`📂 Notes base path doesn't exist yet: ${NOTES_BASE_PATH}`);
-      return;
+    const userTags = await loadAllUserTagsFromDisk(userId);
+    const existingIndex = userTags.findIndex((t) => t.id === tagId);
+
+    if (existingIndex >= 0) {
+      userTags[existingIndex] = tag;
+    } else {
+      userTags.push(tag);
     }
-    
-    const userDirs = await fs.readdir(NOTES_BASE_PATH, { withFileTypes: true });
-    let totalTagsLoaded = 0;
-    
-    for (const dirent of userDirs) {
-      if (dirent.isDirectory()) {
-        const userId = dirent.name;
-        const userTags = await loadUserTags(userId);
-        totalTagsLoaded += userTags.length;
-      }
-    }
-    
-    console.log(`🏷️ Loaded ${totalTagsLoaded} total tags from disk across all users`);
+
+    const tagsFilePath = getTagsFilePath(userId);
+    await ensureDir(join(NOTES_BASE_PATH, userId));
+    await fs.writeFile(tagsFilePath, JSON.stringify(userTags, null, 2));
+
+    console.log(`💾 Saved tag ${tagId} for user ${userId} to disk`);
   } catch (error) {
-    console.error("❌ Error loading tags on startup:", error);
+    console.error(`Error saving tag ${tagId} for user ${userId}:`, error);
+    throw error;
+  }
+}
+
+// Delete a tag from disk
+async function deleteTagFromDisk(userId, tagId) {
+  try {
+    const userTags = await loadAllUserTagsFromDisk(userId);
+    const filteredTags = userTags.filter((t) => t.id !== tagId);
+
+    const tagsFilePath = getTagsFilePath(userId);
+    await ensureDir(join(NOTES_BASE_PATH, userId));
+    await fs.writeFile(tagsFilePath, JSON.stringify(filteredTags, null, 2));
+
+    console.log(`🗑️ Deleted tag ${tagId} for user ${userId} from disk`);
+  } catch (error) {
+    console.error(`Error deleting tag ${tagId} for user ${userId}:`, error);
+    throw error;
+  }
+}
+
+// Update tag sort order on disk
+async function updateTagSortOrderOnDisk(userId, tagId, sortOrder) {
+  try {
+    const userTags = await loadAllUserTagsFromDisk(userId);
+    const tag = userTags.find((t) => t.id === tagId);
+
+    if (!tag) {
+      throw new Error(`Tag ${tagId} not found for user ${userId}`);
+    }
+
+    tag.sortOrder = sortOrder;
+    tag.updated = new Date().toISOString();
+
+    const tagsFilePath = getTagsFilePath(userId);
+    await ensureDir(join(NOTES_BASE_PATH, userId));
+    await fs.writeFile(tagsFilePath, JSON.stringify(userTags, null, 2));
+
+    console.log(`📋 Updated sort order for tag ${tagId} for user ${userId}`);
+  } catch (error) {
+    console.error(
+      `Error updating tag sort order ${tagId} for user ${userId}:`,
+      error
+    );
+    throw error;
+  }
+}
+
+// Helper function to get notebooks file path
+function getNotebooksFilePath(userId) {
+  return join(NOTES_BASE_PATH, userId, "notebooks.json");
+}
+
+// ==========================================
+// DISK-FIRST NOTEBOOK OPERATIONS
+// ==========================================
+
+// Load all notebooks for a user from disk
+async function loadAllUserNotebooksFromDisk(userId) {
+  try {
+    const notebooksPath = getNotebooksFilePath(userId);
+    if (fsSync.existsSync(notebooksPath)) {
+      const content = await fs.readFile(notebooksPath, "utf8");
+      const userNotebooks = JSON.parse(content);
+      console.log(
+        `📚 Loaded ${userNotebooks.length} notebooks for user ${userId} from disk`
+      );
+      return userNotebooks;
+    } else {
+      console.log(
+        `📚 No notebooks file found for user ${userId}, starting fresh`
+      );
+      return [];
+    }
+  } catch (error) {
+    console.error(`Error loading notebooks for user ${userId}:`, error);
+    return [];
+  }
+}
+
+// Load a specific notebook from disk
+async function loadNotebookFromDisk(userId, notebookId) {
+  try {
+    const userNotebooks = await loadAllUserNotebooksFromDisk(userId);
+    const notebook = userNotebooks.find((nb) => nb.id === notebookId);
+    if (!notebook) {
+      throw new Error(`Notebook ${notebookId} not found for user ${userId}`);
+    }
+    return notebook;
+  } catch (error) {
+    console.error(
+      `Error loading notebook ${notebookId} for user ${userId}:`,
+      error
+    );
+    throw error;
+  }
+}
+
+// Save a single notebook to disk
+async function saveNotebookToDisk(userId, notebookId, notebook) {
+  try {
+    const userNotebooks = await loadAllUserNotebooksFromDisk(userId);
+    const existingIndex = userNotebooks.findIndex((nb) => nb.id === notebookId);
+
+    if (existingIndex >= 0) {
+      userNotebooks[existingIndex] = notebook;
+    } else {
+      userNotebooks.push(notebook);
+    }
+
+    const notebooksPath = getNotebooksFilePath(userId);
+    await ensureDir(dirname(notebooksPath));
+    await fs.writeFile(
+      notebooksPath,
+      JSON.stringify(userNotebooks, null, 2),
+      "utf8"
+    );
+
+    console.log(`💾 Saved notebook ${notebookId} for user ${userId} to disk`);
+  } catch (error) {
+    console.error(
+      `Error saving notebook ${notebookId} for user ${userId}:`,
+      error
+    );
+    throw error;
+  }
+}
+
+// Delete a notebook from disk
+async function deleteNotebookFromDisk(userId, notebookId) {
+  try {
+    const userNotebooks = await loadAllUserNotebooksFromDisk(userId);
+    const filteredNotebooks = userNotebooks.filter(
+      (nb) => nb.id !== notebookId
+    );
+
+    const notebooksPath = getNotebooksFilePath(userId);
+    await ensureDir(dirname(notebooksPath));
+    await fs.writeFile(
+      notebooksPath,
+      JSON.stringify(filteredNotebooks, null, 2),
+      "utf8"
+    );
+
+    console.log(
+      `🗑️ Deleted notebook ${notebookId} for user ${userId} from disk`
+    );
+  } catch (error) {
+    console.error(
+      `Error deleting notebook ${notebookId} for user ${userId}:`,
+      error
+    );
+    throw error;
+  }
+}
+
+// Update notebooks sort order on disk
+async function updateNotebookSortOrderOnDisk(userId, notebookId, sortOrder) {
+  try {
+    const userNotebooks = await loadAllUserNotebooksFromDisk(userId);
+    const notebook = userNotebooks.find((nb) => nb.id === notebookId);
+
+    if (!notebook) {
+      throw new Error(`Notebook ${notebookId} not found for user ${userId}`);
+    }
+
+    notebook.sortOrder = sortOrder;
+    notebook.updated = new Date().toISOString();
+
+    const notebooksPath = getNotebooksFilePath(userId);
+    await ensureDir(dirname(notebooksPath));
+    await fs.writeFile(
+      notebooksPath,
+      JSON.stringify(userNotebooks, null, 2),
+      "utf8"
+    );
+
+    console.log(
+      `📋 Updated sort order for notebook ${notebookId} for user ${userId}`
+    );
+  } catch (error) {
+    console.error(
+      `Error updating notebook sort order ${notebookId} for user ${userId}:`,
+      error
+    );
+    throw error;
+  }
+}
+
+// Helper function to get folders file path
+function getFoldersFilePath(userId) {
+  return join(NOTES_BASE_PATH, userId, "folders.json");
+}
+
+// ==========================================
+// DISK-FIRST FOLDER OPERATIONS
+// ==========================================
+
+// Load all folders for a user from disk
+async function loadAllUserFoldersFromDisk(userId) {
+  try {
+    const foldersPath = getFoldersFilePath(userId);
+    if (fsSync.existsSync(foldersPath)) {
+      const content = await fs.readFile(foldersPath, "utf8");
+      const userFolders = JSON.parse(content);
+      console.log(
+        `📁 Loaded ${userFolders.length} folders for user ${userId} from disk`
+      );
+      return userFolders;
+    } else {
+      console.log(
+        `📁 No folders file found for user ${userId}, starting fresh`
+      );
+      return [];
+    }
+  } catch (error) {
+    console.error(`Error loading folders for user ${userId}:`, error);
+    return [];
+  }
+}
+
+// Load a specific folder from disk
+async function loadFolderFromDisk(userId, folderId) {
+  try {
+    const userFolders = await loadAllUserFoldersFromDisk(userId);
+    const folder = userFolders.find((f) => f.id === folderId);
+    if (!folder) {
+      throw new Error(`Folder ${folderId} not found for user ${userId}`);
+    }
+    return folder;
+  } catch (error) {
+    console.error(
+      `Error loading folder ${folderId} for user ${userId}:`,
+      error
+    );
+    throw error;
+  }
+}
+
+// Save a single folder to disk
+async function saveFolderToDisk(userId, folderId, folder) {
+  try {
+    const userFolders = await loadAllUserFoldersFromDisk(userId);
+    const existingIndex = userFolders.findIndex((f) => f.id === folderId);
+
+    if (existingIndex >= 0) {
+      userFolders[existingIndex] = folder;
+    } else {
+      userFolders.push(folder);
+    }
+
+    const foldersPath = getFoldersFilePath(userId);
+    await ensureDir(dirname(foldersPath));
+    await fs.writeFile(
+      foldersPath,
+      JSON.stringify(userFolders, null, 2),
+      "utf8"
+    );
+
+    console.log(`💾 Saved folder ${folderId} for user ${userId} to disk`);
+  } catch (error) {
+    console.error(`Error saving folder ${folderId} for user ${userId}:`, error);
+    throw error;
+  }
+}
+
+// Delete a folder from disk
+async function deleteFolderFromDisk(userId, folderId) {
+  try {
+    const userFolders = await loadAllUserFoldersFromDisk(userId);
+    const filteredFolders = userFolders.filter((f) => f.id !== folderId);
+
+    const foldersPath = getFoldersFilePath(userId);
+    await ensureDir(dirname(foldersPath));
+    await fs.writeFile(
+      foldersPath,
+      JSON.stringify(filteredFolders, null, 2),
+      "utf8"
+    );
+
+    console.log(`🗑️ Deleted folder ${folderId} for user ${userId} from disk`);
+  } catch (error) {
+    console.error(
+      `Error deleting folder ${folderId} for user ${userId}:`,
+      error
+    );
+    throw error;
+  }
+}
+
+// Update folder sort order on disk
+async function updateFolderSortOrderOnDisk(userId, folderId, sortOrder) {
+  try {
+    const userFolders = await loadAllUserFoldersFromDisk(userId);
+    const folder = userFolders.find((f) => f.id === folderId);
+
+    if (!folder) {
+      throw new Error(`Folder ${folderId} not found for user ${userId}`);
+    }
+
+    folder.sortOrder = sortOrder;
+    folder.updated = new Date().toISOString();
+
+    const foldersPath = getFoldersFilePath(userId);
+    await ensureDir(dirname(foldersPath));
+    await fs.writeFile(
+      foldersPath,
+      JSON.stringify(userFolders, null, 2),
+      "utf8"
+    );
+
+    console.log(
+      `📋 Updated sort order for folder ${folderId} for user ${userId}`
+    );
+  } catch (error) {
+    console.error(
+      `Error updating folder sort order ${folderId} for user ${userId}:`,
+      error
+    );
+    throw error;
   }
 }
 
@@ -594,6 +1136,43 @@ app.put("/api/:userId/notes/:noteId", async (req, res) => {
       return res.status(404).json({ error: "Note not found" });
     }
 
+    // Get current content for version comparison
+    const currentContent = await readNoteContent(userId, noteId);
+
+    // Determine version trigger
+    let versionTrigger = null;
+    if (content !== undefined && content !== currentContent) {
+      versionTrigger = "content_change";
+    } else if (updatedFields?.title && updatedFields.title !== metadata.title) {
+      versionTrigger = "title_change";
+    } else if (
+      updatedFields?.tags &&
+      JSON.stringify(updatedFields.tags) !== JSON.stringify(metadata.tags)
+    ) {
+      versionTrigger = "tags_change";
+    } else if (
+      updatedFields?.folder &&
+      updatedFields.folder !== metadata.folder
+    ) {
+      versionTrigger = "folder_change";
+    } else if (
+      updatedFields?.notebook &&
+      updatedFields.notebook !== metadata.notebook
+    ) {
+      versionTrigger = "notebook_change";
+    }
+
+    // Create version before updating if needed
+    if (versionTrigger) {
+      await createVersionIfNeeded(
+        userId,
+        noteId,
+        currentContent,
+        metadata,
+        versionTrigger
+      );
+    }
+
     // Update metadata
     const updatedMetadata = {
       ...metadata,
@@ -696,6 +1275,69 @@ app.get(
       );
 
       await fs.access(attachmentPath);
+
+      // Get file stats
+      const stats = await fs.stat(attachmentPath);
+      const fileSize = stats.size;
+
+      // Set proper headers based on file type
+      const fileExtension = filename.toLowerCase().split(".").pop();
+
+      // Set Content-Type based on file extension
+      if (fileExtension === "pdf") {
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader(
+          "Content-Disposition",
+          'inline; filename="' + filename + '"'
+        );
+      } else if (
+        ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"].includes(
+          fileExtension
+        )
+      ) {
+        const mimeTypes = {
+          jpg: "image/jpeg",
+          jpeg: "image/jpeg",
+          png: "image/png",
+          gif: "image/gif",
+          webp: "image/webp",
+          bmp: "image/bmp",
+          svg: "image/svg+xml",
+        };
+        res.setHeader("Content-Type", mimeTypes[fileExtension] || "image/jpeg");
+        res.setHeader(
+          "Content-Disposition",
+          'inline; filename="' + filename + '"'
+        );
+      } else if (["txt", "md"].includes(fileExtension)) {
+        res.setHeader("Content-Type", "text/plain; charset=utf-8");
+        res.setHeader(
+          "Content-Disposition",
+          'inline; filename="' + filename + '"'
+        );
+      } else if (fileExtension === "json") {
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.setHeader(
+          "Content-Disposition",
+          'inline; filename="' + filename + '"'
+        );
+      } else {
+        // For other files, suggest download
+        res.setHeader(
+          "Content-Disposition",
+          'attachment; filename="' + filename + '"'
+        );
+      }
+
+      // Set additional security headers
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Content-Length", fileSize);
+
+      // Enable CORS for cross-origin requests
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
       res.sendFile(attachmentPath);
     } catch (error) {
       res.status(404).json({ error: "Attachment not found" });
@@ -745,13 +1387,16 @@ app.delete(
 app.get("/api/:userId/notebooks", async (req, res) => {
   try {
     const { userId } = req.params;
-    const userNotebooks = Array.from(notebooks.values())
-      .filter((nb) => nb.userId === userId)
-      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+    const userNotebooks = await loadAllUserNotebooksFromDisk(userId);
+
+    // Sort notebooks by sortOrder
+    const sortedNotebooks = userNotebooks.sort(
+      (a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)
+    );
 
     // Add note count to each notebook
     const notebooksWithCounts = await Promise.all(
-      userNotebooks.map(async (notebook) => {
+      sortedNotebooks.map(async (notebook) => {
         const userNotesPath = join(NOTES_BASE_PATH, userId);
         let noteCount = 0;
         try {
@@ -811,7 +1456,8 @@ app.post("/api/:userId/notebooks", async (req, res) => {
       noteCount: 0,
     };
 
-    notebooks.set(notebookId, notebook);
+    await saveNotebookToDisk(userId, notebookId, notebook);
+
     res.json(notebook);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -824,16 +1470,19 @@ app.put("/api/:userId/notebooks/:notebookId", async (req, res) => {
     const { userId, notebookId } = req.params;
     const updates = req.body;
 
-    const notebook = notebooks.get(notebookId);
+    const notebook = await loadNotebookFromDisk(userId, notebookId);
     if (!notebook || notebook.userId !== userId) {
       return res.status(404).json({ error: "Notebook not found" });
     }
 
     Object.assign(notebook, updates, { updated: new Date().toISOString() });
-    notebooks.set(notebookId, notebook);
+    await saveNotebookToDisk(userId, notebookId, notebook);
 
     res.json(notebook);
   } catch (error) {
+    if (error.message.includes("not found")) {
+      return res.status(404).json({ error: "Notebook not found" });
+    }
     res.status(500).json({ error: error.message });
   }
 });
@@ -843,14 +1492,19 @@ app.delete("/api/:userId/notebooks/:notebookId", async (req, res) => {
   try {
     const { userId, notebookId } = req.params;
 
-    const notebook = notebooks.get(notebookId);
+    // Verify notebook exists before attempting deletion
+    const notebook = await loadNotebookFromDisk(userId, notebookId);
     if (!notebook || notebook.userId !== userId) {
       return res.status(404).json({ error: "Notebook not found" });
     }
 
-    notebooks.delete(notebookId);
+    await deleteNotebookFromDisk(userId, notebookId);
+
     res.json({ success: true });
   } catch (error) {
+    if (error.message.includes("not found")) {
+      return res.status(404).json({ error: "Notebook not found" });
+    }
     res.status(500).json({ error: error.message });
   }
 });
@@ -861,8 +1515,8 @@ app.post("/api/:userId/notebooks/reorder", async (req, res) => {
     const { userId } = req.params;
     const { sourceId, targetId, position = "after" } = req.body;
 
-    const sourceNotebook = notebooks.get(sourceId);
-    const targetNotebook = notebooks.get(targetId);
+    const sourceNotebook = await loadNotebookFromDisk(userId, sourceId);
+    const targetNotebook = await loadNotebookFromDisk(userId, targetId);
 
     if (
       !sourceNotebook ||
@@ -873,10 +1527,8 @@ app.post("/api/:userId/notebooks/reorder", async (req, res) => {
       return res.status(404).json({ error: "One or both notebooks not found" });
     }
 
-    // For in-memory storage, we can implement ordering by updating a sort order field
-    const userNotebooks = Array.from(notebooks.values()).filter(
-      (nb) => nb.userId === userId
-    );
+    // Load all user notebooks to update sort orders
+    const userNotebooks = await loadAllUserNotebooksFromDisk(userId);
 
     // Update sort orders
     userNotebooks.forEach((notebook, index) => {
@@ -890,10 +1542,17 @@ app.post("/api/:userId/notebooks/reorder", async (req, res) => {
       sourceNotebook.sortOrder = targetNotebook.sortOrder + 0.5;
     }
 
-    notebooks.set(sourceId, sourceNotebook);
+    await updateNotebookSortOrderOnDisk(
+      userId,
+      sourceId,
+      sourceNotebook.sortOrder
+    );
 
     res.json({ success: true });
   } catch (error) {
+    if (error.message.includes("not found")) {
+      return res.status(404).json({ error: "One or both notebooks not found" });
+    }
     res.status(500).json({ error: error.message });
   }
 });
@@ -907,8 +1566,9 @@ app.get("/api/:userId/tags", async (req, res) => {
   try {
     const { userId } = req.params;
 
-    // Get explicitly created tags (filter out any with missing names)
-    const explicitTags = Array.from(tags.values())
+    // Get explicitly created tags from disk (filter out any with missing names)
+    const allUserTags = await loadAllUserTagsFromDisk(userId);
+    const explicitTags = allUserTags
       .filter((tag) => tag.userId === userId && tag.name && tag.name.trim())
       .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
 
@@ -928,19 +1588,22 @@ app.get("/api/:userId/tags", async (req, res) => {
             scanForTags(fullPath);
           } else if (entry.name === "metadata.json") {
             try {
-              const metadata = JSON.parse(fsSync.readFileSync(fullPath, "utf8"));
+              const metadata = JSON.parse(
+                fsSync.readFileSync(fullPath, "utf8")
+              );
               if (metadata.tags && Array.isArray(metadata.tags)) {
                 metadata.tags.forEach((tagRef) => {
                   if (typeof tagRef === "string" && tagRef.trim()) {
                     const tagName = tagRef.trim();
-                    
+
                     // Filter out UUID tags or convert them to "unknown"
-                    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                    const UUID_REGEX =
+                      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
                     if (UUID_REGEX.test(tagName)) {
                       // Skip UUID tags entirely
                       return;
                     }
-                    
+
                     dynamicTagCounts.set(
                       tagName,
                       (dynamicTagCounts.get(tagName) || 0) + 1
@@ -979,12 +1642,15 @@ app.get("/api/:userId/tags", async (req, res) => {
               countTagUsage(fullPath);
             } else if (entry.name === "metadata.json") {
               try {
-                const metadata = JSON.parse(fsSync.readFileSync(fullPath, "utf8"));
+                const metadata = JSON.parse(
+                  fsSync.readFileSync(fullPath, "utf8")
+                );
                 if (metadata.tags && Array.isArray(metadata.tags)) {
                   const hasTag = metadata.tags.some((noteTag) => {
                     if (typeof noteTag === "string") {
                       // Skip UUID tags when counting explicit tag usage
-                      const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                      const UUID_REGEX =
+                        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
                       if (UUID_REGEX.test(noteTag)) {
                         return false;
                       }
@@ -1057,11 +1723,8 @@ app.post("/api/:userId/tags", async (req, res) => {
       noteCount: 0,
     };
 
-    tags.set(tagId, tag);
-    
-    // Persist to disk
-    await saveUserTags(userId);
-    
+    await saveTagToDisk(userId, tagId, tag);
+
     res.json(tag);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1074,19 +1737,19 @@ app.put("/api/:userId/tags/:tagId", async (req, res) => {
     const { userId, tagId } = req.params;
     const updates = req.body;
 
-    const tag = tags.get(tagId);
+    const tag = await loadTagFromDisk(userId, tagId);
     if (!tag || tag.userId !== userId) {
       return res.status(404).json({ error: "Tag not found" });
     }
 
-    Object.assign(tag, updates);
-    tags.set(tagId, tag);
-
-    // Persist to disk
-    await saveUserTags(userId);
+    Object.assign(tag, updates, { updated: new Date().toISOString() });
+    await saveTagToDisk(userId, tagId, tag);
 
     res.json(tag);
   } catch (error) {
+    if (error.message.includes("not found")) {
+      return res.status(404).json({ error: "Tag not found" });
+    }
     res.status(500).json({ error: error.message });
   }
 });
@@ -1096,30 +1759,31 @@ app.delete("/api/:userId/tags/:tagId", async (req, res) => {
   try {
     const { userId, tagId } = req.params;
 
-    const tag = tags.get(tagId);
+    // Verify tag exists before attempting deletion
+    const tag = await loadTagFromDisk(userId, tagId);
     if (!tag || tag.userId !== userId) {
       return res.status(404).json({ error: "Tag not found" });
     }
 
-    tags.delete(tagId);
-    
-    // Persist to disk
-    await saveUserTags(userId);
-    
+    await deleteTagFromDisk(userId, tagId);
+
     res.json({ success: true });
   } catch (error) {
+    if (error.message.includes("not found")) {
+      return res.status(404).json({ error: "Tag not found" });
+    }
     res.status(500).json({ error: error.message });
   }
 });
 
-    // Reorder tags
+// Reorder tags
 app.post("/api/:userId/tags/reorder", async (req, res) => {
   try {
     const { userId } = req.params;
     const { sourceId, targetId, position = "after" } = req.body;
 
-    const sourceTag = tags.get(sourceId);
-    const targetTag = tags.get(targetId);
+    const sourceTag = await loadTagFromDisk(userId, sourceId);
+    const targetTag = await loadTagFromDisk(userId, targetId);
 
     if (
       !sourceTag ||
@@ -1131,47 +1795,49 @@ app.post("/api/:userId/tags/reorder", async (req, res) => {
     }
 
     // Get all user tags and sort them by current sortOrder
-    const userTags = Array.from(tags.values())
+    const userTags = await loadAllUserTagsFromDisk(userId);
+    const sortedUserTags = userTags
       .filter((t) => t.userId === userId)
       .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
 
     // Initialize sortOrder if not set
-    userTags.forEach((tag, index) => {
+    sortedUserTags.forEach((tag, index) => {
       if (tag.sortOrder === undefined || tag.sortOrder === null) {
         tag.sortOrder = index;
       }
     });
 
     // Remove source tag from current position
-    const sourceIndex = userTags.findIndex((t) => t.id === sourceId);
-    const targetIndex = userTags.findIndex((t) => t.id === targetId);
+    const sourceIndex = sortedUserTags.findIndex((t) => t.id === sourceId);
+    const targetIndex = sortedUserTags.findIndex((t) => t.id === targetId);
 
     if (sourceIndex !== -1 && targetIndex !== -1) {
       // Remove source from array
-      const [movedTag] = userTags.splice(sourceIndex, 1);
+      const [movedTag] = sortedUserTags.splice(sourceIndex, 1);
 
       // Calculate new target index after removal
-      let newTargetIndex = userTags.findIndex((t) => t.id === targetId);
+      let newTargetIndex = sortedUserTags.findIndex((t) => t.id === targetId);
 
       // Insert at correct position
       if (position === "before") {
-        userTags.splice(newTargetIndex, 0, movedTag);
+        sortedUserTags.splice(newTargetIndex, 0, movedTag);
       } else {
-        userTags.splice(newTargetIndex + 1, 0, movedTag);
+        sortedUserTags.splice(newTargetIndex + 1, 0, movedTag);
       }
 
-      // Reassign sortOrder values to maintain proper order
-      userTags.forEach((tag, index) => {
+      // Reassign sortOrder values to maintain proper order and save each tag
+      for (let index = 0; index < sortedUserTags.length; index++) {
+        const tag = sortedUserTags[index];
         tag.sortOrder = index;
-        tags.set(tag.id, tag);
-      });
+        await saveTagToDisk(userId, tag.id, tag);
+      }
     }
-
-    // Persist to disk
-    await saveUserTags(userId);
 
     res.json({ success: true });
   } catch (error) {
+    if (error.message.includes("not found")) {
+      return res.status(404).json({ error: "One or both tags not found" });
+    }
     res.status(500).json({ error: error.message });
   }
 });
@@ -1184,10 +1850,11 @@ app.post("/api/:userId/tags/reorder", async (req, res) => {
 app.get("/api/:userId/folders", async (req, res) => {
   try {
     const { userId } = req.params;
-    const userFolders = Array.from(folders.values())
+    const userFolders = await loadAllUserFoldersFromDisk(userId);
+    const sortedFolders = userFolders
       .filter((folder) => folder.userId === userId)
       .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
-    res.json(userFolders);
+    res.json(sortedFolders);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -1211,7 +1878,8 @@ app.post("/api/:userId/folders", async (req, res) => {
       noteCount: 0,
     };
 
-    folders.set(folderId, folder);
+    await saveFolderToDisk(userId, folderId, folder);
+
     res.json(folder);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1224,16 +1892,19 @@ app.put("/api/:userId/folders/:folderId", async (req, res) => {
     const { userId, folderId } = req.params;
     const updates = req.body;
 
-    const folder = folders.get(folderId);
+    const folder = await loadFolderFromDisk(userId, folderId);
     if (!folder || folder.userId !== userId) {
       return res.status(404).json({ error: "Folder not found" });
     }
 
     Object.assign(folder, updates, { updated: new Date().toISOString() });
-    folders.set(folderId, folder);
+    await saveFolderToDisk(userId, folderId, folder);
 
     res.json(folder);
   } catch (error) {
+    if (error.message.includes("not found")) {
+      return res.status(404).json({ error: "Folder not found" });
+    }
     res.status(500).json({ error: error.message });
   }
 });
@@ -1243,14 +1914,19 @@ app.delete("/api/:userId/folders/:folderId", async (req, res) => {
   try {
     const { userId, folderId } = req.params;
 
-    const folder = folders.get(folderId);
+    // Verify folder exists before attempting deletion
+    const folder = await loadFolderFromDisk(userId, folderId);
     if (!folder || folder.userId !== userId) {
       return res.status(404).json({ error: "Folder not found" });
     }
 
-    folders.delete(folderId);
+    await deleteFolderFromDisk(userId, folderId);
+
     res.json({ success: true });
   } catch (error) {
+    if (error.message.includes("not found")) {
+      return res.status(404).json({ error: "Folder not found" });
+    }
     res.status(500).json({ error: error.message });
   }
 });
@@ -1261,8 +1937,8 @@ app.post("/api/:userId/folders/reorder", async (req, res) => {
     const { userId } = req.params;
     const { sourceId, targetId, position = "after" } = req.body;
 
-    const sourceFolder = folders.get(sourceId);
-    const targetFolder = folders.get(targetId);
+    const sourceFolder = await loadFolderFromDisk(userId, sourceId);
+    const targetFolder = await loadFolderFromDisk(userId, targetId);
 
     if (
       !sourceFolder ||
@@ -1273,13 +1949,12 @@ app.post("/api/:userId/folders/reorder", async (req, res) => {
       return res.status(404).json({ error: "One or both folders not found" });
     }
 
-    // For in-memory storage, we can implement ordering by updating a sort order field
-    const userFolders = Array.from(folders.values()).filter(
-      (f) => f.userId === userId
-    );
+    // Load all user folders to update sort orders
+    const userFolders = await loadAllUserFoldersFromDisk(userId);
+    const sortedUserFolders = userFolders.filter((f) => f.userId === userId);
 
     // Update sort orders
-    userFolders.forEach((folder, index) => {
+    sortedUserFolders.forEach((folder, index) => {
       if (!folder.sortOrder) folder.sortOrder = index;
     });
 
@@ -1290,10 +1965,13 @@ app.post("/api/:userId/folders/reorder", async (req, res) => {
       sourceFolder.sortOrder = targetFolder.sortOrder + 0.5;
     }
 
-    folders.set(sourceId, sourceFolder);
+    await updateFolderSortOrderOnDisk(userId, sourceId, sourceFolder.sortOrder);
 
     res.json({ success: true });
   } catch (error) {
+    if (error.message.includes("not found")) {
+      return res.status(404).json({ error: "One or both folders not found" });
+    }
     res.status(500).json({ error: error.message });
   }
 });
@@ -1336,6 +2014,9 @@ app.put("/api/users/:userId/profile", async (req, res) => {
     Object.assign(user, allowedUpdates);
     users.set(userId, user);
 
+    // Save users to disk
+    await saveUsers();
+
     const { password: _, ...userProfile } = user;
     res.json(userProfile);
   } catch (error) {
@@ -1362,6 +2043,9 @@ app.post("/api/users/:userId/change-password", async (req, res) => {
     // In production, use bcrypt.hash
     user.password = newPassword;
     users.set(userId, user);
+
+    // Save users to disk
+    await saveUsers();
 
     res.json({ success: true });
   } catch (error) {
@@ -1466,6 +2150,47 @@ app.get("/api/:userId/notes/search", async (req, res) => {
   }
 });
 
+// Authentication endpoint
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
+    }
+
+    // Find user by email
+    const user = Array.from(users.values()).find(
+      (user) => user.email.toLowerCase() === email.toLowerCase()
+    );
+
+    if (!user) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    if (user.password !== password) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    if (user.disabled) {
+      return res.status(401).json({ error: "Account is disabled" });
+    }
+
+    // Update last login
+    user.lastLogin = new Date().toISOString();
+
+    // Save users to disk (for lastLogin update)
+    await saveUsers();
+
+    // Return user info without password
+    const { password: _, ...userInfo } = user;
+    res.json(userInfo);
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // Error handling middleware
 app.use((error, req, res, next) => {
   console.error("Server error:", error);
@@ -1496,8 +2221,11 @@ async function startServer() {
       process.exit(1);
     }
 
-    // Load existing tags from disk before starting the server
-    await loadAllTags();
+    // Load existing users from disk before starting the server
+    await loadUsers();
+
+    // Note: Notebooks, tags, and folders are now loaded on-demand
+    // No need to pre-load them into memory maps
 
     app.listen(PORT, HOST, () => {
       console.log(`🚀 Noet server running on http://${HOST}:${PORT}`);
@@ -1567,3 +2295,1059 @@ app.post("/api/:userId/notes/:noteId/restore", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// ==========================================
+// ADMIN API ROUTES
+// ==========================================
+
+// Admin middleware to check admin privileges
+const requireAdmin = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Admin authentication required" });
+  }
+
+  const userId = authHeader.substring(7); // Remove 'Bearer ' prefix
+  const user = users.get(userId);
+
+  if (!user || !user.isAdmin) {
+    return res.status(403).json({ error: "Admin privileges required" });
+  }
+
+  req.adminUser = user;
+  next();
+};
+
+// Get all users (admin only)
+app.get("/api/admin/users", requireAdmin, async (req, res) => {
+  try {
+    const allUsers = Array.from(users.values()).map((user) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      isAdmin: user.isAdmin,
+      disabled: user.disabled || false,
+      created: user.created,
+      lastLogin: user.lastLogin,
+    }));
+
+    res.json(allUsers);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create new user (admin only)
+app.post("/api/admin/users", requireAdmin, async (req, res) => {
+  try {
+    const { name, email, password, isAdmin } = req.body;
+
+    if (!name || !email || !password) {
+      return res
+        .status(400)
+        .json({ error: "Name, email, and password are required" });
+    }
+
+    if (password.length < 6) {
+      return res
+        .status(400)
+        .json({ error: "Password must be at least 6 characters long" });
+    }
+
+    // Check if email already exists
+    const existingUser = Array.from(users.values()).find(
+      (user) => user.email.toLowerCase() === email.toLowerCase()
+    );
+
+    if (existingUser) {
+      return res.status(400).json({ error: "Email already exists" });
+    }
+
+    const newUserId = `user-${Date.now()}`;
+    const newUser = {
+      id: newUserId,
+      name: name.trim(),
+      email: email.trim(),
+      password: password, // In production, use bcrypt hashing
+      isAdmin: isAdmin || false,
+      disabled: false,
+      created: new Date().toISOString(),
+      settings: {
+        sessionTimeout: 20160 * 60 * 1000, // 2 weeks
+        autoSave: true,
+        theme: "light",
+      },
+    };
+
+    users.set(newUserId, newUser);
+
+    // Save users to disk
+    await saveUsers();
+
+    // Create user directory
+    const userNotesDir = join(NOTES_BASE_PATH, newUserId);
+    await ensureDir(userNotesDir);
+
+    // Log admin action
+    console.log(`Admin ${req.adminUser.email} created user: ${email}`);
+
+    // Return user without password
+    const { password: _, ...userResponse } = newUser;
+    res.status(201).json(userResponse);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Disable user (admin only)
+app.post("/api/admin/users/:userId/disable", requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = users.get(userId);
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (user.isAdmin && user.id !== req.adminUser.id) {
+      return res
+        .status(400)
+        .json({ error: "Cannot disable other admin users" });
+    }
+
+    user.disabled = true;
+    user.disabledAt = new Date().toISOString();
+    user.disabledBy = req.adminUser.id;
+    users.set(userId, user);
+
+    // Save users to disk
+    await saveUsers();
+
+    console.log(`Admin ${req.adminUser.email} disabled user: ${user.email}`);
+    res.json({ success: true, message: "User disabled successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Enable user (admin only)
+app.post("/api/admin/users/:userId/enable", requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = users.get(userId);
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    user.disabled = false;
+    delete user.disabledAt;
+    delete user.disabledBy;
+    users.set(userId, user);
+
+    // Save users to disk
+    await saveUsers();
+
+    console.log(`Admin ${req.adminUser.email} enabled user: ${user.email}`);
+    res.json({ success: true, message: "User enabled successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete user (admin only)
+app.delete("/api/admin/users/:userId", requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = users.get(userId);
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (user.isAdmin && user.id !== req.adminUser.id) {
+      return res.status(400).json({ error: "Cannot delete other admin users" });
+    }
+
+    if (user.id === req.adminUser.id) {
+      return res
+        .status(400)
+        .json({ error: "Cannot delete your own admin account" });
+    }
+
+    // Delete user's notes directory
+    try {
+      const userNotesDir = join(NOTES_BASE_PATH, userId);
+      if (fsSync.existsSync(userNotesDir)) {
+        await fs.rm(userNotesDir, { recursive: true, force: true });
+      }
+    } catch (dirError) {
+      console.error(`Error deleting user directory for ${userId}:`, dirError);
+    }
+
+    // Remove user from memory
+    users.delete(userId);
+
+    // Save users to disk
+    await saveUsers();
+
+    console.log(`Admin ${req.adminUser.email} deleted user: ${user.email}`);
+    res.json({ success: true, message: "User deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Reset user password (admin only)
+app.post(
+  "/api/admin/users/:userId/reset-password",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { newPassword } = req.body;
+
+      if (!newPassword || newPassword.length < 6) {
+        return res
+          .status(400)
+          .json({ error: "New password must be at least 6 characters long" });
+      }
+
+      const user = users.get(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // In production, use bcrypt.hash
+      user.password = newPassword;
+      user.passwordResetAt = new Date().toISOString();
+      user.passwordResetBy = req.adminUser.id;
+      users.set(userId, user);
+
+      // Save users to disk
+      await saveUsers();
+
+      console.log(
+        `Admin ${req.adminUser.email} reset password for user: ${user.email}`
+      );
+      res.json({ success: true, message: "Password reset successfully" });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// Update user information (admin only)
+app.put("/api/admin/users/:userId", requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { name, email, isAdmin } = req.body;
+
+    const user = users.get(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Validate required fields
+    if (name !== undefined && (!name || !name.trim())) {
+      return res
+        .status(400)
+        .json({ error: "Name is required and cannot be empty" });
+    }
+
+    if (email !== undefined && (!email || !email.trim())) {
+      return res
+        .status(400)
+        .json({ error: "Email is required and cannot be empty" });
+    }
+
+    // Validate email uniqueness
+    if (email && email !== user.email) {
+      const existingUser = Array.from(users.values()).find(
+        (u) => u.id !== userId && u.email.toLowerCase() === email.toLowerCase()
+      );
+
+      if (existingUser) {
+        return res.status(400).json({ error: "Email already exists" });
+      }
+    }
+
+    // Update user information
+    if (name !== undefined) user.name = name.trim();
+    if (email !== undefined) user.email = email.trim();
+    if (typeof isAdmin === "boolean") {
+      // Prevent removing admin status from the last admin
+      if (!isAdmin && user.isAdmin) {
+        const adminCount = Array.from(users.values()).filter(
+          (u) => u.isAdmin
+        ).length;
+        if (adminCount <= 1) {
+          return res.status(400).json({
+            error: "Cannot remove admin status from the last admin user",
+          });
+        }
+      }
+      user.isAdmin = isAdmin;
+    }
+
+    user.updated = new Date().toISOString();
+    user.updatedBy = req.adminUser.id;
+    users.set(userId, user);
+
+    // Save users to disk
+    await saveUsers();
+
+    console.log(`Admin ${req.adminUser.email} updated user: ${user.email}`);
+
+    // Return user without password
+    const { password: _, ...userResponse } = user;
+    res.json(userResponse);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get storage information (admin only)
+app.get("/api/admin/storage", requireAdmin, async (req, res) => {
+  try {
+    const userUsage = [];
+
+    for (const [userId, user] of users.entries()) {
+      try {
+        const userNotesDir = join(NOTES_BASE_PATH, userId);
+
+        if (!fsSync.existsSync(userNotesDir)) {
+          userUsage.push({
+            userId,
+            userName: user.name,
+            noteCount: 0,
+            attachmentCount: 0,
+            totalSize: "0 KB",
+          });
+          continue;
+        }
+
+        const noteFiles = await fs.readdir(userNotesDir);
+        const jsonFiles = noteFiles.filter((file) => file.endsWith(".json"));
+
+        let totalSizeBytes = 0;
+        let attachmentCount = 0;
+
+        // Calculate notes size
+        for (const file of jsonFiles) {
+          const filePath = join(userNotesDir, file);
+          const stats = await fs.stat(filePath);
+          totalSizeBytes += stats.size;
+
+          // Check for attachments
+          const noteDir = join(userNotesDir, file.replace(".json", ""));
+          if (fsSync.existsSync(noteDir)) {
+            const attachmentsDir = join(noteDir, "attachments");
+            if (fsSync.existsSync(attachmentsDir)) {
+              const attachments = await fs.readdir(attachmentsDir);
+              attachmentCount += attachments.length;
+
+              for (const attachment of attachments) {
+                const attachmentPath = join(attachmentsDir, attachment);
+                const attachmentStats = await fs.stat(attachmentPath);
+                totalSizeBytes += attachmentStats.size;
+              }
+            }
+          }
+        }
+
+        const formatSize = (bytes) => {
+          if (bytes < 1024) return `${bytes} B`;
+          if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+          if (bytes < 1024 * 1024 * 1024)
+            return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+          return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+        };
+
+        userUsage.push({
+          userId,
+          userName: user.name,
+          noteCount: jsonFiles.length,
+          attachmentCount,
+          totalSize: formatSize(totalSizeBytes),
+        });
+      } catch (userError) {
+        console.error(`Error calculating usage for user ${userId}:`, userError);
+        userUsage.push({
+          userId,
+          userName: user.name,
+          noteCount: 0,
+          attachmentCount: 0,
+          totalSize: "Error",
+        });
+      }
+    }
+
+    res.json({
+      location: NOTES_BASE_PATH,
+      userUsage,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update storage location (admin only)
+app.post("/api/admin/storage/location", requireAdmin, async (req, res) => {
+  try {
+    const { location } = req.body;
+
+    if (!location) {
+      return res.status(400).json({ error: "Storage location is required" });
+    }
+
+    // Validate the path exists or can be created
+    try {
+      await ensureDir(location);
+      NOTES_BASE_PATH = location;
+
+      console.log(
+        `Admin ${req.adminUser.email} updated storage location to: ${location}`
+      );
+      res.json({ success: true, location: NOTES_BASE_PATH });
+    } catch (pathError) {
+      res
+
+        .status(400)
+        .json({ error: `Invalid storage location: ${pathError.message}` });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Clear unknown tags for a user (admin only)
+app.post(
+  "/api/admin/users/:userId/clear-unknown-tags",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+
+      const user = users.get(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const userNotesDir = join(NOTES_BASE_PATH, userId);
+      if (!fsSync.existsSync(userNotesDir)) {
+        return res.json({ success: true, message: "No notes found for user" });
+      }
+
+      const noteFiles = await fs.readdir(userNotesDir);
+      const jsonFiles = noteFiles.filter((file) => file.endsWith(".json"));
+
+      let clearedCount = 0;
+
+      for (const file of jsonFiles) {
+        try {
+          const filePath = join(userNotesDir, file);
+          const noteData = JSON.parse(await fs.readFile(filePath, "utf8"));
+
+          if (noteData.tags && Array.isArray(noteData.tags)) {
+            const originalLength = noteData.tags.length;
+            // Filter out UUID tags (unknown tags)
+            noteData.tags = noteData.tags.filter((tag) => {
+              const tagName =
+                typeof tag === "string" ? tag : tag.name || tag.id;
+              return tagName && !isUUID(tagName);
+            });
+
+            if (noteData.tags.length !== originalLength) {
+              noteData.updated = new Date().toISOString();
+              await fs.writeFile(filePath, JSON.stringify(noteData, null, 2));
+              clearedCount++;
+            }
+          }
+        } catch (fileError) {
+          console.error(`Error processing note file ${file}:`, fileError);
+        }
+      }
+
+      console.log(
+        `Admin ${req.adminUser.email} cleared unknown tags for user: ${user.email}, ${clearedCount} notes updated`
+      );
+      res.json({
+        success: true,
+        message: `Cleared unknown tags from ${clearedCount} notes`,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// ==========================================
+// VERSION MANAGEMENT SYSTEM
+// ==========================================
+
+// Default version configuration
+let VERSION_CONFIG = {
+  maxVersionsPerNote: 100,
+  autoVersionOnChange: true,
+  minChangePercentage: 10, // 10% change triggers version (increased from 5%)
+  enableFocusSwitch: true,
+};
+
+// Default auto-save configuration
+let AUTO_SAVE_CONFIG = {
+  autoSaveDelayMs: 10000, // 10 seconds default
+  minChangePercentage: 5, // 5% change required for auto-save
+  enableAutoSave: true,
+  enableBeforeUnloadSave: true,
+};
+
+// Version creation locks to prevent race conditions
+const versionLocks = new Map();
+
+// Version deduplication cache (trigger -> timestamp)
+const versionDedupeCache = new Map();
+
+// Enhanced debouncing for different operations
+const VERSION_DEBOUNCE_TIMES = {
+  content_change: 5000, // 5 seconds between content versions
+  focus_switch: 10000, // 10 seconds between focus switch versions (reduced frequency)
+  title_change: 1000, // 1 second between title changes
+  tags_change: 1000, // 1 second between tag changes
+  folder_change: 1000, // 1 second between folder changes
+  notebook_change: 1000, // 1 second between notebook changes
+};
+
+// Helper function to get a lock for version creation
+async function getVersionLock(noteId) {
+  const lockKey = `version_lock_${noteId}`;
+
+  if (versionLocks.has(lockKey)) {
+    // Wait for existing lock to be released
+    await versionLocks.get(lockKey);
+  }
+
+  let resolveLock;
+  const lockPromise = new Promise((resolve) => {
+    resolveLock = resolve;
+  });
+
+  versionLocks.set(lockKey, lockPromise);
+
+  return () => {
+    versionLocks.delete(lockKey);
+    resolveLock();
+  };
+}
+
+// Helper function to get the next version number based on disk state
+async function getNextVersionNumber(userId, noteId) {
+  try {
+    const versions = await loadVersionHistory(userId, noteId);
+
+    if (versions.length === 0) {
+      return 1;
+    }
+
+    // Find the highest version number actually saved on disk
+    const highestVersion = Math.max(...versions.map((v) => v.version));
+    return highestVersion + 1;
+  } catch (error) {
+    console.error("Error calculating next version number:", error);
+    return 1;
+  }
+}
+
+// Helper function to check if we should dedupe this version creation
+function shouldDedupeVersion(noteId, trigger) {
+  const dedupeKey = `${noteId}_${trigger}`;
+  const now = Date.now();
+  const lastCreated = versionDedupeCache.get(dedupeKey);
+
+  // Get debounce time for this trigger type
+  const debounceTime = VERSION_DEBOUNCE_TIMES[trigger] || 1000;
+
+  // Dedupe if same trigger happened within the debounce time
+  if (lastCreated && now - lastCreated < debounceTime) {
+    return true;
+  }
+
+  versionDedupeCache.set(dedupeKey, now);
+
+  // Clean up old cache entries (older than 30 seconds)
+  for (const [key, timestamp] of versionDedupeCache.entries()) {
+    if (now - timestamp > 30000) {
+      versionDedupeCache.delete(key);
+    }
+  }
+
+  return false;
+}
+
+// Helper function to calculate content change percentage
+function calculateChangePercentage(oldContent, newContent) {
+  if (!oldContent && !newContent) return 0;
+  if (!oldContent) return 100;
+  if (!newContent) return 100;
+
+  // Remove HTML tags for accurate text comparison
+  const oldText = oldContent.replace(/<[^>]*>/g, "");
+  const newText = newContent.replace(/<[^>]*>/g, "");
+
+  const oldLength = oldText.length;
+  const newLength = newText.length;
+
+  if (oldLength === 0 && newLength === 0) return 0;
+  if (oldLength === 0) return 100;
+
+  const changeRatio = Math.abs(newLength - oldLength) / oldLength;
+  return changeRatio * 100;
+}
+
+// Helper function to get version directory path
+function getVersionsPath(userId, noteId) {
+  return join(getNotePath(userId, noteId), "versions");
+}
+
+// Helper function to read all versions for a note
+async function loadVersionHistory(userId, noteId) {
+  try {
+    const versionsPath = getVersionsPath(userId, noteId);
+
+    if (!fsSync.existsSync(versionsPath)) {
+      return [];
+    }
+
+    const versionFiles = await fs.readdir(versionsPath);
+    const versions = [];
+
+    for (const file of versionFiles) {
+      if (file.endsWith(".json")) {
+        try {
+          const versionPath = join(versionsPath, file);
+          const versionData = JSON.parse(
+            await fs.readFile(versionPath, "utf8")
+          );
+          versions.push(versionData);
+        } catch (error) {
+          console.error(`Error reading version file ${file}:`, error);
+        }
+      }
+    }
+
+    // Sort by creation date (newest first)
+    versions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    return versions;
+  } catch (error) {
+    console.error("Error loading version history:", error);
+    return [];
+  }
+}
+
+// Helper function to save a version
+async function saveVersion(userId, noteId, versionData) {
+  try {
+    const versionsPath = getVersionsPath(userId, noteId);
+    await ensureDir(versionsPath);
+
+    const versionFile = join(versionsPath, `v${versionData.version}.json`);
+    await fs.writeFile(versionFile, JSON.stringify(versionData, null, 2));
+
+    console.log(`💾 Saved version ${versionData.version} for note ${noteId}`);
+
+    // Clean up old versions if we exceed the limit
+    await cleanupOldVersions(userId, noteId);
+
+    return versionData;
+  } catch (error) {
+    console.error("Error saving version:", error);
+    throw error;
+  }
+}
+
+// Helper function to cleanup old versions based on admin limit
+async function cleanupOldVersions(userId, noteId) {
+  try {
+    const versions = await loadVersionHistory(userId, noteId);
+
+    if (versions.length <= VERSION_CONFIG.maxVersionsPerNote) {
+      return; // No cleanup needed
+    }
+
+    // Remove oldest versions beyond the limit
+    const versionsToRemove = versions.slice(VERSION_CONFIG.maxVersionsPerNote);
+    const versionsPath = getVersionsPath(userId, noteId);
+
+    for (const version of versionsToRemove) {
+      try {
+        const versionFile = join(versionsPath, `v${version.version}.json`);
+        await fs.unlink(versionFile);
+        console.log(
+          `🗑️ Cleaned up old version ${version.version} for note ${noteId}`
+        );
+      } catch (error) {
+        console.error(`Error removing version ${version.version}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error("Error during version cleanup:", error);
+  }
+}
+
+// Helper function to create a version when conditions are met
+async function createVersionIfNeeded(
+  userId,
+  noteId,
+  currentContent,
+  currentMetadata,
+  trigger
+) {
+  // Get lock for this note to prevent race conditions
+  const releaseLock = await getVersionLock(noteId);
+
+  try {
+    if (!VERSION_CONFIG.autoVersionOnChange) {
+      return false;
+    }
+
+    // Check for deduplication
+    if (shouldDedupeVersion(noteId, trigger)) {
+      console.log(
+        `🔄 Deduping version creation for note ${noteId}, trigger: ${trigger}`
+      );
+      return false;
+    }
+
+    const versions = await loadVersionHistory(userId, noteId);
+    const lastVersion = versions.length > 0 ? versions[0] : null;
+
+    let shouldCreateVersion = false;
+    let changeDescription = trigger;
+
+    // Check different triggers
+    if (trigger === "content_change") {
+      if (lastVersion) {
+        const changePercentage = calculateChangePercentage(
+          lastVersion.content,
+          currentContent
+        );
+        if (changePercentage >= VERSION_CONFIG.minChangePercentage) {
+          shouldCreateVersion = true;
+          changeDescription = `${changePercentage.toFixed(1)}% content change`;
+        }
+      } else {
+        shouldCreateVersion = true;
+        changeDescription = "Initial version";
+      }
+    } else if (
+      [
+        "title_change",
+        "tags_change",
+        "folder_change",
+        "notebook_change",
+        "focus_switch",
+      ].includes(trigger)
+    ) {
+      shouldCreateVersion = true;
+    }
+
+    if (shouldCreateVersion) {
+      // Get the next version number based on actual disk state
+      const nextVersionNumber = await getNextVersionNumber(userId, noteId);
+
+      const newVersion = {
+        id: uuidv4(),
+        version: nextVersionNumber,
+        noteId: noteId,
+        userId: userId,
+        content: currentContent || "",
+        metadata: { ...currentMetadata },
+        createdAt: new Date().toISOString(),
+        trigger: trigger,
+        changeDescription: changeDescription,
+        size: (currentContent || "").length,
+      };
+
+      await saveVersion(userId, noteId, newVersion);
+      console.log(
+        `📝 Created version ${newVersion.version} for note ${noteId}: ${changeDescription}`
+      );
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error("Error creating version:", error);
+    return false;
+  } finally {
+    // Always release the lock
+    releaseLock();
+  }
+}
+
+// ==========================================
+// VERSION API ENDPOINTS
+// ==========================================
+
+// Get version history for a note
+app.get("/api/:userId/notes/:noteId/versions", async (req, res) => {
+  try {
+    const { userId, noteId } = req.params;
+    const versions = await loadVersionHistory(userId, noteId);
+
+    // Return summary info (without full content to save bandwidth)
+    const versionSummaries = versions.map((v) => ({
+      id: v.id,
+      version: v.version,
+      createdAt: v.createdAt,
+      trigger: v.trigger,
+      changeDescription: v.changeDescription,
+      size: v.size,
+    }));
+
+    res.json(versionSummaries);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get specific version content
+app.get("/api/:userId/notes/:noteId/versions/:versionId", async (req, res) => {
+  try {
+    const { userId, noteId, versionId } = req.params;
+    const versions = await loadVersionHistory(userId, noteId);
+
+    const version = versions.find((v) => v.id === versionId);
+    if (!version) {
+      return res.status(404).json({ error: "Version not found" });
+    }
+
+    res.json(version);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Restore note to specific version
+app.post("/api/:userId/notes/:noteId/restore/:versionId", async (req, res) => {
+  try {
+    const { userId, noteId, versionId } = req.params;
+    const versions = await loadVersionHistory(userId, noteId);
+
+    const versionToRestore = versions.find((v) => v.id === versionId);
+    if (!versionToRestore) {
+      return res.status(404).json({ error: "Version not found" });
+    }
+
+    // Get current metadata
+    const currentMetadata = await readMetadata(userId, noteId);
+    if (!currentMetadata) {
+      return res.status(404).json({ error: "Note not found" });
+    }
+
+    // Create a version of the current state before restoring
+    const currentContent = await readNoteContent(userId, noteId);
+    await createVersionIfNeeded(
+      userId,
+      noteId,
+      currentContent,
+      currentMetadata,
+      "before_restore"
+    );
+
+    // Update metadata with restored version info
+    const restoredMetadata = {
+      ...currentMetadata,
+      ...versionToRestore.metadata,
+      updated: new Date().toISOString(),
+      version: currentMetadata.version + 1,
+      restoredFromVersion: versionToRestore.version,
+    };
+
+    // Write restored content and metadata
+    await writeNoteContent(userId, noteId, versionToRestore.content);
+    await writeMetadata(userId, noteId, restoredMetadata);
+
+    // Create a version for the restore action
+    await createVersionIfNeeded(
+      userId,
+      noteId,
+      versionToRestore.content,
+      restoredMetadata,
+      `restored_from_v${versionToRestore.version}`
+    );
+
+    // Return the complete note object with content
+    const restoredNote = {
+      ...restoredMetadata,
+      content: versionToRestore.content,
+    };
+
+    console.log(
+      `✅ Restored note ${noteId} to version ${versionToRestore.version}, created new version ${restoredMetadata.version}`
+    );
+
+    res.json(restoredNote);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete specific version
+app.delete(
+  "/api/:userId/notes/:noteId/versions/:versionId",
+  async (req, res) => {
+    try {
+      const { userId, noteId, versionId } = req.params;
+      const versions = await loadVersionHistory(userId, noteId);
+
+      const versionToDelete = versions.find((v) => v.id === versionId);
+      if (!versionToDelete) {
+        return res.status(404).json({ error: "Version not found" });
+      }
+
+      const versionsPath = getVersionsPath(userId, noteId);
+      const versionFile = join(
+        versionsPath,
+        `v${versionToDelete.version}.json`
+      );
+
+      await fs.unlink(versionFile);
+
+      res.json({ success: true, message: "Version deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// Create version on focus switch
+app.post("/api/:userId/notes/:noteId/version-checkpoint", async (req, res) => {
+  try {
+    const { userId, noteId } = req.params;
+
+    const metadata = await readMetadata(userId, noteId);
+    const content = await readNoteContent(userId, noteId);
+
+    if (metadata) {
+      const created = await createVersionIfNeeded(
+        userId,
+        noteId,
+        content,
+        metadata,
+        "focus_switch"
+      );
+      res.json({ versionCreated: created });
+    } else {
+      res.status(404).json({ error: "Note not found" });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// ADMIN VERSION CONFIGURATION
+// ==========================================
+
+// Get version configuration (admin only)
+app.get("/api/admin/config/versions", requireAdmin, (req, res) => {
+  res.json(VERSION_CONFIG);
+});
+
+// Update version configuration (admin only)
+app.post("/api/admin/config/versions", requireAdmin, async (req, res) => {
+  try {
+    const {
+      maxVersionsPerNote,
+      autoVersionOnChange,
+      minChangePercentage,
+      enableFocusSwitch,
+    } = req.body;
+
+    if (maxVersionsPerNote !== undefined) {
+      VERSION_CONFIG.maxVersionsPerNote = Math.max(
+        1,
+        Math.min(1000, maxVersionsPerNote)
+      );
+    }
+    if (autoVersionOnChange !== undefined) {
+      VERSION_CONFIG.autoVersionOnChange = Boolean(autoVersionOnChange);
+    }
+    if (minChangePercentage !== undefined) {
+      VERSION_CONFIG.minChangePercentage = Math.max(
+        1,
+        Math.min(100, minChangePercentage)
+      );
+    }
+    if (enableFocusSwitch !== undefined) {
+      VERSION_CONFIG.enableFocusSwitch = Boolean(enableFocusSwitch);
+    }
+
+    console.log(
+      `Admin ${req.adminUser.email} updated version configuration:`,
+      VERSION_CONFIG
+    );
+    res.json(VERSION_CONFIG);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// AUTO-SAVE CONFIGURATION
+// ==========================================
+
+// Get auto-save configuration
+app.get("/api/admin/config/auto-save", requireAdmin, (req, res) => {
+  res.json(AUTO_SAVE_CONFIG);
+});
+
+// Update auto-save configuration (admin only)
+app.post("/api/admin/config/auto-save", requireAdmin, async (req, res) => {
+  try {
+    const {
+      autoSaveDelayMs,
+      minChangePercentage,
+      enableAutoSave,
+      enableBeforeUnloadSave,
+    } = req.body;
+
+    if (autoSaveDelayMs !== undefined) {
+      AUTO_SAVE_CONFIG.autoSaveDelayMs = Math.max(
+        1000, // Minimum 1 second
+        Math.min(300000, autoSaveDelayMs) // Maximum 5 minutes
+      );
+    }
+    if (minChangePercentage !== undefined) {
+      AUTO_SAVE_CONFIG.minChangePercentage = Math.max(
+        0, // Allow 0% for immediate save
+        Math.min(100, minChangePercentage)
+      );
+    }
+    if (enableAutoSave !== undefined) {
+      AUTO_SAVE_CONFIG.enableAutoSave = Boolean(enableAutoSave);
+    }
+    if (enableBeforeUnloadSave !== undefined) {
+      AUTO_SAVE_CONFIG.enableBeforeUnloadSave = Boolean(enableBeforeUnloadSave);
+    }
+
+    console.log(
+      `Admin ${req.adminUser.email} updated auto-save configuration:`,
+      AUTO_SAVE_CONFIG
+    );
+    res.json(AUTO_SAVE_CONFIG);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get auto-save configuration (public endpoint for frontend)
+app.get("/api/config/auto-save", (req, res) => {
+  res.json(AUTO_SAVE_CONFIG);
+});
+
+// ==========================================
+// ENHANCED NOTE UPDATE WITH VERSIONING
+// ==========================================

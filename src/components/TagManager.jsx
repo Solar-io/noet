@@ -2,6 +2,34 @@ import React, { useState, useEffect } from "react";
 import { Hash, Plus, X, Tag, Edit2, Trash2, Check } from "lucide-react";
 import configService from "../configService.js";
 
+// Preset color options for quick selection
+const PRESET_COLORS = [
+  "#3b82f6",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6",
+  "#06b6d4",
+  "#84cc16",
+  "#f97316",
+  "#ec4899",
+  "#6366f1",
+  "#14b8a6",
+  "#eab308",
+  "#dc2626",
+  "#7c3aed",
+  "#0891b2",
+  "#65a30d",
+  "#ea580c",
+  "#db2777",
+  "#4f46e5",
+  "#059669",
+  "#d97706",
+  "#b91c1c",
+  "#7c2d12",
+  "#991b1b",
+];
+
 const TagManager = ({
   userId,
   noteId,
@@ -27,7 +55,7 @@ const TagManager = ({
         setBackendUrl(url);
       } catch (error) {
         console.error("Failed to get backend URL:", error);
-        setBackendUrl("http://localhost:3003"); // fallback
+        setBackendUrl("http://localhost:3004"); // fallback
       }
     };
     initBackendUrl();
@@ -53,7 +81,7 @@ const TagManager = ({
       setNewTagName("");
       setNewTagColor("#3b82f6");
       setIsCreating(false);
-      
+
       // Refresh tags in parent component
       if (onTagsUpdate) {
         onTagsUpdate();
@@ -79,7 +107,7 @@ const TagManager = ({
 
       const updatedTag = await response.json();
       setEditingTag(null);
-      
+
       // Refresh tags in parent component
       if (onTagsUpdate) {
         onTagsUpdate();
@@ -108,7 +136,7 @@ const TagManager = ({
         const updatedTags = noteTags.filter((t) => t !== tagId);
         onTagsChange?.(updatedTags);
       }
-      
+
       // Refresh tags in parent component
       if (onTagsUpdate) {
         onTagsUpdate();
@@ -130,12 +158,41 @@ const TagManager = ({
 
   const getTagById = (tagId) => {
     // Filter out UUID tags
-    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const UUID_REGEX =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (UUID_REGEX.test(tagId)) {
       return null;
     }
     return availableTags.find((tag) => tag.id === tagId);
   };
+
+  // Color picker component with presets
+  const ColorPicker = ({ value, onChange, className = "" }) => (
+    <div className={`space-y-2 ${className}`}>
+      <div className="flex items-center space-x-2">
+        <input
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
+        />
+        <span className="text-xs text-gray-500">Custom</span>
+      </div>
+      <div className="grid grid-cols-6 gap-1">
+        {PRESET_COLORS.map((color) => (
+          <button
+            key={color}
+            onClick={() => onChange(color)}
+            className={`w-6 h-6 rounded border-2 transition-all hover:scale-110 ${
+              value === color ? "border-gray-800" : "border-gray-300"
+            }`}
+            style={{ backgroundColor: color }}
+            title={color}
+          />
+        ))}
+      </div>
+    </div>
+  );
 
   if (loading) {
     return (
@@ -158,8 +215,9 @@ const TagManager = ({
       )}
 
       {/* Assigned Tags Display */}
-      {noteTags.filter(tagId => {
-        const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      {noteTags.filter((tagId) => {
+        const UUID_REGEX =
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         return !UUID_REGEX.test(tagId);
       }).length > 0 && (
         <div className="space-y-2">
@@ -178,6 +236,7 @@ const TagManager = ({
                   className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium text-white group hover:opacity-80 transition-opacity"
                   style={{ backgroundColor: tag.color }}
                 >
+                  <Hash size={10} className="mr-1" />
                   {tag.name}
                   <button
                     onClick={() => toggleTagAssignment(tagId)}
@@ -210,22 +269,22 @@ const TagManager = ({
 
         {/* Create New Tag */}
         {isCreating && (
-          <div className="bg-gray-50 border border-gray-200 rounded p-3 space-y-2">
-            <div className="flex space-x-2">
+          <div className="bg-gray-50 border border-gray-200 rounded p-4 space-y-3">
+            <div className="space-y-2">
               <input
                 type="text"
                 value={newTagName}
                 onChange={(e) => setNewTagName(e.target.value)}
                 placeholder="Tag name"
-                className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
                 autoFocus
               />
-              <input
-                type="color"
-                value={newTagColor}
-                onChange={(e) => setNewTagColor(e.target.value)}
-                className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
-              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Choose Color
+                </label>
+                <ColorPicker value={newTagColor} onChange={setNewTagColor} />
+              </div>
             </div>
             <div className="flex space-x-2">
               <button
@@ -257,6 +316,10 @@ const TagManager = ({
               className="flex items-center justify-between p-2 rounded hover:bg-gray-50 group"
             >
               <div className="flex items-center space-x-2 flex-1">
+                <div
+                  className="w-3 h-3 rounded-full border border-gray-300"
+                  style={{ backgroundColor: tag.color }}
+                />
                 <button
                   onClick={() => toggleTagAssignment(tag.id)}
                   className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium transition-all ${
@@ -304,9 +367,16 @@ const TagManager = ({
       {/* Edit Tag Modal */}
       {editingTag && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-80">
-            <h3 className="text-lg font-semibold mb-4">Edit Tag</h3>
-            <div className="space-y-3">
+          <div className="bg-white rounded-lg p-6 w-96">
+            <h3 className="text-lg font-semibold mb-4 flex items-center">
+              <Hash
+                size={18}
+                className="mr-2"
+                style={{ color: editingTag.color }}
+              />
+              Edit Tag
+            </h3>
+            <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Name
@@ -321,16 +391,12 @@ const TagManager = ({
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Color
                 </label>
-                <input
-                  type="color"
+                <ColorPicker
                   value={editingTag.color}
-                  onChange={(e) =>
-                    setEditingTag({ ...editingTag, color: e.target.value })
-                  }
-                  className="w-full h-10 border border-gray-300 rounded cursor-pointer"
+                  onChange={(color) => setEditingTag({ ...editingTag, color })}
                 />
               </div>
               <div>

@@ -54,6 +54,7 @@ import { v4 as uuidv4 } from "uuid";
 import TurndownService from "turndown";
 import { gfm } from "turndown-plugin-gfm";
 import ComprehensiveColorPicker from "./components/ComprehensiveColorPicker.jsx";
+import FileViewer from "./components/FileViewer.jsx";
 import configService from "./configService.js";
 
 // Initialize markdown converter
@@ -64,7 +65,14 @@ const turndownService = new TurndownService({
 turndownService.use(gfm);
 
 // TipTap Editor Component
-const TipTapEditor = ({ note, onSave, onContentChange, userId, availableTags = [], onTagsUpdate }) => {
+const TipTapEditor = ({
+  note,
+  onSave,
+  onContentChange,
+  userId,
+  availableTags = [],
+  onTagsUpdate,
+}) => {
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState(note?.attachments || []);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -73,6 +81,7 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId, availableTags = [
     x: 0,
     y: 0,
   });
+  const [viewingAttachment, setViewingAttachment] = useState(null);
   const fileInputRef = useRef(null);
   const attachmentInputRef = useRef(null);
   const autoSaveTimeoutRef = useRef(null);
@@ -105,54 +114,129 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId, availableTags = [
     editor._customStorage = { ...editor._customStorage, currentNoteId: noteId };
   };
 
-  // Auto-save functionality
+  // Smart auto-save functionality with configurable timing and change detection
+  const [lastSavedContent, setLastSavedContent] = useState(note?.content || "");
+  const [autoSaveConfig, setAutoSaveConfig] = useState({
+    autoSaveDelayMs: 10000, // Default 10 seconds
+    minChangePercentage: 5, // Default 5% change
+  });
+
+  // Load auto-save configuration from backend
+  useEffect(() => {
+    const loadAutoSaveConfig = async () => {
+      try {
+        const backendUrl = await configService.getBackendUrl();
+        const response = await fetch(
+          `${backendUrl}/api/admin/config/auto-save`
+        );
+        if (response.ok) {
+          const config = await response.json();
+          setAutoSaveConfig({
+            autoSaveDelayMs: config.autoSaveDelayMs || 10000,
+            minChangePercentage: config.minChangePercentage || 5,
+          });
+          console.log("📋 Loaded auto-save config:", config);
+        }
+      } catch (error) {
+        console.warn(
+          "⚠️ Failed to load auto-save config, using defaults:",
+          error
+        );
+      }
+    };
+    loadAutoSaveConfig();
+  }, []);
+
+  // Update last saved content when note changes
+  useEffect(() => {
+    if (note?.content) {
+      setLastSavedContent(note.content);
+    }
+  }, [note?.id]); // Only update when switching to different note
+
+  const smartAutoSave = async () => {
+    if (!note || !editor || !userId) return;
+
+    try {
+      const currentContent = editor.getHTML();
+      const markdown = turndownService.turndown(currentContent);
+
+      // Check if content has actually changed
+      if (currentContent === lastSavedContent) {
+        console.log("⏭️ Auto-save skipped: No changes detected");
+        return;
+      }
+
+      // Calculate content change percentage
+      const oldLength = lastSavedContent.length || 1;
+      const newLength = currentContent.length;
+      const changePercentage =
+        (Math.abs(newLength - oldLength) / oldLength) * 100;
+
+      // Only save if change exceeds threshold or is first save
+      if (
+        changePercentage < autoSaveConfig.minChangePercentage &&
+        lastSavedContent
+      ) {
+        console.log(
+          `⏭️ Auto-save skipped: Change ${changePercentage.toFixed(
+            1
+          )}% < threshold ${autoSaveConfig.minChangePercentage}%`
+        );
+        return;
+      }
+
+      // Get backend URL
+      const backendUrl = await configService.getBackendUrl();
+
+      // Smart save with change detection
+      const response = await fetch(
+        `${backendUrl}/api/${userId}/notes/${note.id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: note.title,
+            content: currentContent,
+            markdown,
+            tags: note.tags,
+            notebook: note.notebook,
+            folder: note.folder,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        console.log(
+          `💾 Smart auto-save successful: ${changePercentage.toFixed(
+            1
+          )}% change in "${note.title}"`
+        );
+        setLastSavedContent(currentContent); // Update saved content reference
+
+        // Call parent's onSave if provided
+        onSave?.({
+          ...note,
+          content: currentContent,
+          markdown,
+        });
+      } else {
+        console.error("❌ Smart auto-save failed:", response.statusText);
+      }
+    } catch (error) {
+      console.error("❌ Smart auto-save error:", error);
+    }
+  };
+
   const triggerAutoSave = async () => {
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
     }
 
+    // Configurable delay with smart change detection
     autoSaveTimeoutRef.current = setTimeout(async () => {
-      if (note && editor && userId) {
-        try {
-          const content = editor.getHTML();
-          const markdown = turndownService.turndown(content);
-
-          // Get backend URL
-          const backendUrl = await configService.getBackendUrl();
-
-          // Save to backend using the correct API format
-          const response = await fetch(
-            `${backendUrl}/api/${userId}/notes/${note.id}`,
-            {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                title: note.title,
-                content,
-                markdown,
-                tags: note.tags,
-                notebook: note.notebook,
-                folder: note.folder,
-              }),
-            }
-          );
-
-          if (response.ok) {
-            console.log("� Auto-saved note:", note.title);
-            // Also call the parent's onSave if provided
-            onSave?.({
-              ...note,
-              content,
-              markdown,
-            });
-          } else {
-            console.error("❌ Auto-save failed:", response.statusText);
-          }
-        } catch (error) {
-          console.error("❌ Auto-save error:", error);
-        }
-      }
-    }, 2000); // Auto-save after 2 seconds of inactivity
+      await smartAutoSave();
+    }, autoSaveConfig.autoSaveDelayMs);
   };
 
   const editor = useEditor({
@@ -341,43 +425,161 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId, availableTags = [
     },
   });
 
+  // Debug: Track when note prop changes
+  useEffect(() => {
+    console.log("🔍 TipTap component received new note prop:", {
+      noteId: note?.id,
+      noteTitle: note?.title,
+      tempVersionPreview: note?.tempVersionPreview,
+      previewingVersion: note?.previewingVersion,
+      contentLength: note?.content?.length,
+      contentPreview:
+        note?.content?.substring(0, 50) +
+        (note?.content?.length > 50 ? "..." : ""),
+    });
+  }, [note]);
+
   // Update attachments when note changes
   useEffect(() => {
     setAttachments(note?.attachments || []);
   }, [note]);
 
-  // Update editor content when note changes (only when switching notes, not during editing)
+  // Update editor content when note changes (only when switching notes or versions, not during editing)
   useEffect(() => {
+    console.log("🔍 TipTap useEffect triggered:", {
+      hasEditor: !!editor,
+      hasNote: !!note,
+      noteId: note?.id,
+      noteTitle: note?.title,
+      tempVersionPreview: note?.tempVersionPreview,
+      previewingVersion: note?.previewingVersion,
+      contentLength: note?.content?.length,
+    });
+
     if (editor && note && note.id) {
       const newContent = note.content || "<p>Start writing your note...</p>";
       const currentContent = editor.getHTML();
 
-      // Only update if this is a different note (by ID) or if the content is significantly different
-      // Don't update during typing to prevent cursor jumps
+      // Only update if this is a different note (by ID) or a version switch
+      // NEVER update during normal typing to prevent cursor jumps
       const currentNoteId = getEditorNoteId(editor);
       const isNewNote = currentNoteId !== note.id;
+      const isVersionSwitch = note.tempVersionPreview; // Check if this is a version switch
       const hasSignificantChange =
         currentContent !== newContent &&
         (currentContent === "<p>Start writing your note...</p>" ||
           currentContent === "<p></p>" ||
           !currentContent.trim());
 
-      if (isNewNote || hasSignificantChange) {
-        editor.commands.setContent(newContent);
-        setEditorNoteId(editor, note.id);
-        console.log("📝 Updated editor content for note:", note.title);
-      }
-    }
-  }, [editor, note?.id]); // Only depend on note ID, not content
+      console.log("🔍 TipTap content update check:", {
+        isNewNote,
+        isVersionSwitch,
+        hasSignificantChange,
+        currentNoteId,
+        noteId: note.id,
+        tempVersionPreview: note.tempVersionPreview,
+        previewingVersion: note.previewingVersion,
+        currentContentLength: currentContent?.length,
+        newContentLength: newContent?.length,
+        contentsEqual: currentContent === newContent,
+      });
 
-  // Cleanup auto-save timeout on unmount
+      // ONLY update for note switches or version switches - NEVER during normal typing
+      if (isNewNote || isVersionSwitch || hasSignificantChange) {
+        console.log("📝 Updating TipTap editor content:", {
+          isNewNote,
+          isVersionSwitch,
+          hasSignificantChange,
+          previewingVersion: note.previewingVersion,
+          noteTitle: note.title,
+          newContent:
+            newContent.substring(0, 100) +
+            (newContent.length > 100 ? "..." : ""),
+        });
+
+        // Force clear and set content for version switches to ensure update
+        if (isVersionSwitch) {
+          console.log("🔄 Force updating TipTap content for version switch");
+          editor.commands.clearContent();
+          // Use a small delay to ensure the clear takes effect
+          setTimeout(() => {
+            editor.commands.setContent(newContent);
+            editor.commands.focus();
+          }, 10);
+        } else {
+          editor.commands.setContent(newContent);
+        }
+
+        setEditorNoteId(editor, note.id);
+        console.log("✅ TipTap editor content updated for note:", note.title);
+      } else {
+        console.log(
+          "⏭️ Skipping TipTap content update - normal typing detected"
+        );
+      }
+    } else {
+      console.log("⚠️ TipTap useEffect - missing editor, note, or note.id");
+    }
+  }, [editor, note?.id, note?.tempVersionPreview]); // REMOVED note?.content to prevent updates during typing!
+
+  // Cleanup auto-save timeout on unmount and add beforeunload protection
   useEffect(() => {
+    // Add beforeunload listener to save when user tries to close browser/tab
+    const handleBeforeUnload = async (event) => {
+      if (note && editor && userId) {
+        // Cancel any pending auto-save
+        if (autoSaveTimeoutRef.current) {
+          clearTimeout(autoSaveTimeoutRef.current);
+        }
+
+        // Force save before page unload (bypass change threshold for safety)
+        const currentContent = editor.getHTML();
+        if (currentContent !== lastSavedContent) {
+          console.log("🚪 BeforeUnload: Forcing save of unsaved changes");
+          try {
+            const markdown = turndownService.turndown(currentContent);
+            const backendUrl = await configService.getBackendUrl();
+
+            // Use fetch for synchronous save on page unload
+            const response = await fetch(
+              `${backendUrl}/api/${userId}/notes/${note.id}`,
+              {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  title: note.title,
+                  content: currentContent,
+                  markdown,
+                  tags: note.tags,
+                  notebook: note.notebook,
+                  folder: note.folder,
+                }),
+                keepalive: true, // Keep request alive during page unload
+              }
+            );
+
+            if (response.ok) {
+              console.log("✅ BeforeUnload save successful");
+            }
+          } catch (error) {
+            console.error("❌ BeforeUnload save failed:", error);
+          }
+        }
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
     return () => {
+      // Cleanup timeout
       if (autoSaveTimeoutRef.current) {
         clearTimeout(autoSaveTimeoutRef.current);
       }
+
+      // Remove beforeunload listener
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, []);
+  }, [note, editor, userId]); // Dependencies needed for beforeunload handler
 
   // Toolbar actions
   const toggleBold = () => editor?.chain().focus().toggleBold().run();
@@ -420,7 +622,7 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId, availableTags = [
 
   // Font family action
   const setFontFamily = (fontFamily) => {
-    if (fontFamily === 'default') {
+    if (fontFamily === "default") {
       editor?.chain().focus().unsetFontFamily().run();
     } else {
       editor?.chain().focus().setFontFamily(fontFamily).run();
@@ -586,8 +788,24 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId, availableTags = [
       // For non-image attachments, don't insert anything into the editor
       // They will be shown in the attachments panel below
 
-      // Trigger a save to update the note metadata
-      onSave?.();
+      // Fetch updated note data from server to get current attachment metadata
+      try {
+        const noteResponse = await fetch(
+          `${backendUrl}/api/${userId}/notes/${note.id}`
+        );
+        if (noteResponse.ok) {
+          const updatedNote = await noteResponse.json();
+          // Call onSave with the updated note to refresh the notes list
+          onSave?.(updatedNote.content, updatedNote.markdown, updatedNote);
+        } else {
+          // Fallback: trigger a basic save
+          onSave?.();
+        }
+      } catch (error) {
+        console.error("Error fetching updated note:", error);
+        // Fallback: trigger a basic save
+        onSave?.();
+      }
     } catch (error) {
       console.error("Error uploading file:", error);
       console.error("Error details:", {
@@ -634,8 +852,24 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId, availableTags = [
       // Update local attachments state
       setAttachments((prev) => prev.filter((att) => att.filename !== filename));
 
-      // Trigger a save to update the note metadata
-      onSave?.();
+      // Fetch updated note data from server to get current attachment metadata
+      try {
+        const noteResponse = await fetch(
+          `${backendUrl}/api/${userId}/notes/${note.id}`
+        );
+        if (noteResponse.ok) {
+          const updatedNote = await noteResponse.json();
+          // Call onSave with the updated note to refresh the notes list
+          onSave?.(updatedNote.content, updatedNote.markdown, updatedNote);
+        } else {
+          // Fallback: trigger a basic save
+          onSave?.();
+        }
+      } catch (error) {
+        console.error("Error fetching updated note:", error);
+        // Fallback: trigger a basic save
+        onSave?.();
+      }
     } catch (error) {
       console.error("Error removing attachment:", error);
       alert("Failed to remove attachment. Please try again.");
@@ -737,7 +971,7 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId, availableTags = [
           <div className="border-r pr-2 mr-2">
             <select
               onChange={(e) => setFontFamily(e.target.value)}
-              value={editor?.getAttributes('textStyle').fontFamily || 'default'}
+              value={editor?.getAttributes("textStyle").fontFamily || "default"}
               className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
               title="Font Family"
             >
@@ -747,7 +981,9 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId, availableTags = [
               <option value="Times, serif">Times</option>
               <option value="Georgia, serif">Georgia</option>
               <option value="'Courier New', monospace">Courier New</option>
-              <option value="Monaco, 'Lucida Console', monospace">Monaco</option>
+              <option value="Monaco, 'Lucida Console', monospace">
+                Monaco
+              </option>
               <option value="'Comic Sans MS', cursive">Comic Sans</option>
               <option value="Impact, sans-serif">Impact</option>
               <option value="Verdana, sans-serif">Verdana</option>
@@ -960,13 +1196,7 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId, availableTags = [
                   </div>
                   <div className="flex items-center space-x-2">
                     <button
-                      onClick={async () => {
-                        const backendUrl = await configService.getBackendUrl();
-                        window.open(
-                          `${backendUrl}/api/${userId}/notes/${note.id}/attachments/${attachment.filename}`,
-                          "_blank"
-                        );
-                      }}
+                      onClick={() => setViewingAttachment(attachment)}
                       className="p-1 rounded hover:bg-gray-100"
                       title="View/Download"
                     >
@@ -1011,7 +1241,9 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId, availableTags = [
             {editor?.storage.characterCount?.words() || 0} words
           </span>
           <span className="text-xs">
-            Auto-save enabled • Press Ctrl+S to save manually
+            Auto-save: {(autoSaveConfig.autoSaveDelayMs / 1000).toFixed(1)}s (≥
+            {autoSaveConfig.minChangePercentage}% change) • Press Ctrl+S to save
+            manually • Smart change detection
           </span>
         </div>
       </div>
@@ -1069,6 +1301,16 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId, availableTags = [
             />
           </div>
         </>
+      )}
+
+      {/* File Viewer */}
+      {viewingAttachment && (
+        <FileViewer
+          attachment={viewingAttachment}
+          userId={userId}
+          noteId={note.id}
+          onClose={() => setViewingAttachment(null)}
+        />
       )}
     </div>
   );

@@ -7,10 +7,13 @@ import ImprovedNotesList from "./components/ImprovedNotesList.jsx";
 import NoteEditor from "./components/NoteEditor.jsx";
 import ImprovedSidebar from "./components/ImprovedSidebar.jsx";
 import UserManagement from "./components/UserManagement.jsx";
+import AdminInterface from "./components/AdminInterface.jsx";
 import NoteVersionHistory from "./components/NoteVersionHistory.jsx";
 import EvernoteImport from "./components/EvernoteImport.jsx";
 import DragDropManager from "./components/DragDropManager.jsx";
 import RobustErrorBoundary from "./components/RobustErrorBoundary.jsx";
+import BulkActionsBar from "./components/BulkActionsBar.jsx";
+import TagManagementDialog from "./components/TagManagementDialog.jsx";
 import {
   validateNote,
   validateUser,
@@ -45,6 +48,7 @@ import {
   User,
   History,
   Upload,
+  Shield,
 } from "lucide-react";
 
 // Simple Authentication Component
@@ -54,7 +58,7 @@ const AuthenticationFlow = ({ onLoginSuccess }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState("");
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     if (e) e.preventDefault();
     setLoginError("");
 
@@ -63,24 +67,25 @@ const AuthenticationFlow = ({ onLoginSuccess }) => {
       return;
     }
 
-    if (email === "demo@example.com" && password === "demo123") {
-      onLoginSuccess({
-        id: "user-1",
-        email,
-        name: "Demo User",
-        isAdmin: false,
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
       });
-    } else if (email === "admin@example.com" && password === "admin123") {
-      onLoginSuccess({
-        id: "admin-1",
-        email,
-        name: "Admin User",
-        isAdmin: true,
-      });
-    } else {
-      setLoginError(
-        "Invalid credentials. Try demo@example.com / demo123 or admin@example.com / admin123"
-      );
+
+      if (response.ok) {
+        const user = await response.json();
+        onLoginSuccess(user);
+      } else {
+        const error = await response.json();
+        setLoginError(error.error || "Invalid credentials");
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      setLoginError("Network error. Please try again.");
     }
   };
 
@@ -174,6 +179,7 @@ const Sidebar = ({
   onLogout,
   onShowSettings,
   onShowUserManagement,
+  onShowAdminInterface,
   onShowEvernoteImport,
   noteStats,
   storageService,
@@ -557,13 +563,22 @@ const Sidebar = ({
         />
 
         {user?.isAdmin && (
-          <NavItem
-            icon={Settings}
-            title="Admin Settings"
-            isActive={false}
-            onClick={onShowSettings}
-            className="py-2"
-          />
+          <>
+            <NavItem
+              icon={Settings}
+              title="Admin Settings"
+              isActive={false}
+              onClick={onShowSettings}
+              className="py-2"
+            />
+            <NavItem
+              icon={Shield}
+              title="Admin Interface"
+              isActive={false}
+              onClick={onShowAdminInterface}
+              className="py-2 text-red-600 hover:text-red-700"
+            />
+          </>
         )}
 
         <NavItem
@@ -592,12 +607,20 @@ const NoetTipTapApp = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [showUserManagement, setShowUserManagement] = useState(false);
+  const [showAdminInterface, setShowAdminInterface] = useState(false);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [showEvernoteImport, setShowEvernoteImport] = useState(false);
   const [userMessage, setUserMessage] = useState("");
   const [userMessageType, setUserMessageType] = useState("info");
   const [storageService] = useState(new NoteStorageService());
   const [backendUrl, setBackendUrl] = useState("");
+
+  // Bulk actions state
+  const [selectedNotes, setSelectedNotes] = useState(new Set());
+  const [showTagDialog, setShowTagDialog] = useState(false);
+  const [deletedNotes, setDeletedNotes] = useState([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState(null);
 
   // Set up error recovery service user message handler
   useEffect(() => {
@@ -615,13 +638,31 @@ const NoetTipTapApp = () => {
       try {
         const url = await configService.getBackendUrl();
         setBackendUrl(url);
+        console.log("✅ Backend URL initialized:", url);
       } catch (error) {
-        console.error("Failed to get backend URL:", error);
-        setBackendUrl("http://localhost:3003"); // fallback
+        console.error("❌ Failed to get backend URL:", error);
+        setBackendUrl("http://localhost:3004"); // fallback
       }
     };
     initBackendUrl();
-  }, []);
+
+    // Debug function for checking tag state
+    window.debugTags = () => {
+      console.log("🏷️ Current Tag State:");
+      console.log("Available tags:", tags);
+      console.log(
+        "Notes with tags:",
+        notes
+          .filter((n) => n.tags?.length > 0)
+          .map((n) => ({
+            title: n.title,
+            id: n.id,
+            tags: n.tags,
+            tagCount: n.tags?.length || 0,
+          }))
+      );
+    };
+  }, [tags, notes]);
 
   // Load notes from API
   const loadNotes = useCallback(async () => {
@@ -753,8 +794,8 @@ const NoetTipTapApp = () => {
       }
       const tagsData = await response.json();
       console.log(`✅ Loaded ${tagsData.length} tags`);
-      console.log('Raw tags data from backend:', tagsData);
-      console.log('First tag details:', tagsData[0]);
+      console.log("Raw tags data from backend:", tagsData);
+      console.log("First tag details:", tagsData[0]);
       setTags(tagsData);
     } catch (error) {
       console.error("Error loading tags:", error);
@@ -909,42 +950,111 @@ const NoetTipTapApp = () => {
   };
 
   const handleNoteContentChange = (note, content, markdown) => {
-    // Update local state immediately for better UX
-    setSelectedNote((prev) => (prev ? { ...prev, content, markdown } : null));
-    setNotes((prev) =>
-      prev.map((n) => (n.id === note.id ? { ...n, content, markdown } : n))
-    );
-  };
+    console.log("📝 handleNoteContentChange called:", {
+      noteId: note?.id,
+      noteTitle: note?.title,
+      isVersionPreview: note?.tempVersionPreview,
+      previewingVersion: note?.previewingVersion,
+      contentLength: content?.length,
+      markdownLength: markdown?.length,
+    });
 
-  const handleNoteSave = async (note) => {
-    if (!note || !user?.id) return;
-
-    try {
-      const response = await fetch(
-        `${backendUrl}/api/${user.id}/notes/${note.id}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: note.title,
-            content: note.content,
-            markdown: note.markdown,
-            tags: note.tags,
-            notebook: note.notebook,
-            folder: note.folder,
-          }),
-        }
+    // If this is a version preview, don't update the main note state
+    // Only update the editor content via the selectedNote state
+    if (note?.tempVersionPreview) {
+      console.log(
+        "🔍 Version preview detected - updating editor only, not main state"
       );
 
-      if (!response.ok) throw new Error("Failed to save note");
+      // Update only the selectedNote for editor display
+      setSelectedNote((prev) =>
+        prev
+          ? {
+              ...prev,
+              content,
+              markdown,
+              tempVersionPreview: note.tempVersionPreview,
+              previewingVersion: note.previewingVersion,
+            }
+          : null
+      );
 
-      const updatedNote = await response.json();
+      console.log("✅ Editor content updated for version preview");
+      return;
+    }
+
+    // Normal content update (not version preview) - update main state
+    console.log("💾 Normal content update - updating main state");
+
+    setSelectedNote((prev) =>
+      prev
+        ? {
+            ...prev,
+            content,
+            markdown,
+          }
+        : null
+    );
+
+    setNotes((prev) =>
+      prev.map((n) =>
+        n.id === note.id
+          ? {
+              ...n,
+              content,
+              markdown,
+            }
+          : n
+      )
+    );
+
+    console.log("✅ Note content updated in main state");
+  };
+
+  const handleNoteSave = async (content, markdown, updatedNote) => {
+    // If we already have the updated note data (from attachment operations), use it directly
+    if (updatedNote) {
+      console.log("✅ Using pre-fetched updated note data");
 
       // Update local state
       setNotes((prev) =>
         prev.map((n) => (n.id === updatedNote.id ? updatedNote : n))
       );
       setSelectedNote(updatedNote);
+
+      console.log("✅ Note updated successfully with attachment metadata");
+      return;
+    }
+
+    // Otherwise, perform a normal save operation
+    if (!selectedNote || !user?.id) return;
+
+    try {
+      const response = await fetch(
+        `${backendUrl}/api/${user.id}/notes/${selectedNote.id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: selectedNote.title,
+            content: content || selectedNote.content,
+            markdown: markdown || selectedNote.markdown,
+            tags: selectedNote.tags,
+            notebook: selectedNote.notebook,
+            folder: selectedNote.folder,
+          }),
+        }
+      );
+
+      if (!response.ok) throw new Error("Failed to save note");
+
+      const savedNote = await response.json();
+
+      // Update local state
+      setNotes((prev) =>
+        prev.map((n) => (n.id === savedNote.id ? savedNote : n))
+      );
+      setSelectedNote(savedNote);
 
       // Refresh tags since note tags may have changed (temporarily disabled)
       // await refreshTags();
@@ -1038,6 +1148,16 @@ const NoetTipTapApp = () => {
   const handleNoteSelection = async (note) => {
     console.log("handleNoteSelection called with:", note);
 
+    // Clear version preview state when switching notes
+    if (selectedNote && selectedNote.tempVersionPreview) {
+      console.log("🔄 Clearing version preview state when switching notes");
+      setSelectedNote((prev) =>
+        prev
+          ? { ...prev, tempVersionPreview: false, previewingVersion: null }
+          : null
+      );
+    }
+
     // Validate note with comprehensive validation
     if (!validateNote(note)) {
       const errorMsg = "Invalid note object passed to handleNoteSelection";
@@ -1061,6 +1181,41 @@ const NoetTipTapApp = () => {
       console.warn("User:", user, "Backend URL:", backendUrl);
       setSelectedNote(note);
       return;
+    }
+
+    // SAVE CURRENT NOTE CONTENT BEFORE SWITCHING
+    if (selectedNote && selectedNote.id !== note.id) {
+      try {
+        console.log("💾 Saving current note content before switching...");
+
+        // Call handleNoteSave to ensure current content is saved
+        await handleNoteSave(selectedNote.content, selectedNote.markdown);
+
+        console.log("✅ Current note content saved successfully");
+
+        // Small delay to ensure save completes
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // Create focus switch version checkpoint (with reduced frequency)
+        console.log(
+          "🔄 Creating focus switch version for:",
+          selectedNote.title
+        );
+        await fetch(
+          `${backendUrl}/api/${user.id}/notes/${selectedNote.id}/version-checkpoint`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+        console.log("✅ Focus switch version created");
+      } catch (error) {
+        console.warn(
+          "Failed to save current note or create focus switch version:",
+          error
+        );
+        // Don't block note switching if save/version creation fails
+      }
     }
 
     try {
@@ -1109,6 +1264,296 @@ const NoetTipTapApp = () => {
         // Fallback to the note without content
         setSelectedNote(note);
       }
+    }
+  };
+
+  // Bulk actions handlers
+  const handleBulkTagAction = (noteIds) => {
+    console.log("Bulk tag action called with noteIds:", noteIds);
+    setShowTagDialog(true);
+  };
+
+  const handleBulkExport = async (noteIds) => {
+    setIsProcessing(true);
+    setProcessingStatus({
+      current: 0,
+      total: noteIds.length,
+      operation: "exporting",
+    });
+
+    try {
+      const notesToExport = notes.filter((note) => noteIds.includes(note.id));
+      const JSZip = await import("jszip");
+      const zip = new JSZip.default();
+
+      for (let i = 0; i < notesToExport.length; i++) {
+        const note = notesToExport[i];
+        setProcessingStatus({
+          current: i + 1,
+          total: notesToExport.length,
+          operation: "exporting",
+        });
+
+        const noteFolder = zip.folder(note.title || `Note_${note.id}`);
+        const markdownContent = `# ${note.title || "Untitled"}\n\n${
+          note.content || ""
+        }`;
+        noteFolder.file(
+          `${note.title || `Note_${note.id}`}.md`,
+          markdownContent
+        );
+
+        if (note.attachments && note.attachments.length > 0) {
+          const attachmentsFolder = noteFolder.folder("attachments");
+          for (const attachment of note.attachments) {
+            try {
+              const response = await fetch(
+                `${backendUrl}/api/${user.id}/notes/${note.id}/attachments/${attachment.id}`
+              );
+              if (response.ok) {
+                const blob = await response.blob();
+                attachmentsFolder.file(attachment.filename, blob);
+              }
+            } catch (error) {
+              console.error(
+                `Failed to export attachment ${attachment.filename}:`,
+                error
+              );
+            }
+          }
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      const content = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(content);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `notes_export_${new Date().toISOString().split("T")[0]}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setSelectedNotes(new Set());
+    } catch (error) {
+      console.error("Export failed:", error);
+      setUserMessage("Export failed. Please try again.");
+      setUserMessageType("error");
+    } finally {
+      setIsProcessing(false);
+      setProcessingStatus(null);
+    }
+  };
+
+  const handleBulkDelete = async (noteIds) => {
+    setIsProcessing(true);
+    setProcessingStatus({
+      current: 0,
+      total: noteIds.length,
+      operation: "deleting",
+    });
+
+    try {
+      const notesToDelete = notes.filter((note) => noteIds.includes(note.id));
+      setDeletedNotes(notesToDelete);
+
+      for (let i = 0; i < noteIds.length; i++) {
+        const noteId = noteIds[i];
+        setProcessingStatus({
+          current: i + 1,
+          total: noteIds.length,
+          operation: "deleting",
+        });
+
+        const response = await fetch(
+          `${backendUrl}/api/${user.id}/notes/${noteId}`,
+          { method: "DELETE" }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to delete note ${noteId}`);
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      setSelectedNotes(new Set());
+      await loadNotes();
+    } catch (error) {
+      console.error("Bulk delete failed:", error);
+      setUserMessage("Some notes could not be deleted. Please try again.");
+      setUserMessageType("error");
+    } finally {
+      setIsProcessing(false);
+      setProcessingStatus(null);
+    }
+  };
+
+  const handleBulkUndo = async () => {
+    console.log("Undo functionality would be implemented here");
+    setDeletedNotes([]);
+    await loadNotes();
+  };
+
+  const handleAddTags = async (noteIds, tagIds) => {
+    console.log("Adding tags:", { noteIds, tagIds });
+    setIsProcessing(true);
+    setProcessingStatus({
+      current: 0,
+      total: noteIds.length,
+      operation: "adding tags",
+    });
+
+    try {
+      for (let i = 0; i < noteIds.length; i++) {
+        const noteId = noteIds[i];
+        setProcessingStatus({
+          current: i + 1,
+          total: noteIds.length,
+          operation: "adding tags",
+        });
+
+        const note = notes.find((n) => n.id === noteId);
+        if (!note) {
+          console.warn(`Note not found: ${noteId}`);
+          continue;
+        }
+
+        const existingTags = note.tags || [];
+        const newTags = [...new Set([...existingTags, ...tagIds])];
+
+        console.log(`Updating note ${noteId} with tags:`, {
+          existingTags,
+          newTags,
+        });
+
+        const response = await fetch(
+          `${backendUrl}/api/${user.id}/notes/${noteId}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ metadata: { tags: newTags } }),
+          }
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Failed to add tags to note ${noteId}:`, errorText);
+          throw new Error(`Failed to add tags to note ${noteId}: ${errorText}`);
+        }
+
+        const updatedNote = await response.json();
+        console.log(
+          `Successfully updated note ${noteId} with tags:`,
+          updatedNote
+        );
+      }
+
+      console.log("🔄 Reloading notes after tag application...");
+
+      // Add a small delay to ensure backend processing is complete
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      // Reload data simultaneously to avoid empty state
+      await Promise.all([loadNotes(), loadTags()]);
+
+      // Force a second reload to ensure state synchronization
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await loadNotes();
+
+      setSelectedNotes(new Set());
+      setUserMessage("Tags added successfully!");
+      setUserMessageType("success");
+
+      console.log(
+        "✅ Tag application completed - notes should now show updated tags."
+      );
+    } catch (error) {
+      console.error("Add tags failed:", error);
+      setUserMessage("Failed to add tags. Please try again.");
+      setUserMessageType("error");
+    } finally {
+      setIsProcessing(false);
+      setProcessingStatus(null);
+    }
+  };
+
+  const handleRemoveTags = async (noteIds, tagIds) => {
+    setIsProcessing(true);
+    setProcessingStatus({
+      current: 0,
+      total: noteIds.length,
+      operation: "removing tags",
+    });
+
+    try {
+      for (let i = 0; i < noteIds.length; i++) {
+        const noteId = noteIds[i];
+        setProcessingStatus({
+          current: i + 1,
+          total: noteIds.length,
+          operation: "removing tags",
+        });
+
+        const note = notes.find((n) => n.id === noteId);
+        if (!note) continue;
+
+        const existingTags = note.tags || [];
+        const newTags = existingTags.filter((tag) => !tagIds.includes(tag));
+
+        const response = await fetch(
+          `${backendUrl}/api/${user.id}/notes/${noteId}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ metadata: { tags: newTags } }),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to remove tags from note ${noteId}`);
+        }
+      }
+
+      // Add delay and double reload for consistency with handleAddTags
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      await Promise.all([loadNotes(), loadTags()]);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await loadNotes();
+
+      setSelectedNotes(new Set());
+    } catch (error) {
+      console.error("Remove tags failed:", error);
+      setUserMessage("Failed to remove tags. Please try again.");
+      setUserMessageType("error");
+    } finally {
+      setIsProcessing(false);
+      setProcessingStatus(null);
+    }
+  };
+
+  const handleCreateTag = async (tagName) => {
+    try {
+      const response = await fetch(`${backendUrl}/api/${user.id}/tags`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: tagName, color: "#3B82F6" }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to create tag: ${response.status}`);
+      }
+
+      const newTag = await response.json();
+      await loadTags();
+      return newTag;
+    } catch (error) {
+      console.error("Create tag failed:", error);
+      setUserMessage("Failed to create tag. Please try again.");
+      setUserMessageType("error");
+      return null;
     }
   };
 
@@ -1167,6 +1612,7 @@ const NoetTipTapApp = () => {
           onLogout={handleLogout}
           onShowSettings={() => setShowSettings(true)}
           onShowUserManagement={() => setShowUserManagement(true)}
+          onShowAdminInterface={() => setShowAdminInterface(true)}
           onShowEvernoteImport={() => setShowEvernoteImport(true)}
           onNotesUpdate={loadNotes}
         />
@@ -1261,6 +1707,14 @@ const NoetTipTapApp = () => {
           />
         )}
 
+        {/* Admin Interface Modal */}
+        {showAdminInterface && (
+          <AdminInterface
+            user={user}
+            onClose={() => setShowAdminInterface(false)}
+          />
+        )}
+
         {/* Evernote Import Modal */}
         {showEvernoteImport && (
           <EvernoteImport
@@ -1278,6 +1732,23 @@ const NoetTipTapApp = () => {
           <NoteVersionHistory
             noteId={selectedNote.id}
             onClose={() => setShowVersionHistory(false)}
+          />
+        )}
+
+        {/* Tag Management Dialog */}
+        {showTagDialog && (
+          <TagManagementDialog
+            isOpen={showTagDialog}
+            onClose={() => setShowTagDialog(false)}
+            selectedNotes={Array.from(selectedNotes)
+              .map((noteId) => notes.find((note) => note.id === noteId))
+              .filter(Boolean)}
+            availableTags={tags}
+            onAddTags={handleAddTags}
+            onRemoveTags={handleRemoveTags}
+            onCreateTag={handleCreateTag}
+            isProcessing={isProcessing}
+            processingStatus={processingStatus}
           />
         )}
       </div>
