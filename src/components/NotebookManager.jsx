@@ -11,6 +11,34 @@ import {
 } from "lucide-react";
 import configService from "../configService.js";
 
+// Preset color options for quick selection
+const PRESET_COLORS = [
+  "#3b82f6",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6",
+  "#06b6d4",
+  "#84cc16",
+  "#f97316",
+  "#ec4899",
+  "#6366f1",
+  "#14b8a6",
+  "#eab308",
+  "#dc2626",
+  "#7c3aed",
+  "#0891b2",
+  "#65a30d",
+  "#ea580c",
+  "#db2777",
+  "#4f46e5",
+  "#059669",
+  "#d97706",
+  "#b91c1c",
+  "#7c2d12",
+  "#991b1b",
+];
+
 const NotebookManager = ({
   userId,
   currentNotebook,
@@ -37,7 +65,7 @@ const NotebookManager = ({
         setBackendUrl(url);
       } catch (error) {
         console.error("Failed to get backend URL:", error);
-        setBackendUrl("http://localhost:3003"); // fallback
+        setBackendUrl("http://localhost:3004"); // fallback
       }
     };
     initBackendUrl();
@@ -150,6 +178,34 @@ const NotebookManager = ({
     onNotebookChange?.(notebookId);
   };
 
+  // Color picker component with presets
+  const ColorPicker = ({ value, onChange, className = "" }) => (
+    <div className={`space-y-2 ${className}`}>
+      <div className="flex items-center space-x-2">
+        <input
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
+        />
+        <span className="text-xs text-gray-500">Custom</span>
+      </div>
+      <div className="grid grid-cols-6 gap-1">
+        {PRESET_COLORS.map((color) => (
+          <button
+            key={color}
+            onClick={() => onChange(color)}
+            className={`w-6 h-6 rounded border-2 transition-all hover:scale-110 ${
+              value === color ? "border-gray-800" : "border-gray-300"
+            }`}
+            style={{ backgroundColor: color }}
+            title={color}
+          />
+        ))}
+      </div>
+    </div>
+  );
+
   if (loading) {
     return (
       <div className={`animate-pulse space-y-2 ${className}`}>
@@ -186,7 +242,7 @@ const NotebookManager = ({
 
       {/* Create New Notebook */}
       {isCreating && (
-        <div className="bg-gray-50 border border-gray-200 rounded p-3 space-y-3">
+        <div className="bg-gray-50 border border-gray-200 rounded p-4 space-y-3">
           <div className="space-y-2">
             <input
               type="text"
@@ -207,15 +263,13 @@ const NotebookManager = ({
               className="w-full px-3 py-2 border border-gray-300 rounded text-sm resize-none"
               rows="2"
             />
-            <div className="flex items-center space-x-2">
-              <label className="text-sm text-gray-600">Color:</label>
-              <input
-                type="color"
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Choose Color
+              </label>
+              <ColorPicker
                 value={newNotebook.color}
-                onChange={(e) =>
-                  setNewNotebook({ ...newNotebook, color: e.target.value })
-                }
-                className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
+                onChange={(color) => setNewNotebook({ ...newNotebook, color })}
               />
             </div>
           </div>
@@ -240,74 +294,52 @@ const NotebookManager = ({
         </div>
       )}
 
-      {/* No Notebook Option */}
-      <div
-        className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors ${
-          currentNotebook === null
-            ? "bg-blue-100 text-blue-800 border border-blue-200"
-            : "hover:bg-gray-50"
-        }`}
-        onClick={() => selectNotebook(null)}
-      >
-        <div className="flex items-center space-x-2">
-          <FolderOpen size={16} className="text-gray-500" />
-          <span className="text-sm font-medium">No Notebook</span>
-        </div>
-        {currentNotebook === null && (
-          <Star size={14} className="text-blue-600" />
-        )}
-      </div>
-
       {/* Notebooks List */}
-      <div className="space-y-1 max-h-64 overflow-y-auto">
+      <div className="space-y-1 max-h-60 overflow-y-auto">
+        {/* No Notebook option */}
+        <div
+          onClick={() => selectNotebook(null)}
+          className={`flex items-center space-x-2 p-2 rounded cursor-pointer transition-colors ${
+            currentNotebook === null
+              ? "bg-blue-100 text-blue-700"
+              : "hover:bg-gray-50"
+          }`}
+        >
+          <Book size={14} className="text-gray-400" />
+          <span className="text-sm">No Notebook</span>
+        </div>
+
         {notebooks.map((notebook) => (
           <div
             key={notebook.id}
-            className={`flex items-center justify-between p-2 rounded group transition-colors ${
-              currentNotebook === notebook.id
-                ? "bg-blue-100 text-blue-800 border border-blue-200"
-                : "hover:bg-gray-50 cursor-pointer"
-            }`}
+            className="flex items-center justify-between p-2 rounded hover:bg-gray-50 group"
           >
             <div
-              className="flex items-center space-x-2 flex-1 cursor-pointer"
               onClick={() => selectNotebook(notebook.id)}
+              className={`flex items-center space-x-2 flex-1 cursor-pointer ${
+                currentNotebook === notebook.id
+                  ? "text-blue-600 font-medium"
+                  : ""
+              }`}
             >
               <div
-                className="w-3 h-3 rounded-full"
+                className="w-3 h-3 rounded-full border border-gray-300"
                 style={{ backgroundColor: notebook.color }}
               />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate">
-                  {notebook.name}
-                </div>
-                {notebook.description && (
-                  <div className="text-xs text-gray-500 truncate">
-                    {notebook.description}
-                  </div>
-                )}
-              </div>
-              {currentNotebook === notebook.id && (
-                <Star size={14} className="text-blue-600" />
-              )}
+              <Book size={14} style={{ color: notebook.color }} />
+              <span className="text-sm">{notebook.name}</span>
             </div>
 
             <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setEditingNotebook(notebook);
-                }}
+                onClick={() => setEditingNotebook(notebook)}
                 className="text-gray-400 hover:text-gray-600 p-1 rounded"
                 title="Edit notebook"
               >
                 <Edit2 size={12} />
               </button>
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteNotebook(notebook.id);
-                }}
+                onClick={() => deleteNotebook(notebook.id)}
                 className="text-red-400 hover:text-red-600 p-1 rounded"
                 title="Delete notebook"
               >
@@ -328,8 +360,15 @@ const NotebookManager = ({
       {editingNotebook && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-96">
-            <h3 className="text-lg font-semibold mb-4">Edit Notebook</h3>
-            <div className="space-y-3">
+            <h3 className="text-lg font-semibold mb-4 flex items-center">
+              <Book
+                size={18}
+                className="mr-2"
+                style={{ color: editingNotebook.color }}
+              />
+              Edit Notebook
+            </h3>
+            <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Name
@@ -359,23 +398,18 @@ const NotebookManager = ({
                     })
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded resize-none"
-                  rows="3"
+                  rows="2"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Color
                 </label>
-                <input
-                  type="color"
+                <ColorPicker
                   value={editingNotebook.color}
-                  onChange={(e) =>
-                    setEditingNotebook({
-                      ...editingNotebook,
-                      color: e.target.value,
-                    })
+                  onChange={(color) =>
+                    setEditingNotebook({ ...editingNotebook, color })
                   }
-                  className="w-full h-10 border border-gray-300 rounded cursor-pointer"
                 />
               </div>
             </div>

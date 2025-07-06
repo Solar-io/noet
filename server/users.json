@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "lastSaved": "2025-07-06T14:04:19.529Z",
+  "users": [
+    [
+      "user-1",
+      {
+        "id": "user-1",
+        "email": "demo@example.com",
+        "name": "Demo User",
+        "password": "demo123",
+        "isAdmin": false,
+        "created": "2025-07-05T00:45:08.142Z",
+        "settings": {
+          "sessionTimeout": 1209600000,
+          "autoSave": true,
+          "theme": "light"
+        },
+        "lastLogin": "2025-07-06T14:04:19.529Z"
+      }
+    ],
+    [
+      "admin-1",
+      {
+        "id": "admin-1",
+        "email": "admin@example.com",
+        "name": "Admin User",
+        "password": "admin123",
+        "isAdmin": true,
+        "created": "2025-07-05T00:45:08.144Z",
+        "settings": {
+          "sessionTimeout": 1209600000,
+          "autoSave": true,
+          "theme": "light"
+        },
+        "lastLogin": "2025-07-06T00:58:16.474Z"
+      }
+    ],
+    [
+      "user-1751763374331",
+      {
+        "id": "user-1751763374331",
+        "name": "Sam",
+        "email": "sgallant@gmail.com",
+        "password": "123456",
+        "isAdmin": true,
+        "disabled": false,
+        "created": "2025-07-06T00:56:14.331Z",
+        "settings": {
+          "sessionTimeout": 1209600000,
+          "autoSave": true,
+          "theme": "light"
+        },
+        "lastLogin": "2025-07-06T00:56:33.688Z"
+      }
+    ]
+  ]
+}

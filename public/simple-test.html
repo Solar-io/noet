@@ -1,32 +1,121 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Simple Test</title>
+    <title>React App Status Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      .status {
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 4px;
+      }
+      .success {
+        background: #d4edda;
+        color: #155724;
+      }
+      .error {
+        background: #f8d7da;
+        color: #721c24;
+      }
+      .warning {
+        background: #fff3cd;
+        color: #856404;
+      }
+      .info {
+        background: #d1ecf1;
+        color: #0c5460;
+      }
+    </style>
   </head>
   <body>
-    <h1>🔧 Simple Backend Test</h1>
-    <button onclick="testAPI()">Test API</button>
-    <div id="result"></div>
+    <h1>React App Status Test</h1>
+    <div id="results"></div>
 
     <script>
-      async function testAPI() {
-        try {
-          const response = await fetch("http://localhost:3004/api/health");
-          const data = await response.json();
-          document.getElementById(
-            "result"
-          ).innerHTML = `<p>✅ Backend OK: ${JSON.stringify(data)}</p>`;
-        } catch (error) {
-          document.getElementById(
-            "result"
-          ).innerHTML = `<p>❌ Backend Error: ${error.message}</p>`;
-        }
+      const results = document.getElementById("results");
+
+      function addStatus(message, type = "info") {
+        const div = document.createElement("div");
+        div.className = `status ${type}`;
+        div.textContent = message;
+        results.appendChild(div);
       }
 
-      // Auto test on load
-      window.onload = testAPI;
+      addStatus("Starting tests...", "info");
+
+      // Test 1: Check main app
+      fetch("/")
+        .then((response) => response.text())
+        .then((html) => {
+          if (html.includes("React failed to load")) {
+            addStatus("❌ React app is showing failure message", "error");
+          } else if (html.includes("Loading React app")) {
+            addStatus("⏳ React app is still in loading state", "warning");
+          } else {
+            addStatus("✅ React app HTML looks normal", "success");
+          }
+        })
+        .catch((err) =>
+          addStatus(`❌ Main app error: ${err.message}`, "error")
+        );
+
+      // Test 2: Check backend
+      fetch("http://localhost:3004/api/health")
+        .then((response) => response.json())
+        .then((data) => {
+          if (data.status === "ok") {
+            addStatus("✅ Backend is healthy", "success");
+          } else {
+            addStatus("❌ Backend health check failed", "error");
+          }
+        })
+        .catch((err) => addStatus(`❌ Backend error: ${err.message}`, "error"));
+
+      // Test 3: Check if PDF.js loads
+      fetch("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js")
+        .then((response) => {
+          if (response.ok) {
+            addStatus("✅ PDF.js CDN is accessible", "success");
+          } else {
+            addStatus("❌ PDF.js CDN failed", "error");
+          }
+        })
+        .catch((err) =>
+          addStatus(`❌ PDF.js CDN error: ${err.message}`, "error")
+        );
+
+      // Test 4: Check if components are accessible
+      fetch("/src/components/PDFViewer.jsx")
+        .then((response) => {
+          if (response.ok) {
+            addStatus("✅ PDFViewer component is accessible", "success");
+          } else {
+            addStatus("❌ PDFViewer component not accessible", "error");
+          }
+        })
+        .catch((err) =>
+          addStatus(`❌ PDFViewer error: ${err.message}`, "error")
+        );
+
+      // Test 5: Check if main JSX is accessible
+      fetch("/src/main.jsx")
+        .then((response) => {
+          if (response.ok) {
+            addStatus("✅ main.jsx is accessible", "success");
+          } else {
+            addStatus("❌ main.jsx not accessible", "error");
+          }
+        })
+        .catch((err) =>
+          addStatus(`❌ main.jsx error: ${err.message}`, "error")
+        );
+
+      setTimeout(() => {
+        addStatus("All tests completed", "info");
+      }, 3000);
     </script>
   </body>
 </html>

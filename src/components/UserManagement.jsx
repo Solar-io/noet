@@ -41,7 +41,7 @@ const UserManagement = ({ user, onUserUpdate, onClose }) => {
         setBackendUrl(url);
       } catch (error) {
         console.error("Failed to get backend URL:", error);
-        setBackendUrl("http://localhost:3003"); // fallback
+        setBackendUrl("http://localhost:3004"); // fallback
       }
     };
     initBackendUrl();
