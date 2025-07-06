@@ -27,7 +27,7 @@ async function testFrontendFileUpload() {
 
     // 2. Create a test image file for upload
     console.log("2. Creating test image file...");
-    const testImagePath = "./test-image.png";
+    const testImagePath = ./image.png";
 
     // Create a simple 1x1 PNG image (base64 encoded)
     const pngData = Buffer.from(
@@ -65,7 +65,7 @@ async function testFrontendFileUpload() {
     console.log("5. Testing document file upload...");
     await testFileUpload(
       testNote.id,
-      "./test-upload-file.txt",
+      ./upload-file.txt",
       "test-document.txt",
       "text/plain"
     );

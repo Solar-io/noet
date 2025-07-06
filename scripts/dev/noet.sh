@@ -4,7 +4,7 @@
 # Uses simple config approach for directory management
 
 # Source simple config and switch to project directory
-source "$(dirname "${BASH_SOURCE[0]}")/simple-config.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/scripts/simple-config.sh"
 cd "$NOET_PROJECT_PATH"
 
 # Main execution

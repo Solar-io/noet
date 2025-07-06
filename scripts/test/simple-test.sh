@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Simple test runner that sources config and runs tests
-source "$(dirname "${BASH_SOURCE[0]}")/simple-config.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/scripts/simple-config.sh"
 cd "$NOET_PROJECT_PATH"
 
 echo "🧪 Running tests from: $(pwd)"

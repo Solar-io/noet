@@ -2,7 +2,7 @@
   "name": "noet-app",
   "version": "1.0.0-beta",
   "type": "module",
-  "description": "A modern note-taking app with TipTap editor",
+  "description": "A modern note-taking app with Slate editor",
   "main": "index.js",
   "scripts": {
     "dev": "vite",
@@ -14,19 +14,10 @@
     "backend": "node server/server.js",
     "frontend": "vite",
     "clean": "node scripts/clean.js",
-    "test": "scripts/test/test-runner.sh",
-    "test-comprehensive": "node tests/e2e/comprehensive.js",
-    "test-watch": "nodemon tests/integration/features.js",
-    "test-quick": "scripts/test/simple-test.sh",
-    "test-status": "node tests/integration/app-status.cjs",
-    "test-attachments": "node tests/integration/attachment-functionality.cjs",
-    "dev-start": "scripts/dev/simple-noet.sh",
-    "dev-clean": "scripts/dev/noet-clean.sh",
-    "dev-guard": "scripts/dev/noet-guard.sh",
-    "dev-debug": "scripts/dev/debug-api.sh",
-    "setup": "scripts/deploy/setup-complete.sh",
-    "setup-dev": "scripts/deploy/setup-dev-env.sh",
-    "quick-start": "scripts/dev/quick-start.sh"
+    "test": "node test-features.js",
+    "test-comprehensive": "node comprehensive-test.js",
+    "test-watch": "nodemon test-features.js",
+    "quick-start": "./quick-start.sh"
   },
   "repository": {
     "type": "git",
@@ -40,7 +31,7 @@
     "notes",
     "editor",
     "react",
-    "tiptap",
+    "slate",
     "note-taking",
     "rich-text"
   ],

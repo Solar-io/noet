@@ -65,7 +65,7 @@ async function testUploadToNote(noteId) {
     console.log(`2. Uploading test file to note ${noteId}...`);
 
     // Read the file
-    const fileContent = fs.readFileSync("./test-upload-file.txt");
+    const fileContent = fs.readFileSync(./upload-file.txt");
     const blob = new Blob([fileContent], { type: "text/plain" });
 
     const form = new FormData();

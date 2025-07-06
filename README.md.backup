@@ -8,7 +8,7 @@ A React-based note-taking application with rich text editing capabilities using 
 
 - **PDF and Image Viewing**: ✅ **FIXED** - CSP and cross-origin policies updated
 - **Notebook Unnesting**: ✅ **FIXED** - Enhanced drop zones for folder management
-- Directory handling fixed with unified `scripts/simple-config.sh`
+- Directory handling fixed with unified `simple-config.sh`
 - Tag management working (UUID tags filtered out)
 - Archive functionality restored
 - Font family selection added
@@ -21,7 +21,7 @@ A React-based note-taking application with rich text editing capabilities using 
 **Option 1: Use the simple startup script (recommended)**
 
 ```bash
-./scripts/dev/simple-noet.sh
+./simple-noet.sh
 ```
 
 **Option 2: Manual startup**
@@ -99,7 +99,7 @@ npm run dev
 ├── server/                       # Backend Express server
 │   └── server.js                # Main server file
 ├── public/                       # Static assets
-├── scripts/simple-config.sh             # Unified directory configuration
+├── simple-config.sh             # Unified directory configuration
 ├── simple-noet.sh              # Simple startup script
 ├── test-*.js                   # Test suite
 └── *.md                        # Documentation
@@ -107,16 +107,16 @@ npm run dev
 
 ## Scripts and Tools
 
-- `./scripts/dev/simple-noet.sh` - Start both backend and frontend
-- `./scripts/test/simple-test.sh` - Run basic tests
-- `./scripts/test/test-runner.sh` - Run comprehensive test suite
-- `./scripts/test/run-test.sh [test-file]` - Run specific test
-- `./scripts/dev/noet.sh` - Advanced startup with options
+- `./simple-noet.sh` - Start both backend and frontend
+- `./simple-test.sh` - Run basic tests
+- `./test-runner.sh` - Run comprehensive test suite
+- `./run-test.sh [test-file]` - Run specific test
+- `./noet.sh` - Advanced startup with options
 
 ### New Test Scripts (December 2024)
 
-- `node tests/integration/app-status.cjs` - Quick health check for all systems
-- `node tests/integration/attachment-functionality.cjs` - Comprehensive attachment testing
+- `node test-app-status.cjs` - Quick health check for all systems
+- `node test-attachment-functionality.cjs` - Comprehensive attachment testing
 - `public/simple-test.html` - Browser-based diagnostics page
 
 ## Development Environment
@@ -160,7 +160,7 @@ npm run dev
    - Real-time icon color updates and visual feedback
    - Colors persist across browser sessions
 
-4. **Directory Handling**: Created `scripts/simple-config.sh` for unified directory management
+4. **Directory Handling**: Created `simple-config.sh` for unified directory management
 5. **Tag Management**: Fixed UUID tag filtering across frontend and backend
 6. **Archive Functionality**: Restored proper archive API calls
 7. **UI Enhancements**: Added comprehensive text color picker and font family selection
@@ -173,15 +173,15 @@ npm run dev
 Run the comprehensive test suite:
 
 ```bash
-./scripts/test/test-runner.sh
+./test-runner.sh
 ```
 
 Individual tests:
 
 ```bash
-./scripts/test/run-test.sh tests/integration/tag-counts.js
-./scripts/test/run-test.sh tests/integration/note-counts.js
-./scripts/test/run-test.sh test-color-picker.js      # Test color picker functionality
+./run-test.sh test-tag-counts.js
+./run-test.sh test-note-counts.js
+./run-test.sh test-color-picker.js      # Test color picker functionality
 ```
 
 ## Development Workflow
@@ -189,7 +189,7 @@ Individual tests:
 1. **Start development environment**:
 
    ```bash
-   ./scripts/dev/simple-noet.sh
+   ./simple-noet.sh
    ```
 
 2. **Make changes** to frontend (`src/`) or backend (`server/`)
@@ -197,12 +197,12 @@ Individual tests:
 3. **Test changes**:
 
    ```bash
-   ./scripts/test/simple-test.sh
+   ./simple-test.sh
    ```
 
 4. **Run comprehensive tests**:
    ```bash
-   ./scripts/test/test-runner.sh
+   ./test-runner.sh
    ```
 
 ## For New Development
@@ -211,23 +211,23 @@ Start with a stable baseline - all core functionality is working. The applicatio
 
 **🚨 IMPORTANT: Check these first to avoid redoing work!**
 
-- `docs/development/complete-development-history.md` - Everything we tried for tags & font size (what worked/failed)
-- `docs/development/technical-reference.md` - Exact working code you can copy/paste
+- `COMPLETE_DEVELOPMENT_HISTORY.md` - Everything we tried for tags & font size (what worked/failed)
+- `TECHNICAL_REFERENCE.md` - Exact working code you can copy/paste
 
 **Before making changes:**
 
 - Run the test suite to ensure current functionality works
 - Check the comprehensive documentation in the various `.md` files
-- Use the existing `scripts/simple-config.sh` pattern for any new scripts
+- Use the existing `simple-config.sh` pattern for any new scripts
 
 ## Documentation Files
 
 ### 🔥 Essential References (Start Here!)
 
-- `docs/development/complete-development-history.md` - **Complete journey of all tag & font size work** - Never start from scratch!
-- `docs/development/technical-reference.md` - **Copy-paste ready working code** for all implementations
-- `docs/current-state.md` - Quick status overview and what's working
-- `docs/project-handoff.md` - Comprehensive technical handoff guide
+- `COMPLETE_DEVELOPMENT_HISTORY.md` - **Complete journey of all tag & font size work** - Never start from scratch!
+- `TECHNICAL_REFERENCE.md` - **Copy-paste ready working code** for all implementations
+- `CURRENT_STATE.md` - Quick status overview and what's working
+- `PROJECT_HANDOFF.md` - Comprehensive technical handoff guide
 
 ### Specific Technical Details
 
@@ -239,7 +239,7 @@ Start with a stable baseline - all core functionality is working. The applicatio
 
 ## Contributing
 
-1. Ensure all tests pass with `./scripts/test/test-runner.sh`
+1. Ensure all tests pass with `./test-runner.sh`
 2. Test both frontend and backend functionality
 3. Update documentation if adding new features
 4. Follow the existing code patterns and directory structure
