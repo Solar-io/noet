@@ -3625,7 +3625,6 @@ app.post(
       let importNotebookId;
       let existingNotebooks = [];
       try {
-        console.log(`📚 Setting up notebook "${notebookName}" for import`);
         // First check if the notebook already exists
         existingNotebooks = await loadAllUserNotebooksFromDisk(userId);
         const importNotebook = existingNotebooks.find(
@@ -3640,7 +3639,6 @@ app.post(
         } else {
           // Create new notebook
           importNotebookId = uuidv4();
-          console.log(`📚 Generated new notebook ID: ${importNotebookId}`);
           const newNotebook = {
             id: importNotebookId,
             userId,
@@ -3659,7 +3657,6 @@ app.post(
           );
           results.notebooksCreated++;
         }
-        console.log(`📚 Final importNotebookId: ${importNotebookId}`);
       } catch (error) {
         console.error("❌ Failed to create/get import notebook:", error);
         return res
@@ -3936,9 +3933,6 @@ app.post(
           }
 
           // Create the note
-          console.log(
-            `📝 Creating note "${title}" with notebook: ${importNotebookId}`
-          );
           const metadata = {
             id: noteId,
             title,
