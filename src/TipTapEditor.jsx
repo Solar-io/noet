@@ -382,7 +382,11 @@ const TipTapEditor = ({
         },
       }),
       // Advanced text formatting
-      TextStyle,
+      TextStyle.configure({
+        HTMLAttributes: {
+          class: "text-style",
+        },
+      }),
       Color.configure({
         types: ["textStyle"],
       }),

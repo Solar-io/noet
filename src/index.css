@@ -49,10 +49,52 @@ code {
   line-height: 1.2;
 }
 
+/* High specificity rule to force font-size in lists */
+.ProseMirror ul li span[style*="font-size"],
+.ProseMirror ol li span[style*="font-size"],
+.ProseMirror li p span[style*="font-size"] {
+  font-size: var(--font-size) !important;
+}
+
+/* CSS custom property support for dynamic font sizes */
+.ProseMirror span[style*="font-size: 12px"] {
+  --font-size: 12px;
+  font-size: 12px !important;
+}
+.ProseMirror span[style*="font-size: 14px"] {
+  --font-size: 14px;
+  font-size: 14px !important;
+}
+.ProseMirror span[style*="font-size: 16px"] {
+  --font-size: 16px;
+  font-size: 16px !important;
+}
+.ProseMirror span[style*="font-size: 18px"] {
+  --font-size: 18px;
+  font-size: 18px !important;
+}
+.ProseMirror span[style*="font-size: 20px"] {
+  --font-size: 20px;
+  font-size: 20px !important;
+}
+.ProseMirror span[style*="font-size: 24px"] {
+  --font-size: 24px;
+  font-size: 24px !important;
+}
+.ProseMirror span[style*="font-size: 28px"] {
+  --font-size: 28px;
+  font-size: 28px !important;
+}
+.ProseMirror span[style*="font-size: 32px"] {
+  --font-size: 32px;
+  font-size: 32px !important;
+}
+
 /* Fix for double-line lists - Remove extra paragraph spacing */
 .ProseMirror li > p {
   margin: 0 !important;
-  display: inline;
+  display: inline-block;
+  width: 100%;
 }
 
 /* Ensure font-size is properly applied to list items */
@@ -62,6 +104,15 @@ code {
 
 .ProseMirror li p span[style*="font-size"] {
   display: inline !important;
+}
+
+/* Ensure font-size inheritance works properly in list paragraphs */
+.ProseMirror li > p {
+  font-size: inherit;
+}
+
+.ProseMirror li > p span {
+  font-size: inherit;
 }
 
 /* Specific styling for different list types */

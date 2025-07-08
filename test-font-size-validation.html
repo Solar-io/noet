@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Font Size Validation Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+      }
+      .test-section {
+        margin: 20px 0;
+        padding: 15px;
+        border: 1px solid #ccc;
+      }
+      .success {
+        color: green;
+      }
+      .error {
+        color: red;
+      }
+      .ProseMirror {
+        border: 1px solid #ddd;
+        padding: 10px;
+        margin: 10px 0;
+      }
+
+      /* Copy the exact CSS from index.css */
+      .ProseMirror span[style*="font-size"] {
+        line-height: 1.2;
+      }
+      .ProseMirror li span[style*="font-size"],
+      .ProseMirror .list-item span[style*="font-size"],
+      .ProseMirror .task-item span[style*="font-size"] {
+        line-height: 1.2;
+      }
+      .ProseMirror ul li span[style*="font-size"],
+      .ProseMirror ol li span[style*="font-size"],
+      .ProseMirror li p span[style*="font-size"] {
+        font-size: var(--font-size) !important;
+      }
+      .ProseMirror span[style*="font-size: 28px"] {
+        --font-size: 28px;
+        font-size: 28px !important;
+      }
+      .ProseMirror li > p {
+        margin: 0 !important;
+        display: inline-block;
+        width: 100%;
+      }
+      .ProseMirror li > p {
+        font-size: inherit;
+      }
+      .ProseMirror li > p span {
+        font-size: inherit;
+      }
+      .ProseMirror li span[style*="font-size"] {
+        display: inline !important;
+      }
+      .ProseMirror li p span[style*="font-size"] {
+        display: inline !important;
+      }
+      .ProseMirror ul.bullet-list {
+        list-style-type: disc !important;
+        padding-left: 1.5rem;
+      }
+      .ProseMirror li.list-item {
+        display: list-item !important;
+        margin: 0.25rem 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Font Size Validation Test</h1>
+
+    <div class="test-section">
+      <h2>Test 1: Regular Text</h2>
+      <div class="ProseMirror">
+        <p>
+          Regular text with
+          <span style="font-size: 28px">28px font size</span> applied.
+        </p>
+      </div>
+      <div id="test1-result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>Test 2: List Items (Current Structure)</h2>
+      <div class="ProseMirror">
+        <ul class="bullet-list">
+          <li class="list-item">
+            <p>
+              <span style="font-size: 28px">List item with 28px font-size</span>
+            </p>
+          </li>
+          <li class="list-item">
+            <p>
+              Normal text and <span style="font-size: 28px">28px text</span> in
+              same item
+            </p>
+          </li>
+        </ul>
+      </div>
+      <div id="test2-result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>Test 3: Ordered List</h2>
+      <div class="ProseMirror">
+        <ol>
+          <li class="list-item">
+            <p>
+              <span style="font-size: 28px"
+                >Ordered list with 28px font-size</span
+              >
+            </p>
+          </li>
+        </ol>
+      </div>
+      <div id="test3-result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>Test 4: Multiple Font Sizes</h2>
+      <div class="ProseMirror">
+        <ul class="bullet-list">
+          <li class="list-item">
+            <p>
+              <span style="font-size: 12px">12px</span> and
+              <span style="font-size: 18px">18px</span> and
+              <span style="font-size: 24px">24px</span> and
+              <span style="font-size: 32px">32px</span>
+            </p>
+          </li>
+        </ul>
+      </div>
+      <div id="test4-result"></div>
+    </div>
+
+    <script>
+      function testFontSize(elementId, expectedSize) {
+        const element = document.querySelector(
+          `#${elementId.replace(
+            "-result",
+            ""
+          )} span[style*="font-size: ${expectedSize}"]`
+        );
+        const resultDiv = document.getElementById(elementId);
+
+        if (element) {
+          const computedStyle = window.getComputedStyle(element);
+          const actualSize = computedStyle.fontSize;
+          const expectedPx = expectedSize;
+
+          if (actualSize === expectedPx) {
+            resultDiv.innerHTML = `<span class="success">✅ PASS: Font size ${expectedSize} correctly applied (computed: ${actualSize})</span>`;
+            return true;
+          } else {
+            resultDiv.innerHTML = `<span class="error">❌ FAIL: Expected ${expectedPx}, got ${actualSize}</span>`;
+            return false;
+          }
+        } else {
+          resultDiv.innerHTML = `<span class="error">❌ FAIL: Element with font-size ${expectedSize} not found</span>`;
+          return false;
+        }
+      }
+
+      function runTests() {
+        console.log("🧪 Running font size validation tests...");
+
+        // Wait for DOM to be ready
+        setTimeout(() => {
+          const results = [];
+
+          // Test 1: Regular text
+          const test1 = testFontSize("test1-result", "28px");
+          results.push(test1);
+
+          // Test 2: List items
+          const listSpans =
+            document.querySelectorAll("#test2-result").length > 0
+              ? document.querySelector(
+                  '.test-section:nth-child(2) span[style*="font-size: 28px"]'
+                )
+              : null;
+
+          if (listSpans) {
+            const computedSize = window.getComputedStyle(listSpans).fontSize;
+            const test2Pass = computedSize === "28px";
+            const test2Result = document.getElementById("test2-result");
+
+            if (test2Pass) {
+              test2Result.innerHTML = `<span class="success">✅ PASS: List font size 28px correctly applied (computed: ${computedSize})</span>`;
+            } else {
+              test2Result.innerHTML = `<span class="error">❌ FAIL: List font size - Expected 28px, got ${computedSize}</span>`;
+            }
+            results.push(test2Pass);
+          }
+
+          // Test 3: Ordered list
+          const orderedSpan = document.querySelector(
+            '.test-section:nth-child(3) span[style*="font-size: 28px"]'
+          );
+          if (orderedSpan) {
+            const computedSize = window.getComputedStyle(orderedSpan).fontSize;
+            const test3Pass = computedSize === "28px";
+            const test3Result = document.getElementById("test3-result");
+
+            if (test3Pass) {
+              test3Result.innerHTML = `<span class="success">✅ PASS: Ordered list font size 28px correctly applied</span>`;
+            } else {
+              test3Result.innerHTML = `<span class="error">❌ FAIL: Ordered list font size - Expected 28px, got ${computedSize}</span>`;
+            }
+            results.push(test3Pass);
+          }
+
+          // Test 4: Multiple sizes
+          const sizes = ["12px", "18px", "24px", "32px"];
+          const multiResults = sizes.map((size) => {
+            const span = document.querySelector(
+              `.test-section:nth-child(4) span[style*="font-size: ${size}"]`
+            );
+            if (span) {
+              const computed = window.getComputedStyle(span).fontSize;
+              return computed === size;
+            }
+            return false;
+          });
+
+          const test4Pass = multiResults.every((r) => r);
+          const test4Result = document.getElementById("test4-result");
+
+          if (test4Pass) {
+            test4Result.innerHTML = `<span class="success">✅ PASS: All multiple font sizes working correctly</span>`;
+          } else {
+            test4Result.innerHTML = `<span class="error">❌ FAIL: Some multiple font sizes not working</span>`;
+          }
+
+          results.push(test4Pass);
+
+          // Summary
+          const passCount = results.filter((r) => r).length;
+          const totalTests = results.length;
+
+          const summary = document.createElement("div");
+          summary.className = "test-section";
+          summary.innerHTML = `
+                    <h2>Test Summary</h2>
+                    <p><strong>Results: ${passCount}/${totalTests} tests passed</strong></p>
+                    ${
+                      passCount === totalTests
+                        ? '<p class="success">🎉 All tests passed! Font size fix is working correctly.</p>'
+                        : '<p class="error">⚠️  Some tests failed. Font size fix needs more work.</p>'
+                    }
+                `;
+          document.body.appendChild(summary);
+
+          console.log(`Test Results: ${passCount}/${totalTests} passed`);
+        }, 500);
+      }
+
+      // Run tests when page loads
+      document.addEventListener("DOMContentLoaded", runTests);
+    </script>
+  </body>
+</html>

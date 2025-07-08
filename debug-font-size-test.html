@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Font Size Debug Test</title>
+    <style>
+      /* Copy relevant CSS from index.css */
+      .ProseMirror {
+        outline: none;
+        padding: 1rem;
+        min-height: 200px;
+        border: 1px solid #ccc;
+        margin: 10px 0;
+      }
+
+      /* Current CSS rules from index.css */
+      .ProseMirror span[style*="font-size"] {
+        line-height: 1.2;
+      }
+
+      .ProseMirror li span[style*="font-size"],
+      .ProseMirror .list-item span[style*="font-size"],
+      .ProseMirror .task-item span[style*="font-size"] {
+        line-height: 1.2;
+      }
+
+      .ProseMirror li > p {
+        margin: 0 !important;
+        display: inline;
+      }
+
+      .ProseMirror li span[style*="font-size"] {
+        display: inline !important;
+      }
+
+      .ProseMirror li p span[style*="font-size"] {
+        display: inline !important;
+      }
+
+      /* List styles */
+      .ProseMirror ul.bullet-list,
+      .ProseMirror ul:not(.task-list):not([data-type="taskList"]) {
+        list-style-type: disc !important;
+        padding-left: 1.5rem;
+        margin: 1em 0;
+      }
+
+      .ProseMirror li.list-item,
+      .ProseMirror ul:not(.task-list):not([data-type="taskList"]) li,
+      .ProseMirror ol:not(.task-list):not([data-type="taskList"]) li {
+        display: list-item !important;
+        list-style-position: outside;
+        margin: 0.25rem 0;
+        padding-left: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Font Size Debug Test</h1>
+
+    <h2>Test 1: Regular text with inline font-size</h2>
+    <div class="ProseMirror">
+      <p>
+        This is regular text with
+        <span style="font-size: 28px">28px font size</span> applied.
+      </p>
+    </div>
+
+    <h2>Test 2: List items with font-size (current structure from logs)</h2>
+    <div class="ProseMirror">
+      <ul class="bullet-list">
+        <li class="list-item">
+          <p>Regular list item without font-size</p>
+        </li>
+        <li class="list-item">
+          <p>
+            <span style="font-size: 28px"
+              >List item with 28px font-size in span</span
+            >
+          </p>
+        </li>
+        <li class="list-item">
+          <span style="font-size: 28px"
+            ><p>List item with 28px font-size wrapping paragraph</p></span
+          >
+        </li>
+      </ul>
+    </div>
+
+    <h2>Test 3: Direct list item font-size</h2>
+    <div class="ProseMirror">
+      <ul class="bullet-list">
+        <li class="list-item" style="font-size: 28px">
+          <p>List item with direct font-size on li element</p>
+        </li>
+      </ul>
+    </div>
+
+    <h2>Test 4: Paragraph font-size in list</h2>
+    <div class="ProseMirror">
+      <ul class="bullet-list">
+        <li class="list-item">
+          <p style="font-size: 28px">List item with font-size on p element</p>
+        </li>
+      </ul>
+    </div>
+
+    <h2>Expected Results</h2>
+    <p><strong>Test 1:</strong> Should show large text (28px)</p>
+    <p>
+      <strong>Test 2:</strong> Second and third items should show large text
+    </p>
+    <p><strong>Test 3:</strong> Should show large text</p>
+    <p><strong>Test 4:</strong> Should show large text</p>
+
+    <script>
+      // Add inspection capability
+      document.addEventListener("DOMContentLoaded", function () {
+        const spans = document.querySelectorAll('span[style*="font-size"]');
+        console.log("Font-size spans found:", spans.length);
+        spans.forEach((span, index) => {
+          console.log(`Span ${index + 1}:`, {
+            element: span,
+            style: span.style.fontSize,
+            computedStyle: window.getComputedStyle(span).fontSize,
+            parent: span.parentElement.tagName,
+            inList: span.closest("li") !== null,
+          });
+        });
+      });
+    </script>
+  </body>
+</html>
