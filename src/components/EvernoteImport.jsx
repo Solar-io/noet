@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Upload,
   FileText,
@@ -19,6 +19,7 @@ const EvernoteImport = ({ userId, onClose, onImportComplete }) => {
   const [importStatus, setImportStatus] = useState("idle"); // 'idle', 'processing', 'success', 'error'
   const [importResults, setImportResults] = useState(null);
   const [error, setError] = useState("");
+  const [backendUrl, setBackendUrl] = useState(null);
   const [options, setOptions] = useState({
     preserveNotebooks: true,
     preserveTags: true,
@@ -27,7 +28,22 @@ const EvernoteImport = ({ userId, onClose, onImportComplete }) => {
     conflictResolution: "rename", // 'rename', 'overwrite', 'skip'
   });
 
-  const backendUrl = configService.getBackendUrl();
+  // Load backend URL on component mount
+  useEffect(() => {
+    const loadBackendUrl = async () => {
+      try {
+        const url = await configService.getBackendUrl();
+        console.log("Loaded backend URL:", url);
+        setBackendUrl(url);
+      } catch (error) {
+        console.error("Failed to load backend URL:", error);
+        setError(
+          "Failed to connect to server. Please ensure the backend is running."
+        );
+      }
+    };
+    loadBackendUrl();
+  }, []);
 
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
@@ -63,6 +79,11 @@ const EvernoteImport = ({ userId, onClose, onImportComplete }) => {
   const startImport = async () => {
     if (!selectedFile) return;
 
+    if (!backendUrl) {
+      setError("Backend URL not loaded. Please try again.");
+      return;
+    }
+
     setImporting(true);
     setImportStatus("processing");
     setError("");
@@ -72,20 +93,54 @@ const EvernoteImport = ({ userId, onClose, onImportComplete }) => {
     formData.append("options", JSON.stringify(options));
 
     try {
-      const response = await fetch(
-        `${backendUrl}/api/${userId}/import/evernote`,
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
+      const importUrl = `${backendUrl}/api/${userId}/import/evernote`;
+      console.log("Import URL:", importUrl);
+      console.log("Backend URL:", backendUrl);
+      console.log("User ID:", userId);
+      console.log("File:", selectedFile);
 
+      const response = await fetch(importUrl, {
+        method: "POST",
+        body: formData,
+      });
+
+      console.log("Import response status:", response.status);
+      console.log("Import response headers:", response.headers);
+
+      // First check if the response is ok
       if (!response.ok) {
-        const errorData = await response.json();
+        // Try to get error text first
+        const errorText = await response.text();
+        console.error("Import error response text:", errorText);
+
+        // Try to parse as JSON if possible
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          // If not JSON, use the text as the error message
+          errorData = {
+            message:
+              errorText || `Import failed with status ${response.status}`,
+          };
+        }
+
         throw new Error(errorData.message || "Import failed");
       }
 
+      // For success responses, also check content type
+      const contentType = response.headers.get("content-type");
+      console.log("Response content type:", contentType);
+
+      if (!contentType || !contentType.includes("application/json")) {
+        const responseText = await response.text();
+        console.error("Non-JSON response:", responseText);
+        throw new Error("Server returned non-JSON response");
+      }
+
       const results = await response.json();
+      console.log("Import results:", results);
+
       setImportResults(results);
       setImportStatus("success");
 

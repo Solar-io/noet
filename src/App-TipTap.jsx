@@ -729,7 +729,14 @@ const NoetTipTapApp = () => {
       );
       setNotes(validNotes);
     } catch (error) {
-      console.error("Error loading notes:", error);
+      // Handle network errors more gracefully during startup
+      if (error.message.includes("Failed to fetch")) {
+        console.log(
+          "ℹ️ Notes loading failed (network), will retry automatically"
+        );
+      } else {
+        console.error("Error loading notes:", error.message);
+      }
 
       // Use error recovery service
       const recoveryResult = await errorRecoveryService.handleError(error, {
@@ -775,7 +782,12 @@ const NoetTipTapApp = () => {
       console.log(`✅ Loaded ${notebooksData.length} notebooks`);
       setNotebooks(notebooksData);
     } catch (error) {
-      console.error("Error loading notebooks:", error);
+      // Handle network errors more gracefully during startup
+      if (error.message.includes("Failed to fetch")) {
+        console.log("ℹ️ Notebooks loading failed (network), using empty list");
+      } else {
+        console.error("Error loading notebooks:", error.message);
+      }
       setNotebooks([]);
     }
   };
@@ -798,7 +810,12 @@ const NoetTipTapApp = () => {
       console.log("First tag details:", tagsData[0]);
       setTags(tagsData);
     } catch (error) {
-      console.error("Error loading tags:", error);
+      // Handle network errors more gracefully during startup
+      if (error.message.includes("Failed to fetch")) {
+        console.log("ℹ️ Tags loading failed (network), using empty list");
+      } else {
+        console.error("Error loading tags:", error.message);
+      }
       setTags([]);
     }
   };
@@ -819,7 +836,12 @@ const NoetTipTapApp = () => {
       console.log(`✅ Loaded ${foldersData.length} folders`);
       setFolders(foldersData);
     } catch (error) {
-      console.error("Error loading folders:", error);
+      // Handle network errors more gracefully during startup
+      if (error.message.includes("Failed to fetch")) {
+        console.log("ℹ️ Folders loading failed (network), using empty list");
+      } else {
+        console.error("Error loading folders:", error.message);
+      }
       setFolders([]);
     }
   };
@@ -975,6 +997,9 @@ const NoetTipTapApp = () => {
               markdown,
               tempVersionPreview: note.tempVersionPreview,
               previewingVersion: note.previewingVersion,
+              // Preserve original content tracking for change detection
+              originalContent: prev.originalContent,
+              originalMarkdown: prev.originalMarkdown,
             }
           : null
       );
@@ -992,6 +1017,9 @@ const NoetTipTapApp = () => {
             ...prev,
             content,
             markdown,
+            // Preserve original content tracking for change detection
+            originalContent: prev.originalContent,
+            originalMarkdown: prev.originalMarkdown,
           }
         : null
     );
@@ -1020,10 +1048,26 @@ const NoetTipTapApp = () => {
       setNotes((prev) =>
         prev.map((n) => (n.id === updatedNote.id ? updatedNote : n))
       );
-      setSelectedNote(updatedNote);
 
-      console.log("✅ Note updated successfully with attachment metadata");
-      return;
+      // Update selectedNote and reset original content tracking
+      setSelectedNote((prev) =>
+        prev?.id === updatedNote.id
+          ? {
+              ...updatedNote,
+              // Reset original content to current content after save
+              originalContent: updatedNote.content,
+              originalMarkdown: updatedNote.markdown,
+              // Preserve any temporary flags
+              tempVersionPreview: prev.tempVersionPreview,
+              previewingVersion: prev.previewingVersion,
+            }
+          : prev
+      );
+
+      // Refresh tags since note tags may have changed (temporarily disabled)
+      // await refreshTags();
+
+      console.log("✅ Note saved successfully");
     }
 
     // Otherwise, perform a normal save operation
@@ -1054,7 +1098,21 @@ const NoetTipTapApp = () => {
       setNotes((prev) =>
         prev.map((n) => (n.id === savedNote.id ? savedNote : n))
       );
-      setSelectedNote(savedNote);
+
+      // Update selectedNote and reset original content tracking
+      setSelectedNote((prev) =>
+        prev?.id === savedNote.id
+          ? {
+              ...savedNote,
+              // Reset original content to current content after save
+              originalContent: savedNote.content,
+              originalMarkdown: savedNote.markdown,
+              // Preserve any temporary flags
+              tempVersionPreview: prev.tempVersionPreview,
+              previewingVersion: prev.previewingVersion,
+            }
+          : prev
+      );
 
       // Refresh tags since note tags may have changed (temporarily disabled)
       // await refreshTags();
@@ -1063,6 +1121,67 @@ const NoetTipTapApp = () => {
     } catch (error) {
       console.error("Error saving note:", error);
       throw error; // Re-throw to let the editor handle the error
+    }
+  };
+
+  // Save note without updating selectedNote state (for note switching)
+  const saveNoteWithoutStateUpdate = async (noteToSave, content, markdown) => {
+    const saveId = Math.random().toString(36).substr(2, 9);
+    console.log(`💾 [${saveId}] saveNoteWithoutStateUpdate called:`, {
+      noteId: noteToSave?.id,
+      noteTitle: noteToSave?.title,
+      contentLength: content?.length,
+      markdownLength: markdown?.length,
+    });
+
+    if (!noteToSave || !user?.id) {
+      console.warn(`⚠️ [${saveId}] Missing noteToSave or user ID`, {
+        hasNote: !!noteToSave,
+        hasUser: !!user?.id,
+      });
+      return;
+    }
+
+    try {
+      const apiUrl = `${backendUrl}/api/${user.id}/notes/${noteToSave.id}`;
+      console.log(`📡 [${saveId}] Saving note to:`, apiUrl);
+
+      const response = await fetch(apiUrl, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: noteToSave.title,
+          content: content || noteToSave.content,
+          markdown: markdown || noteToSave.markdown,
+          tags: noteToSave.tags,
+          notebook: noteToSave.notebook,
+          folder: noteToSave.folder,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to save note");
+
+      const savedNote = await response.json();
+      console.log(`📡 [${saveId}] Save response:`, {
+        savedNoteId: savedNote?.id,
+        savedNoteTitle: savedNote?.title,
+        originalNoteId: noteToSave.id,
+        originalNoteTitle: noteToSave.title,
+        idsMatch: savedNote?.id === noteToSave.id,
+      });
+
+      // Only update notes array, not selectedNote
+      setNotes((prev) =>
+        prev.map((n) => (n.id === savedNote.id ? savedNote : n))
+      );
+
+      console.log(
+        `✅ [${saveId}] Note saved successfully without state update`
+      );
+      return savedNote;
+    } catch (error) {
+      console.error(`❌ [${saveId}] Error saving note:`, error);
+      throw error;
     }
   };
 
@@ -1146,22 +1265,17 @@ const NoetTipTapApp = () => {
 
   // Handle note selection with full content loading
   const handleNoteSelection = async (note) => {
-    console.log("handleNoteSelection called with:", note);
-
-    // Clear version preview state when switching notes
-    if (selectedNote && selectedNote.tempVersionPreview) {
-      console.log("🔄 Clearing version preview state when switching notes");
-      setSelectedNote((prev) =>
-        prev
-          ? { ...prev, tempVersionPreview: false, previewingVersion: null }
-          : null
-      );
-    }
+    const callId = Math.random().toString(36).substr(2, 9);
+    console.log(`🔍 [${callId}] handleNoteSelection called with:`, {
+      noteId: note?.id,
+      noteTitle: note?.title,
+      callStack: new Error().stack.split("\n").slice(1, 4).join("\n"),
+    });
 
     // Validate note with comprehensive validation
     if (!validateNote(note)) {
       const errorMsg = "Invalid note object passed to handleNoteSelection";
-      console.error(errorMsg, note);
+      console.error(`❌ [${callId}] ${errorMsg}`, note);
 
       await errorRecoveryService.handleError(new Error(errorMsg), {
         operation: "note_selection",
@@ -1176,42 +1290,84 @@ const NoetTipTapApp = () => {
 
     if (!validateUser(user) || !backendUrl) {
       console.warn(
-        "Missing user ID or backend URL, setting note without content"
+        `⚠️ [${callId}] Missing user ID or backend URL, setting note without content`
       );
-      console.warn("User:", user, "Backend URL:", backendUrl);
+      console.warn(`⚠️ [${callId}] User:`, user, "Backend URL:", backendUrl);
       setSelectedNote(note);
       return;
     }
 
-    // SAVE CURRENT NOTE CONTENT BEFORE SWITCHING
+    // SAVE CURRENT NOTE CONTENT BEFORE SWITCHING (without updating selectedNote state)
     if (selectedNote && selectedNote.id !== note.id) {
       try {
-        console.log("💾 Saving current note content before switching...");
-
-        // Call handleNoteSave to ensure current content is saved
-        await handleNoteSave(selectedNote.content, selectedNote.markdown);
-
-        console.log("✅ Current note content saved successfully");
-
-        // Small delay to ensure save completes
-        await new Promise((resolve) => setTimeout(resolve, 100));
-
-        // Create focus switch version checkpoint (with reduced frequency)
         console.log(
-          "🔄 Creating focus switch version for:",
-          selectedNote.title
+          `💾 [${callId}] Saving current note content before switching...`
         );
-        await fetch(
-          `${backendUrl}/api/${user.id}/notes/${selectedNote.id}/version-checkpoint`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-          }
-        );
-        console.log("✅ Focus switch version created");
+        console.log(`💾 [${callId}] Current note:`, {
+          id: selectedNote.id,
+          title: selectedNote.title,
+        });
+        console.log(`💾 [${callId}] Target note:`, {
+          id: note.id,
+          title: note.title,
+        });
+
+        // Check if content has actually changed before saving
+        const hasContentChanged =
+          selectedNote.content !== selectedNote.originalContent ||
+          selectedNote.markdown !== selectedNote.originalMarkdown;
+
+        console.log(`🔍 [${callId}] Content change check:`, {
+          hasContentChanged,
+          currentContentLength: selectedNote.content?.length || 0,
+          originalContentLength: selectedNote.originalContent?.length || 0,
+          currentMarkdownLength: selectedNote.markdown?.length || 0,
+          originalMarkdownLength: selectedNote.originalMarkdown?.length || 0,
+        });
+
+        // Only save if content has actually changed
+        if (hasContentChanged) {
+          console.log(`💾 [${callId}] Content changed - saving note`);
+          // Use saveNoteWithoutStateUpdate to avoid intermediate state updates
+          await saveNoteWithoutStateUpdate(
+            selectedNote,
+            selectedNote.content,
+            selectedNote.markdown
+          );
+          console.log(`✅ [${callId}] Current note content saved successfully`);
+        } else {
+          console.log(
+            `⏭️ [${callId}] No content changes detected - skipping save`
+          );
+        }
+
+        // Small delay to ensure save completes (if it happened)
+        if (hasContentChanged) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+
+        // Create focus switch version checkpoint (with reduced frequency) - only if content changed
+        if (hasContentChanged) {
+          console.log(
+            `🔄 [${callId}] Creating focus switch version for:`,
+            selectedNote.title
+          );
+          await fetch(
+            `${backendUrl}/api/${user.id}/notes/${selectedNote.id}/version-checkpoint`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+          console.log(`✅ [${callId}] Focus switch version created`);
+        } else {
+          console.log(
+            `⏭️ [${callId}] Skipping version creation - no content changes`
+          );
+        }
       } catch (error) {
         console.warn(
-          "Failed to save current note or create focus switch version:",
+          `⚠️ [${callId}] Failed to save current note or create focus switch version:`,
           error
         );
         // Don't block note switching if save/version creation fails
@@ -1220,23 +1376,63 @@ const NoetTipTapApp = () => {
 
     try {
       // Fetch the full note content with error recovery
-      const response = await fetch(
-        `${backendUrl}/api/${user.id}/notes/${note.id}`
-      );
+      const apiUrl = `${backendUrl}/api/${user.id}/notes/${note.id}`;
+      console.log(`📡 [${callId}] Fetching note from:`, apiUrl);
+      console.log(`📡 [${callId}] Expected note ID:`, note.id);
+
+      const response = await fetch(apiUrl);
       if (!response.ok)
         throw new Error(`Failed to load note content: ${response.status}`);
 
       const fullNote = await response.json();
+      console.log(`📡 [${callId}] API Response:`, {
+        returnedNoteId: fullNote?.id,
+        returnedNoteTitle: fullNote?.title,
+        expectedNoteId: note.id,
+        expectedNoteTitle: note.title,
+        idsMatch: fullNote?.id === note.id,
+      });
 
       // Validate the response
       if (!validateNote(fullNote)) {
         throw new Error("Invalid note data received from server");
       }
 
-      console.log("✅ Loaded full note content for:", fullNote.title);
-      setSelectedNote(fullNote);
+      // Check if we got the wrong note
+      if (fullNote.id !== note.id) {
+        console.error(`❌ [${callId}] API returned wrong note!`, {
+          requested: { id: note.id, title: note.title },
+          received: { id: fullNote.id, title: fullNote.title },
+        });
+        // Don't update state with wrong note
+        return;
+      }
+
+      console.log(
+        `✅ [${callId}] Loaded full note content for:`,
+        fullNote.title
+      );
+
+      // Clear version preview state when switching notes - do this AFTER loading the new note
+      // to avoid unnecessary state updates that cause flashing
+      const noteToSet = selectedNote?.tempVersionPreview
+        ? { ...fullNote, tempVersionPreview: false, previewingVersion: null }
+        : fullNote;
+
+      // Track original content for change detection
+      noteToSet.originalContent = fullNote.content;
+      noteToSet.originalMarkdown = fullNote.markdown;
+
+      console.log(`🎯 [${callId}] Setting selected note to:`, {
+        id: noteToSet.id,
+        title: noteToSet.title,
+        hasOriginalContent: !!noteToSet.originalContent,
+        hasOriginalMarkdown: !!noteToSet.originalMarkdown,
+      });
+
+      setSelectedNote(noteToSet);
     } catch (error) {
-      console.error("Error loading note content:", error);
+      console.error(`❌ [${callId}] Error loading note content:`, error);
 
       // Use error recovery service
       const recoveryResult = await errorRecoveryService.handleError(error, {
@@ -1256,13 +1452,55 @@ const NoetTipTapApp = () => {
 
       if (recoveryResult.success) {
         if (validateNote(recoveryResult.result)) {
-          setSelectedNote(recoveryResult.result);
+          // Clear version preview state if needed
+          const noteToSet = selectedNote?.tempVersionPreview
+            ? {
+                ...recoveryResult.result,
+                tempVersionPreview: false,
+                previewingVersion: null,
+              }
+            : recoveryResult.result;
+
+          // Track original content for change detection
+          noteToSet.originalContent = recoveryResult.result.content;
+          noteToSet.originalMarkdown = recoveryResult.result.markdown;
+
+          console.log(`🎯 [${callId}] Setting selected note to (recovery):`, {
+            id: noteToSet.id,
+            title: noteToSet.title,
+            hasOriginalContent: !!noteToSet.originalContent,
+            hasOriginalMarkdown: !!noteToSet.originalMarkdown,
+          });
+          setSelectedNote(noteToSet);
         } else {
-          setSelectedNote(note); // Fallback to note without content
+          console.log(`🎯 [${callId}] Setting selected note to (fallback):`, {
+            id: note.id,
+            title: note.title,
+          });
+          // For fallback without content, set original content to empty
+          const noteToSet = {
+            ...note,
+            originalContent: "",
+            originalMarkdown: "",
+          };
+          setSelectedNote(noteToSet); // Fallback to note without content
         }
       } else {
         // Fallback to the note without content
-        setSelectedNote(note);
+        console.log(
+          `🎯 [${callId}] Setting selected note to (final fallback):`,
+          {
+            id: note.id,
+            title: note.title,
+          }
+        );
+        // For fallback without content, set original content to empty
+        const noteToSet = {
+          ...note,
+          originalContent: "",
+          originalMarkdown: "",
+        };
+        setSelectedNote(noteToSet);
       }
     }
   };
@@ -1638,6 +1876,15 @@ const NoetTipTapApp = () => {
             folders={folders}
             tags={tags}
             className="w-96"
+            selectedNotes={selectedNotes}
+            onSelectedNotesChange={setSelectedNotes}
+            onBulkTagAction={handleBulkTagAction}
+            onBulkExport={handleBulkExport}
+            onBulkDelete={handleBulkDelete}
+            onBulkUndo={handleBulkUndo}
+            isProcessing={isProcessing}
+            processingStatus={processingStatus}
+            deletedNotes={deletedNotes}
           />
         </RobustErrorBoundary>
 
@@ -1723,6 +1970,8 @@ const NoetTipTapApp = () => {
             onImportComplete={() => {
               setShowEvernoteImport(false);
               loadNotes(); // Refresh notes after import
+              loadNotebooks(); // Refresh notebooks after import
+              loadTags(); // Refresh tags after import
             }}
           />
         )}

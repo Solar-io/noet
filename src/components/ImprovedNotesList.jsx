@@ -37,6 +37,8 @@ import {
   RefreshCw,
 } from "lucide-react";
 import configService from "../configService.js";
+import TagManagementDialog from "./TagManagementDialog.jsx";
+import BulkActionsBar from "./BulkActionsBar.jsx";
 
 const ImprovedNotesList = ({
   notes = [],
@@ -55,6 +57,15 @@ const ImprovedNotesList = ({
   folders = [],
   tags = [],
   className = "",
+  selectedNotes = new Set(),
+  onSelectedNotesChange,
+  onBulkTagAction,
+  onBulkExport,
+  onBulkDelete,
+  onBulkUndo,
+  isProcessing = false,
+  processingStatus = null,
+  deletedNotes = [],
 }) => {
   const [backendUrl, setBackendUrl] = useState("");
   const [viewMode, setViewMode] = useState("list");
@@ -67,6 +78,7 @@ const ImprovedNotesList = ({
   const [availableTags, setAvailableTags] = useState([]);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [selectedTagFilters, setSelectedTagFilters] = useState([]);
+  const [lastSelectedIndex, setLastSelectedIndex] = useState(-1);
 
   // Use ref to avoid circular dependencies in useCallback
   const notesRef = useRef(notes);
@@ -84,7 +96,12 @@ const ImprovedNotesList = ({
           setAvailableTags(tagsData);
         }
       } catch (error) {
-        console.error("Error loading tags:", error);
+        // Handle network errors more gracefully during startup
+        if (error.message.includes("Failed to fetch")) {
+          console.log("ℹ️ Tags loading failed (network) in NotesList");
+        } else {
+          console.error("Error loading tags:", error.message);
+        }
       }
     };
 
@@ -466,9 +483,11 @@ const ImprovedNotesList = ({
         position
       );
 
-      // Update visual feedback
-      setDragOverNote(targetNote.id);
-      setDragOverPosition(position);
+      // Update visual feedback only if changed to prevent flicker
+      if (dragOverNote !== targetNote.id || dragOverPosition !== position) {
+        setDragOverNote(targetNote.id);
+        setDragOverPosition(position);
+      }
     } catch (error) {
       console.warn("Error in drag over handler:", error);
       // Still show visual feedback
@@ -487,8 +506,11 @@ const ImprovedNotesList = ({
 
     if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
       console.log("🚪 Drag leave - clearing state");
-      setDragOverNote(null);
-      setDragOverPosition(null);
+      // Add a small delay to prevent flickering when moving between drop zones
+      setTimeout(() => {
+        setDragOverNote(null);
+        setDragOverPosition(null);
+      }, 50);
     }
   };
 
@@ -619,76 +641,339 @@ const ImprovedNotesList = ({
   };
 
   // Filter and sort notes
-  const filteredAndSortedNotes = notes
-    .filter((note) => {
-      // Search query filter
-      if (searchQuery) {
-        const searchLower = searchQuery.toLowerCase();
-        const titleMatch = note.title.toLowerCase().includes(searchLower);
-        const contentMatch = note.content?.toLowerCase().includes(searchLower);
-
-        if (!titleMatch && !contentMatch) {
-          return false;
-        }
+  const filteredAndSortedNotes = React.useMemo(() => {
+    let filtered = notes.filter((note) => {
+      // Skip deleted notes in regular views
+      if (currentView !== "trash" && note.deleted) {
+        return false;
       }
 
-      // Multi-tag filter (independent of view)
-      if (selectedTagFilters.length > 0) {
-        const hasAllSelectedTags = selectedTagFilters.every((selectedTagId) =>
-          note.tags?.includes(selectedTagId)
-        );
-        if (!hasAllSelectedTags) {
-          return false;
-        }
-      }
-
-      // View-based filters
+      // Apply view-specific filters
       switch (currentView) {
+        case "all":
+          return !note.deleted && !note.archived;
+        case "recent":
+          return (
+            !note.deleted &&
+            !note.archived &&
+            new Date(note.updated) >
+              new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+          );
         case "starred":
-          return note.starred === true;
+          return !note.deleted && note.starred;
         case "archived":
-          return note.archived === true;
+          return !note.deleted && note.archived;
         case "trash":
           return note.deleted === true;
-        case "recent":
-          const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-          return new Date(note.updated) > weekAgo;
         case "notebook":
-          return note.notebook === currentViewParams?.notebookId;
+          return (
+            !note.deleted &&
+            !note.archived &&
+            note.notebook === currentViewParams?.notebookId
+          );
         case "folder":
-          return note.folder === currentViewParams?.folderId;
+          return (
+            !note.deleted &&
+            !note.archived &&
+            note.folder === currentViewParams?.folderId
+          );
         case "tag":
-          return note.tags?.includes(currentViewParams?.tagId);
-        case "all":
+          return (
+            !note.deleted &&
+            !note.archived &&
+            note.tags &&
+            (note.tags.includes(currentViewParams?.tagId) ||
+              note.tags.includes(currentViewParams?.tagName))
+          );
         default:
           return !note.deleted && !note.archived;
       }
-    })
-    .sort((a, b) => {
-      let aVal, bVal;
+    });
+
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (note) =>
+          note.title?.toLowerCase().includes(query) ||
+          note.content?.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply tag filters
+    if (selectedTagFilters.length > 0) {
+      filtered = filtered.filter((note) => {
+        if (!note.tags || note.tags.length === 0) return false;
+        return selectedTagFilters.some((tagId) => {
+          return note.tags.some((noteTag) => {
+            if (typeof noteTag === "string") {
+              const tag = availableTags.find(
+                (t) => t.id === tagId || t.name === tagId
+              );
+              return tag && (noteTag === tag.name || noteTag === tag.id);
+            }
+            return noteTag === tagId;
+          });
+        });
+      });
+    }
+
+    // Sort notes
+    filtered.sort((a, b) => {
+      let comparison = 0;
 
       switch (sortBy) {
         case "title":
-          aVal = a.title.toLowerCase();
-          bVal = b.title.toLowerCase();
+          comparison = (a.title || "Untitled").localeCompare(
+            b.title || "Untitled"
+          );
           break;
         case "created":
-          aVal = new Date(a.created);
-          bVal = new Date(b.created);
+          comparison = new Date(a.created) - new Date(b.created);
           break;
         case "updated":
         default:
-          aVal = new Date(a.updated);
-          bVal = new Date(b.updated);
+          comparison = new Date(a.updated) - new Date(b.updated);
           break;
       }
 
-      if (sortOrder === "asc") {
-        return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
-      } else {
-        return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
-      }
+      return sortOrder === "asc" ? comparison : -comparison;
     });
+
+    return filtered;
+  }, [
+    notes,
+    searchQuery,
+    currentView,
+    currentViewParams,
+    sortBy,
+    sortOrder,
+    selectedTagFilters,
+    availableTags,
+  ]);
+
+  // Enhanced note selection with Cmd/Ctrl+click and Shift+click
+  const handleNoteSelect = (note, event) => {
+    if (event?.ctrlKey || event?.metaKey) {
+      // Cmd/Ctrl+click: Toggle selection
+      event.preventDefault();
+
+      // If this is the currently selected note and it's not in selectedNotes, add it
+      if (selectedNote?.id === note.id && !selectedNotes.has(note.id)) {
+        const newSet = new Set(selectedNotes);
+        newSet.add(note.id);
+        onSelectedNotesChange(newSet);
+      } else {
+        handleBulkSelect(note.id);
+      }
+    } else if (event?.shiftKey) {
+      // Shift+click: Range selection
+      event.preventDefault();
+      handleRangeSelect(note.id, event);
+    } else {
+      // Regular click: Select note and clear bulk selection
+      onSelectNote(note);
+      if (onSelectedNotesChange) {
+        onSelectedNotesChange(new Set());
+      }
+      // Reset lastSelectedIndex only when clearing multi-selection
+      setLastSelectedIndex(-1);
+    }
+  };
+
+  const handleBulkSelect = (noteId) => {
+    console.log("🎯 Bulk select called:", {
+      noteId,
+      currentSelection: Array.from(selectedNotes),
+    });
+
+    const noteIndex = filteredAndSortedNotes.findIndex(
+      (note) => note.id === noteId
+    );
+
+    if (onSelectedNotesChange) {
+      const newSet = new Set(selectedNotes);
+      if (newSet.has(noteId)) {
+        console.log("➖ Removing from selection:", noteId);
+        newSet.delete(noteId);
+      } else {
+        console.log("➕ Adding to selection:", noteId);
+        newSet.add(noteId);
+      }
+      console.log("📊 New selection:", Array.from(newSet));
+      onSelectedNotesChange(newSet);
+    }
+
+    setLastSelectedIndex(noteIndex);
+  };
+
+  const handleRangeSelect = (noteId, event) => {
+    console.log("🔄 Range select called:", {
+      noteId,
+      lastSelectedIndex,
+      selectedNotesSize: selectedNotes.size,
+    });
+
+    // Prevent text selection
+    if (event) {
+      event.preventDefault();
+      if (window.getSelection) {
+        window.getSelection().removeAllRanges();
+      }
+    }
+
+    const currentIndex = filteredAndSortedNotes.findIndex(
+      (note) => note.id === noteId
+    );
+
+    console.log(
+      "📍 Current index:",
+      currentIndex,
+      "for note:",
+      filteredAndSortedNotes[currentIndex]?.title
+    );
+
+    // If no previous multi-selection, but there's a currently selected note,
+    // create range from currently selected note to shift-clicked note
+    if (selectedNotes.size === 0 && selectedNote) {
+      const selectedNoteIndex = filteredAndSortedNotes.findIndex(
+        (note) => note.id === selectedNote.id
+      );
+
+      if (selectedNoteIndex !== -1) {
+        console.log(
+          "🎯 Creating range from currently selected note:",
+          selectedNote.title
+        );
+        const start = Math.min(selectedNoteIndex, currentIndex);
+        const end = Math.max(selectedNoteIndex, currentIndex);
+
+        const rangeNotes = filteredAndSortedNotes.slice(start, end + 1);
+        console.log(
+          "📝 Notes in range:",
+          rangeNotes.map((n) => n.title)
+        );
+
+        const newSelectedNotes = new Set(rangeNotes.map((note) => note.id));
+
+        console.log("✅ New selection set size:", newSelectedNotes.size);
+
+        if (onSelectedNotesChange) {
+          onSelectedNotesChange(newSelectedNotes);
+        }
+        setLastSelectedIndex(currentIndex);
+        return;
+      }
+    }
+
+    if (lastSelectedIndex === -1 || selectedNotes.size === 0) {
+      // No previous selection, just select current
+      console.log("🎯 No previous selection, selecting current note");
+      if (onSelectedNotesChange) {
+        onSelectedNotesChange(new Set([noteId]));
+      }
+      setLastSelectedIndex(currentIndex);
+      return;
+    }
+
+    // Select range from last selected to current
+    const start = Math.min(lastSelectedIndex, currentIndex);
+    const end = Math.max(lastSelectedIndex, currentIndex);
+
+    console.log("📊 Range selection:", {
+      start,
+      end,
+      lastSelectedIndex,
+      currentIndex,
+    });
+
+    const rangeNotes = filteredAndSortedNotes.slice(start, end + 1);
+    console.log(
+      "📝 Notes in range:",
+      rangeNotes.map((n) => n.title)
+    );
+
+    const newSelectedNotes = new Set(selectedNotes);
+
+    rangeNotes.forEach((note) => {
+      newSelectedNotes.add(note.id);
+    });
+
+    console.log("✅ New selection set size:", newSelectedNotes.size);
+
+    if (onSelectedNotesChange) {
+      onSelectedNotesChange(newSelectedNotes);
+    }
+
+    // Update the last selected index to the current one
+    setLastSelectedIndex(currentIndex);
+  };
+
+  const handleSelectAll = () => {
+    if (onSelectedNotesChange) {
+      if (selectedNotes.size === filteredAndSortedNotes.length) {
+        onSelectedNotesChange(new Set());
+        setLastSelectedIndex(-1);
+      } else {
+        onSelectedNotesChange(
+          new Set(filteredAndSortedNotes.map((note) => note.id))
+        );
+        setLastSelectedIndex(-1);
+      }
+    }
+  };
+
+  const handleDeselectAll = () => {
+    if (onSelectedNotesChange) {
+      onSelectedNotesChange(new Set());
+    }
+    setLastSelectedIndex(-1);
+  };
+
+  const handleClearSelection = () => {
+    if (onSelectedNotesChange) {
+      onSelectedNotesChange(new Set());
+    }
+    setLastSelectedIndex(-1);
+  };
+
+  // Keyboard shortcuts
+  const handleKeyDown = useCallback(
+    (event) => {
+      if (
+        event.target.tagName === "INPUT" ||
+        event.target.tagName === "TEXTAREA"
+      ) {
+        return; // Don't handle shortcuts when typing
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.key === "a") {
+        event.preventDefault();
+        handleSelectAll();
+      }
+    },
+    [filteredAndSortedNotes]
+  );
+
+  useEffect(() => {
+    const handleKeyDownListener = (event) => handleKeyDown(event);
+    document.addEventListener("keydown", handleKeyDownListener);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDownListener);
+    };
+  }, [handleKeyDown]);
+
+  // Reset selections when view changes
+  useEffect(() => {
+    console.log("🔄 Selection reset triggered by view change:", {
+      currentView,
+      currentViewParams,
+    });
+    if (onSelectedNotesChange) {
+      onSelectedNotesChange(new Set());
+    }
+    setLastSelectedIndex(-1);
+  }, [currentView, currentViewParams, onSelectedNotesChange]);
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -711,25 +996,26 @@ const ImprovedNotesList = ({
   };
 
   const renderNote = (note) => {
-    // Safety check for note object
-    if (!note || !note.id) {
-      console.error("renderNote called with invalid note:", note);
-      return null;
-    }
-
     const isEditing = editingNoteId === note.id;
     const isSelected = selectedNote?.id === note.id;
+    const isMultiSelected = selectedNotes.has(note.id);
     const isDragTarget = dragOverNote === note.id;
+    const isDragOverAbove = isDragTarget && dragOverPosition === "above";
+    const isDragOverBelow = isDragTarget && dragOverPosition === "below";
 
     return (
-      <div key={note.id} className="relative">
+      <div key={note.id} className="note-item-container relative">
         {/* Drop zone above */}
         <div
-          className={`h-2 transition-all ${
-            isDragTarget && dragOverPosition === "above"
-              ? "bg-blue-400 mx-2 rounded-full"
-              : "transparent"
+          className={`absolute top-0 left-0 right-0 transition-all duration-200 pointer-events-none ${
+            isDragOverAbove ? "h-0.5 bg-blue-500" : "h-0"
           }`}
+          style={{
+            transform: isDragOverAbove ? "translateY(-2px)" : "translateY(0)",
+          }}
+        />
+        <div
+          className="absolute top-0 left-0 right-0 h-2 opacity-0"
           onDragOver={(e) => handleDragOver(e, note, "above")}
           onDragLeave={handleDragLeave}
           onDrop={(e) => handleDrop(e, note, "above")}
@@ -737,7 +1023,11 @@ const ImprovedNotesList = ({
 
         <div
           className={`p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors ${
-            isSelected ? "bg-blue-50 border-l-4 border-l-blue-500" : ""
+            isMultiSelected ? "bg-blue-50 border-l-4 border-l-blue-500" : ""
+          } ${
+            isSelected && !isMultiSelected
+              ? "bg-blue-50 border-l-4 border-l-blue-500"
+              : ""
           } ${
             isDragTarget && !dragOverPosition
               ? "bg-green-50 border-l-4 border-l-green-500"
@@ -796,17 +1086,34 @@ const ImprovedNotesList = ({
               console.error("❌ Error handling category drop on note:", error);
             }
           }}
-          onClick={() => {
-            console.log("Note clicked:", note, "isEditing:", isEditing);
+          onClick={(e) => {
+            const clickId = Math.random().toString(36).substr(2, 9);
+            console.log(`🖱️ [${clickId}] Note clicked:`, {
+              noteId: note.id,
+              noteTitle: note.title,
+              isEditing: isEditing,
+              timestamp: new Date().toISOString(),
+            });
 
             if (!isEditing && validateNote(note)) {
-              console.log("Calling onSelectNote with valid note:", note);
-              onSelectNote(note);
+              console.log(
+                `✅ [${clickId}] Calling handleNoteSelect with valid note:`,
+                {
+                  noteId: note.id,
+                  noteTitle: note.title,
+                }
+              );
+              handleNoteSelect(note, e);
             } else if (!validateNote(note)) {
-              console.error("Cannot select note: invalid note object", note);
+              console.error(
+                `❌ [${clickId}] Cannot select note: invalid note object`,
+                note
+              );
               // Could show user notification here
             } else if (isEditing) {
-              console.log("Note click ignored - currently editing");
+              console.log(
+                `⏭️ [${clickId}] Note click ignored - currently editing`
+              );
             }
           }}
         >
@@ -906,10 +1213,6 @@ const ImprovedNotesList = ({
 
             {/* Actions */}
             <div className="flex items-center space-x-1 ml-2">
-              {note.archived && (
-                <Archive size={16} className="text-orange-500" />
-              )}
-
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -980,11 +1283,15 @@ const ImprovedNotesList = ({
 
         {/* Drop zone below */}
         <div
-          className={`h-2 transition-all ${
-            isDragTarget && dragOverPosition === "below"
-              ? "bg-blue-400 mx-2 rounded-full"
-              : "transparent"
+          className={`absolute bottom-0 left-0 right-0 transition-all duration-200 pointer-events-none ${
+            isDragOverBelow ? "h-0.5 bg-blue-500" : "h-0"
           }`}
+          style={{
+            transform: isDragOverBelow ? "translateY(2px)" : "translateY(0)",
+          }}
+        />
+        <div
+          className="absolute bottom-0 left-0 right-0 h-2 opacity-0"
           onDragOver={(e) => handleDragOver(e, note, "below")}
           onDragLeave={handleDragLeave}
           onDrop={(e) => handleDrop(e, note, "below")}
@@ -1231,6 +1538,22 @@ const ImprovedNotesList = ({
           </div>
         )}
       </div>
+
+      {/* Bulk Actions Bar */}
+      <BulkActionsBar
+        selectedNotes={Array.from(selectedNotes)}
+        totalNotes={filteredAndSortedNotes.length}
+        onSelectAll={handleSelectAll}
+        onDeselectAll={handleDeselectAll}
+        onClearSelection={handleClearSelection}
+        onBulkTagAction={onBulkTagAction}
+        onBulkExport={onBulkExport}
+        onBulkDelete={onBulkDelete}
+        onBulkUndo={onBulkUndo}
+        isProcessing={isProcessing}
+        processingStatus={processingStatus}
+        deletedNotes={deletedNotes}
+      />
     </div>
   );
 };

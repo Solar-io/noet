@@ -64,6 +64,66 @@ const turndownService = new TurndownService({
 });
 turndownService.use(gfm);
 
+// Custom ListItem extension to prevent paragraph wrapping (fixes double-line issue)
+const CustomListItem = ListItem.extend({
+  name: "listItem",
+  content: "inline*",
+
+  parseHTML() {
+    return [
+      {
+        tag: "li",
+        // Only match li elements that are NOT task items
+        getAttrs: (node) => {
+          if (
+            node.hasAttribute("data-type") &&
+            node.getAttribute("data-type") === "taskItem"
+          ) {
+            return false; // Don't match task items
+          }
+          if (node.hasAttribute("data-checked")) {
+            return false; // Don't match task items
+          }
+          if (node.classList.contains("task-item")) {
+            return false; // Don't match task items
+          }
+          return {}; // Match regular list items
+        },
+      },
+    ];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ["li", HTMLAttributes, 0];
+  },
+
+  addKeyboardShortcuts() {
+    return {
+      Enter: () => {
+        // Handle Enter key in lists properly
+        if (this.editor.isActive("listItem")) {
+          return this.editor.commands.splitListItem("listItem");
+        }
+        return false;
+      },
+      Tab: () => {
+        // Handle Tab for nesting lists
+        if (this.editor.isActive("listItem")) {
+          return this.editor.commands.sinkListItem("listItem");
+        }
+        return false;
+      },
+      "Shift-Tab": () => {
+        // Handle Shift-Tab for lifting lists
+        if (this.editor.isActive("listItem")) {
+          return this.editor.commands.liftListItem("listItem");
+        }
+        return false;
+      },
+    };
+  },
+});
+
 // TipTap Editor Component
 const TipTapEditor = ({
   note,
@@ -129,6 +189,15 @@ const TipTapEditor = ({
         const response = await fetch(
           `${backendUrl}/api/admin/config/auto-save`
         );
+
+        // Handle 401 Unauthorized - use defaults (expected for non-admin users)
+        if (response.status === 401) {
+          console.log(
+            "ℹ️ Auto-save config requires admin access, using defaults"
+          );
+          return;
+        }
+
         if (response.ok) {
           const config = await response.json();
           setAutoSaveConfig({
@@ -136,12 +205,25 @@ const TipTapEditor = ({
             minChangePercentage: config.minChangePercentage || 5,
           });
           console.log("📋 Loaded auto-save config:", config);
+        } else {
+          console.warn(
+            "⚠️ Failed to load auto-save config:",
+            response.status,
+            response.statusText
+          );
         }
       } catch (error) {
-        console.warn(
-          "⚠️ Failed to load auto-save config, using defaults:",
-          error
-        );
+        // Network errors are common during app startup - use defaults silently
+        if (error.message.includes("Failed to fetch")) {
+          console.log(
+            "ℹ️ Auto-save config unavailable (network), using defaults"
+          );
+        } else {
+          console.warn(
+            "⚠️ Failed to load auto-save config, using defaults:",
+            error.message
+          );
+        }
       }
     };
     loadAutoSaveConfig();
@@ -255,12 +337,17 @@ const TipTapEditor = ({
           depth: 100,
         },
       }),
+      // List extensions - ORDER MATTERS! Put regular lists before task lists
       BulletList.configure({
+        keepMarks: true,
+        keepAttributes: false,
         HTMLAttributes: {
           class: "bullet-list",
         },
       }),
       OrderedList.configure({
+        keepMarks: true,
+        keepAttributes: false,
         HTMLAttributes: {
           class: "ordered-list",
         },
@@ -270,10 +357,12 @@ const TipTapEditor = ({
           class: "list-item",
         },
       }),
+      // Task list extensions AFTER regular lists
       TaskList.configure({
         HTMLAttributes: {
           class: "task-list",
         },
+        itemTypeName: "taskItem", // Ensure it uses the correct item type
       }),
       TaskItem.configure({
         nested: true,
@@ -348,6 +437,81 @@ const TipTapEditor = ({
     onUpdate: ({ editor }) => {
       const html = editor.getHTML();
       const markdown = turndownService.turndown(html);
+
+      // Debug: Check for double-line list issues
+      const listItems = editor.view.dom.querySelectorAll("li");
+      const problematicItems = Array.from(listItems).filter((li) => {
+        const paragraphs = li.querySelectorAll("p");
+        return (
+          paragraphs.length > 1 ||
+          (paragraphs.length === 1 && paragraphs[0].parentNode === li)
+        );
+      });
+
+      if (problematicItems.length > 0) {
+        console.warn(
+          "🚨 Found list items with paragraph wrapping:",
+          problematicItems.length
+        );
+        problematicItems.forEach((item, index) => {
+          console.warn(`Item ${index + 1}:`, item.innerHTML);
+        });
+      } else {
+        console.log(
+          "✅ All list items are properly formatted (no double-line issues)"
+        );
+      }
+
+      // Debug: Check list structure and CSS classes
+      const bulletLists = editor.view.dom.querySelectorAll("ul");
+      const numberedLists = editor.view.dom.querySelectorAll("ol");
+
+      if (bulletLists.length > 0) {
+        console.log("🔍 Bullet lists found:", bulletLists.length);
+        bulletLists.forEach((list, index) => {
+          console.log(`Bullet list ${index + 1}:`, {
+            classList: Array.from(list.classList),
+            style: list.style.cssText,
+            computedStyle: window.getComputedStyle(list).listStyleType,
+            innerHTML: list.innerHTML,
+            dataType: list.getAttribute("data-type"),
+            isTaskList: list.getAttribute("data-type") === "taskList",
+            listItems: Array.from(list.querySelectorAll("li")).map((li) => ({
+              className: li.className,
+              dataType: li.getAttribute("data-type"),
+              dataChecked: li.getAttribute("data-checked"),
+              hasCheckbox: li.querySelector('input[type="checkbox"]') !== null,
+              isTaskItem:
+                li.classList.contains("task-item") ||
+                li.getAttribute("data-type") === "taskItem",
+            })),
+          });
+        });
+      }
+
+      if (numberedLists.length > 0) {
+        console.log("🔍 Numbered lists found:", numberedLists.length);
+        numberedLists.forEach((list, index) => {
+          console.log(`Numbered list ${index + 1}:`, {
+            classList: Array.from(list.classList),
+            style: list.style.cssText,
+            computedStyle: window.getComputedStyle(list).listStyleType,
+            innerHTML: list.innerHTML,
+            dataType: list.getAttribute("data-type"),
+            isTaskList: list.getAttribute("data-type") === "taskList",
+            listItems: Array.from(list.querySelectorAll("li")).map((li) => ({
+              className: li.className,
+              dataType: li.getAttribute("data-type"),
+              dataChecked: li.getAttribute("data-checked"),
+              hasCheckbox: li.querySelector('input[type="checkbox"]') !== null,
+              isTaskItem:
+                li.classList.contains("task-item") ||
+                li.getAttribute("data-type") === "taskItem",
+            })),
+          });
+        });
+      }
+
       onContentChange?.(note, html, markdown);
       triggerAutoSave(); // Trigger auto-save on content change
     },
@@ -500,12 +664,16 @@ const TipTapEditor = ({
         // Force clear and set content for version switches to ensure update
         if (isVersionSwitch) {
           console.log("🔄 Force updating TipTap content for version switch");
-          editor.commands.clearContent();
-          // Use a small delay to ensure the clear takes effect
-          setTimeout(() => {
-            editor.commands.setContent(newContent);
-            editor.commands.focus();
-          }, 10);
+          // Destroy and recreate the editor content to ensure a clean update
+          editor.commands.clearContent(false);
+          // Use requestAnimationFrame to ensure DOM update
+          requestAnimationFrame(() => {
+            editor.commands.setContent(newContent, false, {
+              preserveWhitespace: true,
+            });
+            editor.commands.focus("end");
+            console.log("✅ Version content set successfully");
+          });
         } else {
           editor.commands.setContent(newContent);
         }
@@ -520,7 +688,13 @@ const TipTapEditor = ({
     } else {
       console.log("⚠️ TipTap useEffect - missing editor, note, or note.id");
     }
-  }, [editor, note?.id, note?.tempVersionPreview]); // REMOVED note?.content to prevent updates during typing!
+  }, [
+    editor,
+    note?.id,
+    note?.tempVersionPreview,
+    note?.previewingVersion,
+    note?.content,
+  ]); // Added note?.previewingVersion and note?.content for version switches
 
   // Cleanup auto-save timeout on unmount and add beforeunload protection
   useEffect(() => {
@@ -581,14 +755,462 @@ const TipTapEditor = ({
     };
   }, [note, editor, userId]); // Dependencies needed for beforeunload handler
 
+  // Debug helper - log editor state and create global test function
+  useEffect(() => {
+    if (editor) {
+      // Log editor state when trying to create lists
+      const logEditorState = () => {
+        console.log("🔍 Editor state:", {
+          isEmpty: editor.isEmpty,
+          isActive: {
+            bulletList: editor.isActive("bulletList"),
+            orderedList: editor.isActive("orderedList"),
+            taskList: editor.isActive("taskList"),
+            listItem: editor.isActive("listItem"),
+          },
+          selection: editor.state.selection,
+          content: editor.getHTML(),
+        });
+      };
+
+      // Create global test function for browser console debugging
+      window.testListRendering = () => {
+        console.log("🧪 Testing list rendering...");
+        logEditorState();
+
+        // Test bullet list creation
+        console.log("🔘 Testing bullet list creation...");
+        const bulletResult = editor
+          .chain()
+          .focus()
+          .insertContent({
+            type: "bulletList",
+            content: [
+              {
+                type: "listItem",
+                content: [
+                  {
+                    type: "paragraph",
+                    content: [{ type: "text", text: "Test bullet item" }],
+                  },
+                ],
+              },
+            ],
+          })
+          .run();
+        console.log("🔘 Bullet list creation result:", bulletResult);
+
+        setTimeout(() => {
+          console.log("🔘 After bullet list creation:");
+          logEditorState();
+
+          // Test task list creation
+          console.log("☑️ Testing task list creation...");
+          const taskResult = editor
+            .chain()
+            .focus()
+            .insertContent({
+              type: "taskList",
+              content: [
+                {
+                  type: "taskItem",
+                  attrs: {
+                    checked: false,
+                  },
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: "Test task item" }],
+                    },
+                  ],
+                },
+              ],
+            })
+            .run();
+          console.log("☑️ Task list creation result:", taskResult);
+
+          setTimeout(() => {
+            console.log("☑️ After task list creation:");
+            logEditorState();
+          }, 100);
+        }, 100);
+      };
+
+      // Notify about global test function
+      console.log(
+        "🔧 TipTap Editor Debug: Use `window.testListRendering()` in console to test list creation"
+      );
+
+      // Log state after each update
+      editor.on("update", logEditorState);
+
+      return () => {
+        editor.off("update", logEditorState);
+        // Clean up global function
+        if (window.testListRendering) {
+          delete window.testListRendering;
+        }
+      };
+    }
+  }, [editor]);
+
+  // Helper function to validate list creation
+  const validateListCreation = (listType) => {
+    if (!editor) return false;
+
+    // Check if TipTap thinks the list is active
+    const isActive = editor.isActive(listType);
+
+    // Check if the list actually exists in the DOM
+    let listTag, domLists;
+    if (listType === "bulletList") {
+      listTag = "ul";
+      domLists = editor.view.dom.querySelectorAll(
+        "ul:not([data-type='taskList'])"
+      );
+    } else if (listType === "orderedList") {
+      listTag = "ol";
+      domLists = editor.view.dom.querySelectorAll(
+        "ol:not([data-type='taskList'])"
+      );
+    } else if (listType === "taskList") {
+      listTag = "ul[data-type='taskList']";
+      domLists = editor.view.dom.querySelectorAll("ul[data-type='taskList']");
+    }
+
+    const hasDomList = domLists.length > 0;
+
+    console.log(`🔍 Validating ${listType} creation:`, {
+      isActive,
+      hasDomList,
+      domListCount: domLists.length,
+      listTag,
+    });
+
+    return isActive && hasDomList;
+  };
+
+  // Helper function to create a list when toggle fails
+  const forceCreateList = (listType) => {
+    if (!editor) return false;
+
+    console.log(`🔧 Force creating ${listType} list`);
+
+    try {
+      // Clear selection and focus
+      editor.commands.focus();
+
+      // Insert a new paragraph if editor is empty
+      if (editor.isEmpty) {
+        editor.commands.insertContent("<p></p>");
+      }
+
+      // Build the content structure based on list type
+      let contentStructure;
+      if (listType === "taskList") {
+        contentStructure = {
+          type: "taskList",
+          content: [
+            {
+              type: "taskItem",
+              attrs: {
+                checked: false,
+              },
+              content: [
+                {
+                  type: "paragraph",
+                  content: [],
+                },
+              ],
+            },
+          ],
+        };
+      } else {
+        contentStructure = {
+          type: listType,
+          content: [
+            {
+              type: "listItem",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [],
+                },
+              ],
+            },
+          ],
+        };
+      }
+
+      // Insert the list structure
+      const result = editor
+        .chain()
+        .focus()
+        .insertContent(contentStructure)
+        .run();
+
+      console.log(`🔧 Force create ${listType} result:`, result);
+
+      // Validate the creation
+      setTimeout(() => {
+        const isValid = validateListCreation(listType);
+        console.log(`🔧 Force create ${listType} validation:`, isValid);
+      }, 100);
+
+      return result;
+    } catch (error) {
+      console.error(`❌ Failed to force create ${listType}:`, error);
+      return false;
+    }
+  };
+
   // Toolbar actions
   const toggleBold = () => editor?.chain().focus().toggleBold().run();
   const toggleItalic = () => editor?.chain().focus().toggleItalic().run();
-  const toggleBulletList = () =>
-    editor?.chain().focus().toggleBulletList().run();
-  const toggleOrderedList = () =>
-    editor?.chain().focus().toggleOrderedList().run();
-  const toggleTaskList = () => editor?.chain().focus().toggleTaskList().run();
+  const toggleBulletList = () => {
+    console.log("🔘 toggleBulletList clicked", {
+      isActive: editor?.isActive("bulletList"),
+      isTaskList: editor?.isActive("taskList"),
+      selection: editor?.state.selection,
+      isEmpty: editor?.isEmpty,
+    });
+
+    if (!editor) return;
+
+    const { selection } = editor.state;
+    const { $from, $to } = selection;
+
+    // Check if we're already in a list
+    if (editor.isActive("bulletList")) {
+      console.log("🔘 Already in bullet list, lifting item");
+      const result = editor.chain().focus().liftListItem("listItem").run();
+      console.log("🔘 Lift result:", result);
+      return;
+    }
+
+    // Get selected text or use empty string
+    const text = editor.state.doc.textBetween($from.pos, $to.pos, " ");
+    console.log("🔘 Selected text:", text);
+
+    if (text.trim()) {
+      // If there's selected text, convert it to a list
+      console.log("🔘 Converting selected text to bullet list");
+      const result = editor.chain().focus().toggleBulletList().run();
+      console.log("🔘 Toggle result:", result);
+    } else {
+      // If no text selected, try standard toggle first
+      console.log("🔘 No text selected, trying standard toggle");
+      const result = editor.chain().focus().toggleBulletList().run();
+      console.log("🔘 Standard toggle result:", result);
+
+      // Check if list was created
+      setTimeout(() => {
+        if (!editor.isActive("bulletList")) {
+          console.log("🔘 Standard toggle failed, trying direct insertion");
+          // Try direct insertion first
+          const insertResult = editor
+            .chain()
+            .focus()
+            .insertContent({
+              type: "bulletList",
+              content: [
+                {
+                  type: "listItem",
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [],
+                    },
+                  ],
+                },
+              ],
+            })
+            .run();
+          console.log("🔘 Direct insertion result:", insertResult);
+
+          // If direct insertion also fails, try force create
+          if (!insertResult) {
+            console.log("🔘 Direct insertion failed, trying force create");
+            forceCreateList("bulletList");
+          }
+        }
+      }, 50);
+    }
+
+    // Check state after command
+    setTimeout(() => {
+      console.log("🔘 After toggleBulletList:", {
+        isBulletListActive: editor?.isActive("bulletList"),
+        isListItemActive: editor?.isActive("listItem"),
+        currentSelection: editor?.state.selection,
+        content: editor?.getHTML(),
+      });
+    }, 100);
+  };
+  const toggleOrderedList = () => {
+    console.log("🔢 toggleOrderedList clicked", {
+      isActive: editor?.isActive("orderedList"),
+      isTaskList: editor?.isActive("taskList"),
+      selection: editor?.state.selection,
+      isEmpty: editor?.isEmpty,
+    });
+
+    if (!editor) return;
+
+    const { selection } = editor.state;
+    const { $from, $to } = selection;
+
+    // Check if we're already in a list
+    if (editor.isActive("orderedList")) {
+      console.log("🔢 Already in ordered list, lifting item");
+      const result = editor.chain().focus().liftListItem("listItem").run();
+      console.log("🔢 Lift result:", result);
+      return;
+    }
+
+    // Get selected text or use empty string
+    const text = editor.state.doc.textBetween($from.pos, $to.pos, " ");
+    console.log("🔢 Selected text:", text);
+
+    if (text.trim()) {
+      // If there's selected text, convert it to a list
+      console.log("🔢 Converting selected text to ordered list");
+      const result = editor.chain().focus().toggleOrderedList().run();
+      console.log("🔢 Toggle result:", result);
+    } else {
+      // If no text selected, try standard toggle first
+      console.log("🔢 No text selected, trying standard toggle");
+      const result = editor.chain().focus().toggleOrderedList().run();
+      console.log("🔢 Standard toggle result:", result);
+
+      // Check if list was created
+      setTimeout(() => {
+        if (!editor.isActive("orderedList")) {
+          console.log("🔢 Standard toggle failed, trying direct insertion");
+          // Try direct insertion first
+          const insertResult = editor
+            .chain()
+            .focus()
+            .insertContent({
+              type: "orderedList",
+              content: [
+                {
+                  type: "listItem",
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [],
+                    },
+                  ],
+                },
+              ],
+            })
+            .run();
+          console.log("🔢 Direct insertion result:", insertResult);
+
+          // If direct insertion also fails, try force create
+          if (!insertResult) {
+            console.log("🔢 Direct insertion failed, trying force create");
+            forceCreateList("orderedList");
+          }
+        }
+      }, 50);
+    }
+
+    // Check state after command
+    setTimeout(() => {
+      console.log("🔢 After toggleOrderedList:", {
+        isOrderedListActive: editor?.isActive("orderedList"),
+        isListItemActive: editor?.isActive("listItem"),
+        currentSelection: editor?.state.selection,
+        content: editor?.getHTML(),
+      });
+    }, 100);
+  };
+  const toggleTaskList = () => {
+    console.log("☑️ toggleTaskList clicked", {
+      isActive: editor?.isActive("taskList"),
+      isBulletList: editor?.isActive("bulletList"),
+      isOrderedList: editor?.isActive("orderedList"),
+      selection: editor?.state.selection,
+      isEmpty: editor?.isEmpty,
+    });
+
+    if (!editor) return;
+
+    const { selection } = editor.state;
+    const { $from, $to } = selection;
+
+    // Check if we're already in a task list
+    if (editor.isActive("taskList")) {
+      console.log("☑️ Already in task list, lifting item");
+      const result = editor.chain().focus().liftListItem("taskItem").run();
+      console.log("☑️ Lift result:", result);
+      return;
+    }
+
+    // Get selected text or use empty string
+    const text = editor.state.doc.textBetween($from.pos, $to.pos, " ");
+    console.log("☑️ Selected text:", text);
+
+    if (text.trim()) {
+      // If there's selected text, convert it to a task list
+      console.log("☑️ Converting selected text to task list");
+      const result = editor.chain().focus().toggleTaskList().run();
+      console.log("☑️ Toggle result:", result);
+    } else {
+      // If no text selected, try standard toggle first
+      console.log("☑️ No text selected, trying standard toggle");
+      const result = editor.chain().focus().toggleTaskList().run();
+      console.log("☑️ Standard toggle result:", result);
+
+      // Check if list was created
+      setTimeout(() => {
+        if (!editor.isActive("taskList")) {
+          console.log("☑️ Standard toggle failed, trying direct insertion");
+          // Try direct insertion first
+          const insertResult = editor
+            .chain()
+            .focus()
+            .insertContent({
+              type: "taskList",
+              content: [
+                {
+                  type: "taskItem",
+                  attrs: {
+                    checked: false,
+                  },
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [],
+                    },
+                  ],
+                },
+              ],
+            })
+            .run();
+          console.log("☑️ Direct insertion result:", insertResult);
+
+          // If direct insertion also fails, try force create
+          if (!insertResult) {
+            console.log("☑️ Direct insertion failed, trying force create");
+            forceCreateList("taskList");
+          }
+        }
+      }, 50);
+    }
+
+    // Check state after command
+    setTimeout(() => {
+      console.log("☑️ After toggleTaskList:", {
+        isTaskListActive: editor?.isActive("taskList"),
+        isTaskItemActive: editor?.isActive("taskItem"),
+        currentSelection: editor?.state.selection,
+        content: editor?.getHTML(),
+      });
+    }, 100);
+  };
 
   // Advanced formatting actions
   const toggleStrike = () => editor?.chain().focus().toggleStrike().run();
@@ -626,6 +1248,21 @@ const TipTapEditor = ({
       editor?.chain().focus().unsetFontFamily().run();
     } else {
       editor?.chain().focus().setFontFamily(fontFamily).run();
+    }
+  };
+
+  // Font size action
+  const setFontSize = (fontSize) => {
+    if (!editor) return;
+
+    console.log("📏 Setting font size:", fontSize);
+
+    if (fontSize === "default") {
+      // Remove any font size styling
+      editor.chain().focus().unsetMark("textStyle").run();
+    } else {
+      // Apply font size using inline style
+      editor.chain().focus().setMark("textStyle", { fontSize }).run();
     }
   };
 
@@ -915,6 +1552,104 @@ const TipTapEditor = ({
     }
   };
 
+  // Add diagnostic function to global scope for testing
+  useEffect(() => {
+    window.testListRendering = () => {
+      if (!editor) {
+        console.error("❌ Editor not available");
+        return;
+      }
+
+      console.log("🧪 Testing list rendering...");
+
+      const testCases = [
+        {
+          name: "Bullet List",
+          content:
+            '<ul class="bullet-list list-disc"><li class="list-item">Item 1</li><li class="list-item">Item 2</li></ul>',
+          expectedLines: 2,
+        },
+        {
+          name: "Numbered List",
+          content:
+            '<ol class="ordered-list list-decimal"><li class="list-item">Item 1</li><li class="list-item">Item 2</li></ol>',
+          expectedLines: 2,
+        },
+        {
+          name: "Task List",
+          content:
+            '<ul data-type="taskList" class="task-list"><li data-type="taskItem" class="task-item" data-checked="false">Task 1</li><li data-type="taskItem" class="task-item" data-checked="false">Task 2</li></ul>',
+          expectedLines: 2,
+        },
+      ];
+
+      for (const test of testCases) {
+        console.log(`\n📝 Testing ${test.name}:`);
+
+        // Set test content
+        editor.commands.setContent(test.content);
+
+        // Check for issues
+        const listItems = editor.view.dom.querySelectorAll("li");
+        const actualLines = listItems.length;
+
+        console.log(
+          `Expected lines: ${test.expectedLines}, Actual lines: ${actualLines}`
+        );
+
+        if (actualLines !== test.expectedLines) {
+          console.error(
+            `❌ ${test.name} failed: Expected ${test.expectedLines} lines, got ${actualLines}`
+          );
+        } else {
+          console.log(`✅ ${test.name} passed`);
+        }
+
+        // Check for double paragraphs
+        const doubleParagraphs = Array.from(listItems).filter((li) => {
+          const paragraphs = li.querySelectorAll("p");
+          return paragraphs.length > 1;
+        });
+
+        if (doubleParagraphs.length > 0) {
+          console.error(
+            `❌ Found ${doubleParagraphs.length} list items with nested paragraphs!`
+          );
+          doubleParagraphs.forEach((li, index) => {
+            console.error(`Double paragraph ${index + 1}:`, li.innerHTML);
+          });
+        } else {
+          console.log(`✅ No nested paragraphs found`);
+        }
+
+        // Check for proper CSS classes
+        const hasProperClasses = Array.from(listItems).every((li) => {
+          return (
+            li.classList.contains("list-item") ||
+            li.classList.contains("task-item")
+          );
+        });
+
+        console.log(
+          `CSS classes: ${hasProperClasses ? "✅ Correct" : "❌ Missing"}`
+        );
+      }
+
+      console.log("\n🧪 List rendering test complete!");
+      console.log(
+        "💡 To test manually: Create lists using the toolbar buttons and check the console for warnings."
+      );
+    };
+
+    console.log(
+      "🔧 Diagnostic function added: Run window.testListRendering() to test list rendering"
+    );
+
+    return () => {
+      delete window.testListRendering;
+    };
+  }, [editor]);
+
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
@@ -987,6 +1722,26 @@ const TipTapEditor = ({
               <option value="'Comic Sans MS', cursive">Comic Sans</option>
               <option value="Impact, sans-serif">Impact</option>
               <option value="Verdana, sans-serif">Verdana</option>
+            </select>
+          </div>
+
+          {/* Font Size */}
+          <div className="border-r pr-2 mr-2">
+            <select
+              onChange={(e) => setFontSize(e.target.value)}
+              value={editor?.getAttributes("textStyle").fontSize || "default"}
+              className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              title="Font Size"
+            >
+              <option value="default">Default</option>
+              <option value="12px">Small (12px)</option>
+              <option value="14px">Medium (14px)</option>
+              <option value="16px">Normal (16px)</option>
+              <option value="18px">Large (18px)</option>
+              <option value="20px">X-Large (20px)</option>
+              <option value="24px">XX-Large (24px)</option>
+              <option value="28px">Huge (28px)</option>
+              <option value="32px">Giant (32px)</option>
             </select>
           </div>
 

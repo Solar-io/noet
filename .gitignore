@@ -47,3 +47,19 @@ temp/
 
 # User data - notes should not be in version control
 notes/
+server/notes/
+server/users.json
+users.json
+
+# Test data files (large files for testing)
+test-data/
+
+# Temporary import files
+server/.temp-imports/
+
+# User-specific data files
+server/*/
+!server/middleware/
+!server/routes/
+!server/tests/
+!server/utils/

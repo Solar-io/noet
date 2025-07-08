@@ -23,35 +23,86 @@ code {
   min-height: 200px;
 }
 
+/* Override Tailwind's list style reset for TipTap editor */
+.ProseMirror ul,
+.ProseMirror ol {
+  list-style: revert;
+  margin: revert;
+  padding: revert;
+}
+
+.ProseMirror li {
+  list-style: revert;
+  margin: revert;
+  padding: revert;
+}
+
 /* Ensure font-size styles are applied with high specificity */
 .ProseMirror
   span[style*="font-size"]:not(.task-item span):not(.list-item span) {
   line-height: 1;
 }
 
-/* List Styles */
-.ProseMirror ul.bullet-list {
-  list-style-type: disc;
-  margin-left: 1.5rem;
-  padding-left: 0;
+/* Fix for double-line lists - Remove extra paragraph spacing */
+.ProseMirror li > p {
+  margin: 0 !important;
+  display: inline;
 }
 
-.ProseMirror ol.ordered-list {
-  list-style-type: decimal;
-  margin-left: 1.5rem;
-  padding-left: 0;
+/* Specific styling for different list types */
+.ProseMirror ul.bullet-list,
+.ProseMirror ul:not(.task-list):not([data-type="taskList"]) {
+  list-style-type: disc !important;
+  padding-left: 1.5rem;
+  margin: 1em 0;
 }
 
-.ProseMirror li.list-item {
+.ProseMirror ol.ordered-list,
+.ProseMirror ol:not(.task-list):not([data-type="taskList"]) {
+  list-style-type: decimal !important;
+  padding-left: 1.5rem;
+  margin: 1em 0;
+}
+
+.ProseMirror li.list-item,
+.ProseMirror ul:not(.task-list):not([data-type="taskList"]) li,
+.ProseMirror ol:not(.task-list):not([data-type="taskList"]) li {
+  display: list-item !important;
+  list-style-position: outside;
   margin: 0.25rem 0;
-  padding-left: 0.5rem;
+  padding-left: 0;
 }
 
-/* Task List Styles */
-.ProseMirror ul.task-list {
-  list-style: none;
+/* Task List Styles (checkboxes) */
+.ProseMirror ul.task-list,
+.ProseMirror ul[data-type="taskList"] {
+  list-style: none !important;
   margin-left: 0;
   padding-left: 0;
+}
+
+.ProseMirror li.task-item,
+.ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  position: relative;
+  padding-left: 1.5rem;
+  margin: 0.25rem 0;
+}
+
+.ProseMirror ul[data-type="taskList"] li > label {
+  position: absolute;
+  left: 0;
+  top: 0.125rem;
+}
+
+.ProseMirror ul[data-type="taskList"] li > div {
+  flex: 1;
+}
+
+/* Ensure single line spacing for task items */
+.ProseMirror ul[data-type="taskList"] li p {
+  margin: 0;
 }
 
 .ProseMirror li.task-item {
@@ -101,65 +152,13 @@ code {
   ring-opacity: 0.5;
 }
 
-/* Enhanced checkbox styling for all inputs */
-input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  margin-right: 0.5rem;
-  flex-shrink: 0;
-  cursor: pointer;
-  border: 2px solid #d1d5db;
-  border-radius: 3px;
-  background-color: white;
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  transition: all 0.2s ease;
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  vertical-align: top;
-  line-height: 1;
-}
-
-input[type="checkbox"]:checked {
-  background-color: #3b82f6;
-  border-color: #3b82f6;
-  background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='m13.854 3.646-7.5 7.5a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6 10.293l7.146-7.147a.5.5 0 0 1 .708.708z'/%3e%3c/svg%3e");
-  background-size: 100% 100%;
-  background-position: center;
-  background-repeat: no-repeat;
-}
-
-input[type="checkbox"]:hover {
-  border-color: #9ca3af;
-}
-
-input[type="checkbox"]:focus {
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
-}
-
-input[type="checkbox"]:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* Label with checkbox alignment */
-label:has(input[type="checkbox"]) {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-}
-
-/* Ensure text aligns properly with checkbox */
-label:has(input[type="checkbox"]) > span,
-label:has(input[type="checkbox"]) > div {
-  display: flex;
-  align-items: center;
-  line-height: 1.5;
+/* Fix nested list spacing */
+.ProseMirror ul ul,
+.ProseMirror ul ol,
+.ProseMirror ol ul,
+.ProseMirror ol ol {
+  margin: 0.25rem 0;
+  padding-left: 1.5rem;
 }
 
 /* Nested lists */

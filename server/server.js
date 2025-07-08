@@ -8,7 +8,11 @@ import { dirname, join } from "path";
 import fs from "fs/promises";
 import fsSync from "fs";
 import { v4 as uuidv4 } from "uuid";
+import xml2js from "xml2js";
 import PortManager from "./portManager.js";
+import TurndownService from "turndown";
+import { Buffer } from "buffer";
+import { marked } from "marked";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -21,6 +25,80 @@ const HOST = portManager.getBackendHost();
 // Default notes storage path - can be configured via admin UI
 let NOTES_BASE_PATH = process.env.NOTES_PATH || join(process.cwd(), "notes");
 const USERS_FILE_PATH = join(process.cwd(), "users.json");
+
+// Initialize markdown converter
+const turndownService = new TurndownService({
+  headingStyle: "atx",
+  codeBlockStyle: "fenced",
+  bulletListMarker: "-",
+  br: "\n", // Handle line breaks properly
+});
+
+// Add custom rules for better conversion
+turndownService.addRule("strikethrough", {
+  filter: ["del", "s", "strike"],
+  replacement: function (content) {
+    return "~~" + content + "~~";
+  },
+});
+
+// Add rule to ensure proper paragraph spacing
+turndownService.addRule("paragraph", {
+  filter: "p",
+  replacement: function (content) {
+    return "\n\n" + content + "\n\n";
+  },
+});
+
+// Add rule to handle divs as paragraphs (common in Evernote)
+turndownService.addRule("div", {
+  filter: function (node) {
+    return node.nodeName === "DIV" && !node.querySelector("div");
+  },
+  replacement: function (content) {
+    // If the div contains text or inline elements, treat it as a paragraph
+    if (content.trim()) {
+      return "\n\n" + content + "\n\n";
+    }
+    return content;
+  },
+});
+
+// Add rule to handle line breaks
+turndownService.addRule("lineBreak", {
+  filter: "br",
+  replacement: function () {
+    return "  \n"; // Two spaces + newline for markdown line break
+  },
+});
+
+// Helper function to get file extension from mime type
+function getMimeExtension(mimeType) {
+  const mimeMap = {
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/png": "png",
+    "image/gif": "gif",
+    "image/webp": "webp",
+    "image/bmp": "bmp",
+    "image/tiff": "tiff",
+    "image/svg+xml": "svg",
+    "application/pdf": "pdf",
+    "application/msword": "doc",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+      "docx",
+    "application/vnd.ms-excel": "xls",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+    "application/vnd.ms-powerpoint": "ppt",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+      "pptx",
+    "text/plain": "txt",
+    "text/markdown": "md",
+    "application/zip": "zip",
+    "application/json": "json",
+  };
+  return mimeMap[mimeType] || "dat";
+}
 
 // User persistence functions
 async function saveUsers() {
@@ -364,6 +442,51 @@ const upload = multer({
       cb(null, true);
     } else {
       cb(new Error(`File type ${file.mimetype} not allowed`), false);
+    }
+  },
+});
+
+// Separate multer config for imports (no noteId required)
+const importStorage = multer.diskStorage({
+  destination: async (req, file, cb) => {
+    try {
+      const tempImportPath = join(NOTES_BASE_PATH, ".temp-imports");
+      await fs.mkdir(tempImportPath, { recursive: true });
+      cb(null, tempImportPath);
+    } catch (error) {
+      cb(error);
+    }
+  },
+  filename: (req, file, cb) => {
+    // Add timestamp to avoid conflicts
+    const timestamp = Date.now();
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_");
+    cb(null, `${timestamp}-${safeName}`);
+  },
+});
+
+const uploadImport = multer({
+  storage: importStorage,
+  limits: {
+    fileSize: 100 * 1024 * 1024, // 100MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Allow Evernote export files and other common formats
+    const allowedTypes = [
+      "text/xml",
+      "application/xml",
+      "application/octet-stream", // Some browsers send ENEX files as binary
+      "text/plain",
+    ];
+
+    // Also allow if filename ends with .enex
+    if (
+      allowedTypes.includes(file.mimetype) ||
+      file.originalname.toLowerCase().endsWith(".enex")
+    ) {
+      cb(null, true);
+    } else {
+      cb(new Error(`File type ${file.mimetype} not allowed for import`), false);
     }
   },
 });
@@ -1073,15 +1196,19 @@ app.get("/api/:userId/notes/:noteId", async (req, res) => {
     const { userId, noteId } = req.params;
 
     const metadata = await readMetadata(userId, noteId);
-    const content = await readNoteContent(userId, noteId);
+    const markdownContent = await readNoteContent(userId, noteId);
 
     if (!metadata) {
       return res.status(404).json({ error: "Note not found" });
     }
 
+    // Convert markdown to HTML for the frontend editor
+    const htmlContent = marked(markdownContent || "");
+
     res.json({
       ...metadata,
-      content,
+      content: htmlContent,
+      markdown: markdownContent,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1095,12 +1222,21 @@ app.post("/api/:userId/notes", async (req, res) => {
     const {
       title = "Untitled Note",
       content = "",
+      markdown,
       tags = [],
       notebook = null,
     } = req.body;
 
     const noteId = uuidv4();
     const now = new Date().toISOString();
+
+    // Convert HTML to markdown if markdown not provided
+    let markdownContent = markdown;
+    if (!markdown && content) {
+      markdownContent = turndownService.turndown(content);
+    } else if (!markdown && !content) {
+      markdownContent = `# ${title}`;
+    }
 
     const metadata = {
       id: noteId,
@@ -1117,9 +1253,16 @@ app.post("/api/:userId/notes", async (req, res) => {
     };
 
     await writeMetadata(userId, noteId, metadata);
-    await writeNoteContent(userId, noteId, content);
+    await writeNoteContent(userId, noteId, markdownContent);
 
-    res.json(metadata);
+    // Convert markdown to HTML for response
+    const htmlContent = marked(markdownContent);
+
+    res.json({
+      ...metadata,
+      content: htmlContent,
+      markdown: markdownContent,
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -1129,7 +1272,8 @@ app.post("/api/:userId/notes", async (req, res) => {
 app.put("/api/:userId/notes/:noteId", async (req, res) => {
   try {
     const { userId, noteId } = req.params;
-    const { content, metadata: updatedFields } = req.body;
+    const { content, markdown, title, tags, notebook, folder, ...otherFields } =
+      req.body;
 
     const metadata = await readMetadata(userId, noteId);
     if (!metadata) {
@@ -1137,28 +1281,25 @@ app.put("/api/:userId/notes/:noteId", async (req, res) => {
     }
 
     // Get current content for version comparison
-    const currentContent = await readNoteContent(userId, noteId);
+    const currentMarkdown = await readNoteContent(userId, noteId);
+
+    // Convert HTML content to markdown if markdown not provided
+    let markdownContent = markdown;
+    if (content !== undefined && !markdown) {
+      markdownContent = turndownService.turndown(content);
+    }
 
     // Determine version trigger
     let versionTrigger = null;
-    if (content !== undefined && content !== currentContent) {
+    if (markdownContent !== undefined && markdownContent !== currentMarkdown) {
       versionTrigger = "content_change";
-    } else if (updatedFields?.title && updatedFields.title !== metadata.title) {
+    } else if (title && title !== metadata.title) {
       versionTrigger = "title_change";
-    } else if (
-      updatedFields?.tags &&
-      JSON.stringify(updatedFields.tags) !== JSON.stringify(metadata.tags)
-    ) {
+    } else if (tags && JSON.stringify(tags) !== JSON.stringify(metadata.tags)) {
       versionTrigger = "tags_change";
-    } else if (
-      updatedFields?.folder &&
-      updatedFields.folder !== metadata.folder
-    ) {
+    } else if (folder && folder !== metadata.folder) {
       versionTrigger = "folder_change";
-    } else if (
-      updatedFields?.notebook &&
-      updatedFields.notebook !== metadata.notebook
-    ) {
+    } else if (notebook && notebook !== metadata.notebook) {
       versionTrigger = "notebook_change";
     }
 
@@ -1167,7 +1308,7 @@ app.put("/api/:userId/notes/:noteId", async (req, res) => {
       await createVersionIfNeeded(
         userId,
         noteId,
-        currentContent,
+        currentMarkdown,
         metadata,
         versionTrigger
       );
@@ -1176,18 +1317,30 @@ app.put("/api/:userId/notes/:noteId", async (req, res) => {
     // Update metadata
     const updatedMetadata = {
       ...metadata,
-      ...updatedFields,
+      ...otherFields,
       updated: new Date().toISOString(),
       version: metadata.version + 1,
     };
 
+    if (title !== undefined) updatedMetadata.title = title;
+    if (tags !== undefined) updatedMetadata.tags = tags;
+    if (notebook !== undefined) updatedMetadata.notebook = notebook;
+    if (folder !== undefined) updatedMetadata.folder = folder;
+
     await writeMetadata(userId, noteId, updatedMetadata);
 
-    if (content !== undefined) {
-      await writeNoteContent(userId, noteId, content);
+    if (markdownContent !== undefined) {
+      await writeNoteContent(userId, noteId, markdownContent);
     }
 
-    res.json(updatedMetadata);
+    // Convert markdown back to HTML for response
+    const htmlContent = markdownContent ? marked(markdownContent) : undefined;
+
+    res.json({
+      ...updatedMetadata,
+      content: htmlContent,
+      markdown: markdownContent,
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -1951,10 +2104,9 @@ app.post("/api/:userId/folders/reorder", async (req, res) => {
 
     // Load all user folders to update sort orders
     const userFolders = await loadAllUserFoldersFromDisk(userId);
-    const sortedUserFolders = userFolders.filter((f) => f.userId === userId);
 
     // Update sort orders
-    sortedUserFolders.forEach((folder, index) => {
+    userFolders.forEach((folder, index) => {
       if (!folder.sortOrder) folder.sortOrder = index;
     });
 
@@ -2791,7 +2943,7 @@ let VERSION_CONFIG = {
   maxVersionsPerNote: 100,
   autoVersionOnChange: true,
   minChangePercentage: 10, // 10% change triggers version (increased from 5%)
-  enableFocusSwitch: true,
+  enableFocusSwitch: false, // Disabled to prevent cursor jumping
 };
 
 // Default auto-save configuration
@@ -2810,12 +2962,12 @@ const versionDedupeCache = new Map();
 
 // Enhanced debouncing for different operations
 const VERSION_DEBOUNCE_TIMES = {
-  content_change: 5000, // 5 seconds between content versions
-  focus_switch: 10000, // 10 seconds between focus switch versions (reduced frequency)
-  title_change: 1000, // 1 second between title changes
-  tags_change: 1000, // 1 second between tag changes
-  folder_change: 1000, // 1 second between folder changes
-  notebook_change: 1000, // 1 second between notebook changes
+  content_change: 30000, // 30 seconds between content versions (increased to prevent cursor jumping)
+  focus_switch: 60000, // 60 seconds between focus switch versions (disabled anyway)
+  title_change: 5000, // 5 seconds between title changes
+  tags_change: 5000, // 5 seconds between tag changes
+  folder_change: 5000, // 5 seconds between folder changes
+  notebook_change: 5000, // 5 seconds between notebook changes
 };
 
 // Helper function to get a lock for version creation
@@ -3351,3 +3503,506 @@ app.get("/api/config/auto-save", (req, res) => {
 // ==========================================
 // ENHANCED NOTE UPDATE WITH VERSIONING
 // ==========================================
+
+// ==========================================
+// EVERNOTE IMPORT API
+// ==========================================
+
+// Import Evernote .enex file
+app.post(
+  "/api/:userId/import/evernote",
+  (req, res, next) => {
+    // Debug middleware
+    console.log("📥 Import endpoint hit");
+    console.log("📥 Request headers:", req.headers);
+    console.log("📥 Content-Type:", req.get("content-type"));
+    next();
+  },
+  uploadImport.single("evernoteFile"),
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const evernoteFile = req.file;
+      const options = JSON.parse(req.body.options || "{}");
+
+      if (!evernoteFile) {
+        console.error("❌ No file uploaded - req.file is:", req.file);
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      console.log(`📥 Starting Evernote import for user ${userId}`);
+      console.log(
+        `📄 File: ${evernoteFile.originalname} (${evernoteFile.size} bytes)`
+      );
+      console.log(`⚙️ Options:`, options);
+
+      // Extract notebook name from filename (remove .enex extension)
+      const notebookName = evernoteFile.originalname.replace(/\.enex$/i, "");
+      console.log(`📚 Creating notebook: ${notebookName}`);
+
+      // Read the uploaded file
+      const fileContent = await fs.readFile(evernoteFile.path, "utf8");
+
+      // Clean up uploaded file
+      await fs.unlink(evernoteFile.path);
+
+      // Parse the Evernote XML
+      let enexData;
+      try {
+        enexData = await new Promise((resolve, reject) => {
+          xml2js.parseString(
+            fileContent,
+            {
+              explicitArray: false,
+              ignoreAttrs: false,
+              tagNameProcessors: [(name) => name.toLowerCase()],
+            },
+            (err, result) => {
+              if (err) reject(err);
+              else resolve(result);
+            }
+          );
+        });
+      } catch (parseError) {
+        console.error("❌ Failed to parse Evernote XML:", parseError);
+        return res.status(400).json({
+          error: "Invalid Evernote file format",
+          message:
+            "The uploaded file is not a valid Evernote export (.enex) file",
+        });
+      }
+
+      // Extract notes from the parsed data
+      console.log(
+        "📋 Parsed ENEX structure:",
+        JSON.stringify(enexData, null, 2).substring(0, 500)
+      );
+      const enNotes = enexData["en-export"]?.note || [];
+      const notesArray = Array.isArray(enNotes) ? enNotes : [enNotes];
+
+      console.log(`📝 Found ${notesArray.length} notes to import`);
+
+      // Initialize results object early
+      const results = {
+        notesImported: 0,
+        notebooksCreated: 0,
+        tagsCreated: 0,
+        attachmentsImported: 0,
+        warnings: [],
+      };
+
+      // Create or get the "evernote" tag
+      let evernoteTagId;
+      try {
+        // First check if the tag already exists
+        const existingTags = await loadAllUserTagsFromDisk(userId);
+        const evernoteTag = existingTags.find((tag) => tag.name === "evernote");
+
+        if (evernoteTag) {
+          evernoteTagId = evernoteTag.id;
+          console.log(`🏷️ Using existing "evernote" tag: ${evernoteTagId}`);
+        } else {
+          // Create new tag
+          evernoteTagId = uuidv4();
+          const newTag = {
+            id: evernoteTagId,
+            userId,
+            name: "evernote",
+            color: "#2DBE60", // Evernote green
+            created: new Date().toISOString(),
+            updated: new Date().toISOString(),
+            sortOrder: 0,
+          };
+          await saveTagToDisk(userId, evernoteTagId, newTag);
+          console.log(`🏷️ Created new "evernote" tag: ${evernoteTagId}`);
+        }
+      } catch (error) {
+        console.error("❌ Failed to create/get evernote tag:", error);
+        return res.status(500).json({ error: "Failed to create import tag" });
+      }
+
+      // Create or get the notebook for this import
+      let importNotebookId;
+      let existingNotebooks = [];
+      try {
+        // First check if the notebook already exists
+        existingNotebooks = await loadAllUserNotebooksFromDisk(userId);
+        const importNotebook = existingNotebooks.find(
+          (notebook) => notebook.name === notebookName
+        );
+
+        if (importNotebook) {
+          importNotebookId = importNotebook.id;
+          console.log(
+            `📚 Using existing notebook "${notebookName}": ${importNotebookId}`
+          );
+        } else {
+          // Create new notebook
+          importNotebookId = uuidv4();
+          const newNotebook = {
+            id: importNotebookId,
+            userId,
+            name: notebookName,
+            description: `Imported from ${evernoteFile.originalname}`,
+            color: "#6B46C1", // Purple color for import notebooks
+            created: new Date().toISOString(),
+            updated: new Date().toISOString(),
+            noteCount: 0,
+            sortOrder: existingNotebooks.length,
+            folder: null, // Notebooks can be assigned to folders later
+          };
+          await saveNotebookToDisk(userId, importNotebookId, newNotebook);
+          console.log(
+            `📚 Created new notebook "${notebookName}": ${importNotebookId}`
+          );
+          results.notebooksCreated++;
+        }
+      } catch (error) {
+        console.error("❌ Failed to create/get import notebook:", error);
+        return res
+          .status(500)
+          .json({ error: "Failed to create import notebook" });
+      }
+
+      // Track notebooks and tags
+      const notebookMap = new Map();
+      const tagMap = new Map();
+
+      // Process each note
+      for (const enNote of notesArray) {
+        try {
+          // Helper function to parse Evernote date format (YYYYMMDDTHHMMSSZ)
+          const parseEvernoteDate = (dateStr) => {
+            if (!dateStr) return new Date().toISOString();
+
+            // Handle Evernote date format: 20240101T120000Z
+            const match = dateStr.match(
+              /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z?$/
+            );
+            if (match) {
+              const [, year, month, day, hour, minute, second] = match;
+              return new Date(
+                Date.UTC(
+                  parseInt(year),
+                  parseInt(month) - 1, // Month is 0-based
+                  parseInt(day),
+                  parseInt(hour),
+                  parseInt(minute),
+                  parseInt(second)
+                )
+              ).toISOString();
+            }
+
+            // Try standard date parsing as fallback
+            try {
+              return new Date(dateStr).toISOString();
+            } catch (e) {
+              console.warn(
+                `Failed to parse date: ${dateStr}, using current date`
+              );
+              return new Date().toISOString();
+            }
+          };
+
+          // Extract note data
+          const title = enNote.title || "Untitled Note";
+          const created = parseEvernoteDate(enNote.created);
+          const updated = parseEvernoteDate(enNote.updated) || created;
+
+          // Create the note ID early so we can use it for attachments
+          const noteId = uuidv4();
+
+          // Process resources (attachments/images) first
+          const resourceMap = new Map();
+          const attachmentMetadata = [];
+
+          if (enNote.resource) {
+            const resources = Array.isArray(enNote.resource)
+              ? enNote.resource
+              : [enNote.resource];
+
+            for (const resource of resources) {
+              try {
+                if (resource.data) {
+                  let base64Data = "";
+
+                  // Handle different data structures from xml2js
+                  if (typeof resource.data === "string") {
+                    base64Data = resource.data;
+                  } else if (typeof resource.data === "object") {
+                    // Sometimes xml2js puts text content in '_' property
+                    base64Data = resource.data._ || resource.data;
+                  }
+
+                  // Clean up base64 data (remove whitespace/newlines)
+                  base64Data = base64Data.replace(/\s/g, "");
+
+                  // Decode base64 data
+                  const buffer = Buffer.from(base64Data, "base64");
+
+                  // Extract hash from source-url if available
+                  let hash = null;
+                  if (
+                    resource["resource-attributes"] &&
+                    resource["resource-attributes"]["source-url"]
+                  ) {
+                    const sourceUrl =
+                      resource["resource-attributes"]["source-url"];
+                    // Hash is typically after the user token and before the final part
+                    const hashMatch = sourceUrl.match(/\+([a-f0-9]{32})\+/);
+                    if (hashMatch) {
+                      hash = hashMatch[1];
+                    }
+                  }
+
+                  // Fallback to generate hash if not found
+                  if (!hash) {
+                    // Generate hash from buffer content for consistent identification
+                    const crypto = await import("crypto");
+                    hash = crypto.default
+                      .createHash("md5")
+                      .update(buffer)
+                      .digest("hex");
+                  }
+
+                  // Get other resource attributes
+                  const originalFileName =
+                    resource["resource-attributes"]?.["file-name"] ||
+                    resource.filename ||
+                    "attachment";
+                  const mimeType = resource.mime || "application/octet-stream";
+
+                  // Create unique filename using hash to prevent overwrites
+                  const extension = getMimeExtension(mimeType);
+                  const uniqueFileName = `${hash.substring(
+                    0,
+                    8
+                  )}_${originalFileName}`;
+
+                  // Ensure it has the correct extension
+                  let fileName = uniqueFileName;
+                  if (!uniqueFileName.endsWith(`.${extension}`)) {
+                    // Remove any existing extension and add the correct one
+                    fileName =
+                      uniqueFileName.replace(/\.[^.]+$/, "") + `.${extension}`;
+                  }
+
+                  // Ensure attachments directory exists
+                  const attachmentsPath = join(
+                    NOTES_BASE_PATH,
+                    userId,
+                    noteId,
+                    "attachments"
+                  );
+                  await fs.mkdir(attachmentsPath, { recursive: true });
+
+                  // Save the file
+                  const safeName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
+                  const filePath = join(attachmentsPath, safeName);
+                  await fs.writeFile(filePath, buffer);
+
+                  // Store mapping for en-media replacement
+                  resourceMap.set(hash, {
+                    filename: safeName,
+                    mimeType: mimeType,
+                    originalName: originalFileName,
+                  });
+
+                  // Add to attachment metadata
+                  attachmentMetadata.push({
+                    filename: safeName,
+                    originalName: originalFileName,
+                    size: buffer.length,
+                    type: mimeType,
+                    uploaded: new Date().toISOString(),
+                  });
+
+                  console.log(`📎 Saved attachment: ${safeName} (${mimeType})`);
+                  results.attachmentsImported++;
+                }
+              } catch (resourceError) {
+                console.error(`❌ Failed to process resource:`, resourceError);
+                results.warnings.push(
+                  `Failed to import attachment in note "${title}"`
+                );
+              }
+            }
+          }
+
+          // Convert Evernote content (ENML) to HTML
+          let htmlContent = enNote.content || "";
+
+          // First, replace en-media tags with img/link tags
+          htmlContent = htmlContent.replace(/<en-media[^>]*\/>/g, (match) => {
+            // Extract hash from en-media tag
+            const hashMatch = match.match(/hash="([^"]+)"/);
+            if (hashMatch && resourceMap.has(hashMatch[1])) {
+              const resource = resourceMap.get(hashMatch[1]);
+              const attachmentUrl = `./attachments/${resource.filename}`;
+
+              // If it's an image, use img tag
+              if (resource.mimeType.startsWith("image/")) {
+                return `<img src="${attachmentUrl}" alt="${resource.originalName}" />`;
+              } else {
+                // For other files, create a link
+                return `<a href="${attachmentUrl}">${resource.originalName}</a>`;
+              }
+            }
+            return ""; // Remove unmatched en-media tags
+          });
+
+          // Clean up ENML structure
+          htmlContent = htmlContent
+            .replace(/<en-note[^>]*>/gi, "")
+            .replace(/<\/en-note>/gi, "")
+            .replace(/<!DOCTYPE[^>]*>/gi, "")
+            .replace(/<\?xml[^>]*>/gi, "")
+            .trim();
+
+          // Wrap content in a div if it doesn't have a root element
+          if (!htmlContent.startsWith("<")) {
+            htmlContent = `<div>${htmlContent}</div>`;
+          }
+
+          // Convert HTML to Markdown
+          let markdownContent = turndownService.turndown(htmlContent);
+
+          // Post-process markdown to clean up excessive line breaks
+          markdownContent = markdownContent
+            .replace(/\n{4,}/g, "\n\n\n") // Reduce excessive line breaks to max 3
+            .replace(/^\n+/, "") // Remove leading line breaks
+            .replace(/\n+$/, "") // Remove trailing line breaks
+            .trim();
+
+          // Handle notebook
+          let notebookId = null;
+          if (
+            options.preserveNotebooks &&
+            enNote["note-attributes"]?.["source-notebook"]
+          ) {
+            const notebookName = enNote["note-attributes"]["source-notebook"];
+            if (!notebookMap.has(notebookName)) {
+              // Create notebook
+              notebookId = uuidv4();
+              const notebook = {
+                id: notebookId,
+                userId,
+                name: notebookName,
+                description: `Imported from Evernote`,
+                color: "#3B82F6",
+                created: new Date().toISOString(),
+                updated: new Date().toISOString(),
+                noteCount: 0,
+                sortOrder: notebookMap.size,
+              };
+              await saveNotebookToDisk(userId, notebookId, notebook);
+              notebookMap.set(notebookName, notebookId);
+              results.notebooksCreated++;
+              console.log(`📚 Created notebook: ${notebookName}`);
+            } else {
+              notebookId = notebookMap.get(notebookName);
+            }
+          }
+
+          // Handle tags
+          const tagIds = [evernoteTagId]; // Always include the "evernote" tag
+          if (options.preserveTags && enNote.tag) {
+            const tags = Array.isArray(enNote.tag) ? enNote.tag : [enNote.tag];
+            for (const tagName of tags) {
+              if (!tagMap.has(tagName)) {
+                // Create tag
+                const tagId = uuidv4();
+                const tag = {
+                  id: tagId,
+                  userId,
+                  name: tagName,
+                  color: `#${Math.floor(Math.random() * 16777215).toString(
+                    16
+                  )}`,
+                  created: new Date().toISOString(),
+                  updated: new Date().toISOString(),
+                  sortOrder: tagMap.size + 1, // +1 because evernote tag is 0
+                };
+                await saveTagToDisk(userId, tagId, tag);
+                tagMap.set(tagName, tagId);
+                results.tagsCreated++;
+                console.log(`🏷️ Created tag: ${tagName}`);
+              }
+              tagIds.push(tagMap.get(tagName));
+            }
+          }
+
+          // Create the note
+          const metadata = {
+            id: noteId,
+            title,
+            created: options.preserveCreatedDates
+              ? created
+              : new Date().toISOString(),
+            updated: new Date().toISOString(),
+            tags: tagIds,
+            notebook: importNotebookId, // Assign to the import notebook
+            folder: null, // Notes don't go directly in folders
+            starred: false,
+            deleted: false,
+            version: 1,
+            attachments: attachmentMetadata,
+            evernoteImport: {
+              originalId: enNote["$"]?.guid || null,
+              importedAt: new Date().toISOString(),
+              source: "evernote",
+            },
+          };
+
+          await writeMetadata(userId, noteId, metadata);
+          await writeNoteContent(userId, noteId, markdownContent);
+          results.notesImported++;
+          console.log(`✅ Imported note: ${title}`);
+        } catch (noteError) {
+          console.error(`❌ Failed to import note:`, noteError);
+          console.error(
+            `📋 Note data that failed:`,
+            JSON.stringify(enNote, null, 2).substring(0, 500)
+          );
+          results.warnings.push(
+            `Failed to import note: ${enNote.title || "Untitled"}`
+          );
+        }
+      }
+
+      console.log(`✅ Evernote import completed:`, results);
+      res.json(results);
+    } catch (error) {
+      console.error("❌ Evernote import error:", error);
+      res.status(500).json({
+        error: "Import failed",
+        message: error.message,
+      });
+    }
+  }
+);
+
+// Global error handler - MUST be at the very end after all routes
+app.use((error, req, res, next) => {
+  console.error("❌ Global error handler caught:", error);
+
+  // Always return JSON for API routes
+  if (req.path.startsWith("/api/")) {
+    if (error instanceof multer.MulterError) {
+      if (error.code === "LIMIT_FILE_SIZE") {
+        return res
+          .status(400)
+          .json({ error: "File too large. Maximum size is 100MB." });
+      }
+      return res.status(400).json({ error: error.message });
+    }
+
+    return res.status(500).json({
+      error: error.message || "Internal server error",
+      type: error.constructor.name,
+    });
+  }
+
+  // For non-API routes, use default Express error handler
+  next(error);
+});
