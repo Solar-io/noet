@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Notebook API Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      .notebook {
+        padding: 10px;
+        margin: 5px 0;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background: #f9f9f9;
+      }
+      .book-icon {
+        color: #6b46c1;
+        font-size: 18px;
+      }
+      .note-count {
+        color: #666;
+      }
+      .success {
+        color: green;
+      }
+      .error {
+        color: red;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>📚 Notebook API Test</h1>
+    <div id="status">Loading...</div>
+    <div id="notebooks"></div>
+
+    <script>
+      async function testNotebookAPI() {
+        const status = document.getElementById("status");
+        const container = document.getElementById("notebooks");
+
+        try {
+          console.log("🔄 Testing notebook API...");
+          const response = await fetch(
+            "http://localhost:3004/api/user-1/notebooks"
+          );
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const notebooks = await response.json();
+          console.log("📚 Notebooks loaded:", notebooks);
+
+          status.innerHTML = `<span class="success">✅ API Working - Found ${notebooks.length} notebooks</span>`;
+
+          if (notebooks.length === 0) {
+            container.innerHTML = "<p>No notebooks found</p>";
+          } else {
+            container.innerHTML = notebooks
+              .map(
+                (notebook) => `
+                        <div class="notebook">
+                            <div class="book-icon">📚</div>
+                            <strong>${notebook.name}</strong>
+                            <span class="note-count">(${
+                              notebook.noteCount
+                            })</span>
+                            <div style="font-size: 12px; color: #666;">
+                                ID: ${notebook.id}<br>
+                                Color: <span style="color: ${notebook.color}">${
+                  notebook.color
+                }</span><br>
+                                Created: ${new Date(
+                                  notebook.created
+                                ).toLocaleString()}<br>
+                                Description: ${notebook.description || "None"}
+                            </div>
+                        </div>
+                    `
+              )
+              .join("");
+          }
+        } catch (error) {
+          console.error("❌ Error:", error);
+          status.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+          container.innerHTML = "<p>Failed to load notebooks</p>";
+        }
+      }
+
+      // Test immediately
+      testNotebookAPI();
+
+      // Add refresh button
+      document.body.innerHTML +=
+        '<button onclick="testNotebookAPI()" style="margin-top: 20px;">🔄 Refresh Test</button>';
+    </script>
+  </body>
+</html>

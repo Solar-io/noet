@@ -409,7 +409,7 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 100 * 1024 * 1024, // 100MB limit
+    fileSize: 1024 * 1024 * 1024, // 1GB limit
   },
   fileFilter: (req, file, cb) => {
     // Allow common file types
@@ -468,7 +468,7 @@ const importStorage = multer.diskStorage({
 const uploadImport = multer({
   storage: importStorage,
   limits: {
-    fileSize: 100 * 1024 * 1024, // 100MB limit
+    fileSize: 1024 * 1024 * 1024, // 1GB limit
   },
   fileFilter: (req, file, cb) => {
     // Allow Evernote export files and other common formats
@@ -3681,21 +3681,43 @@ app.post(
             );
             if (match) {
               const [, year, month, day, hour, minute, second] = match;
-              return new Date(
-                Date.UTC(
-                  parseInt(year),
-                  parseInt(month) - 1, // Month is 0-based
-                  parseInt(day),
-                  parseInt(hour),
-                  parseInt(minute),
-                  parseInt(second)
-                )
-              ).toISOString();
+              try {
+                const date = new Date(
+                  Date.UTC(
+                    parseInt(year),
+                    parseInt(month) - 1, // Month is 0-based
+                    parseInt(day),
+                    parseInt(hour),
+                    parseInt(minute),
+                    parseInt(second)
+                  )
+                );
+                // Check if date is valid
+                if (isNaN(date.getTime())) {
+                  console.warn(
+                    `Invalid date created from: ${dateStr}, using current date`
+                  );
+                  return new Date().toISOString();
+                }
+                return date.toISOString();
+              } catch (e) {
+                console.warn(
+                  `Failed to create date from: ${dateStr}, using current date`
+                );
+                return new Date().toISOString();
+              }
             }
 
             // Try standard date parsing as fallback
             try {
-              return new Date(dateStr).toISOString();
+              const date = new Date(dateStr);
+              if (isNaN(date.getTime())) {
+                console.warn(
+                  `Invalid date from standard parsing: ${dateStr}, using current date`
+                );
+                return new Date().toISOString();
+              }
+              return date.toISOString();
             } catch (e) {
               console.warn(
                 `Failed to parse date: ${dateStr}, using current date`

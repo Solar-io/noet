@@ -38,15 +38,30 @@ code {
 }
 
 /* Ensure font-size styles are applied with high specificity */
-.ProseMirror
-  span[style*="font-size"]:not(.task-item span):not(.list-item span) {
-  line-height: 1;
+.ProseMirror span[style*="font-size"] {
+  line-height: 1.2;
+}
+
+/* Ensure font-size works in list items */
+.ProseMirror li span[style*="font-size"],
+.ProseMirror .list-item span[style*="font-size"],
+.ProseMirror .task-item span[style*="font-size"] {
+  line-height: 1.2;
 }
 
 /* Fix for double-line lists - Remove extra paragraph spacing */
 .ProseMirror li > p {
   margin: 0 !important;
   display: inline;
+}
+
+/* Ensure font-size is properly applied to list items */
+.ProseMirror li span[style*="font-size"] {
+  display: inline !important;
+}
+
+.ProseMirror li p span[style*="font-size"] {
+  display: inline !important;
 }
 
 /* Specific styling for different list types */

@@ -63,11 +63,14 @@ const ImprovedSidebar = ({
   onShowAdminInterface,
   onShowEvernoteImport,
   onNotesUpdate,
+  notebooks: propNotebooks = [],
+  folders: propFolders = [],
+  tags: propTags = [],
 }) => {
   const [backendUrl, setBackendUrl] = useState("");
-  const [folders, setFolders] = useState([]);
-  const [notebooks, setNotebooks] = useState([]);
-  const [tags, setTags] = useState([]);
+  const [internalFolders, setInternalFolders] = useState([]);
+  const [internalNotebooks, setInternalNotebooks] = useState([]);
+  const [internalTags, setInternalTags] = useState([]);
   const [expandedFolders, setExpandedFolders] = useState(new Set());
   const [editing, setEditing] = useState({
     type: null,
@@ -84,6 +87,12 @@ const ImprovedSidebar = ({
   const [dragOver, setDragOver] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Use props data if available, otherwise use internal state
+  const folders = propFolders.length > 0 ? propFolders : internalFolders;
+  const notebooks =
+    propNotebooks.length > 0 ? propNotebooks : internalNotebooks;
+  const tags = propTags.length > 0 ? propTags : internalTags;
+
   // Initialize backend URL
   useEffect(() => {
     const initBackendUrl = async () => {
@@ -98,12 +107,31 @@ const ImprovedSidebar = ({
     initBackendUrl();
   }, []);
 
-  // Load data when backend URL and user are available
+  // Load data when backend URL and user are available (only if props are not provided)
   useEffect(() => {
-    if (backendUrl && user?.id) {
+    if (
+      backendUrl &&
+      user?.id &&
+      propNotebooks.length === 0 &&
+      propFolders.length === 0 &&
+      propTags.length === 0
+    ) {
       loadAllData();
+    } else if (
+      propNotebooks.length > 0 ||
+      propFolders.length > 0 ||
+      propTags.length > 0
+    ) {
+      // If props are provided, we don't need to show loading state
+      setLoading(false);
     }
-  }, [backendUrl, user?.id]);
+  }, [
+    backendUrl,
+    user?.id,
+    propNotebooks.length,
+    propFolders.length,
+    propTags.length,
+  ]);
 
   const loadAllData = useCallback(async () => {
     try {
@@ -121,7 +149,7 @@ const ImprovedSidebar = ({
       const response = await fetch(`${backendUrl}/api/${user.id}/folders`);
       if (response.ok) {
         const data = await response.json();
-        setFolders(data);
+        setInternalFolders(data);
       }
     } catch (error) {
       console.error("Error loading folders:", error);
@@ -133,7 +161,7 @@ const ImprovedSidebar = ({
       const response = await fetch(`${backendUrl}/api/${user.id}/notebooks`);
       if (response.ok) {
         const data = await response.json();
-        setNotebooks(data);
+        setInternalNotebooks(data);
       }
     } catch (error) {
       console.error("Error loading notebooks:", error);
@@ -145,7 +173,7 @@ const ImprovedSidebar = ({
       const response = await fetch(`${backendUrl}/api/${user.id}/tags`);
       if (response.ok) {
         const data = await response.json();
-        setTags(data);
+        setInternalTags(data);
       } else {
         console.error(
           "ImprovedSidebar: Failed to load tags:",
@@ -206,7 +234,7 @@ const ImprovedSidebar = ({
 
       if (response.ok) {
         const newFolder = await response.json();
-        setFolders((prev) => [...prev, newFolder]);
+        setInternalFolders((prev) => [...prev, newFolder]);
         // Don't trigger notes refresh for folder creation
         return newFolder;
       } else {
@@ -237,7 +265,7 @@ const ImprovedSidebar = ({
 
       if (response.ok) {
         const newNotebook = await response.json();
-        setNotebooks((prev) => [...prev, newNotebook]);
+        setInternalNotebooks((prev) => [...prev, newNotebook]);
         // Don't trigger notes refresh for notebook creation
         return newNotebook;
       } else {
@@ -267,7 +295,7 @@ const ImprovedSidebar = ({
 
       if (response.ok) {
         const newTag = await response.json();
-        setTags((prev) => [...prev, newTag]);
+        setInternalTags((prev) => [...prev, newTag]);
         // Don't trigger notes refresh for tag creation
         return newTag;
       } else {
@@ -295,15 +323,17 @@ const ImprovedSidebar = ({
         const updatedItem = await response.json();
 
         if (type === "folder") {
-          setFolders((prev) =>
+          setInternalFolders((prev) =>
             prev.map((f) => (f.id === id ? updatedItem : f))
           );
         } else if (type === "notebook") {
-          setNotebooks((prev) =>
+          setInternalNotebooks((prev) =>
             prev.map((n) => (n.id === id ? updatedItem : n))
           );
         } else if (type === "tag") {
-          setTags((prev) => prev.map((t) => (t.id === id ? updatedItem : t)));
+          setInternalTags((prev) =>
+            prev.map((t) => (t.id === id ? updatedItem : t))
+          );
         }
 
         return updatedItem;
@@ -327,13 +357,13 @@ const ImprovedSidebar = ({
 
       if (response.ok) {
         if (type === "folder") {
-          setFolders((prev) => prev.filter((f) => f.id !== id));
+          setInternalFolders((prev) => prev.filter((f) => f.id !== id));
           // Also remove notebooks in this folder
-          setNotebooks((prev) => prev.filter((n) => n.folderId !== id));
+          setInternalNotebooks((prev) => prev.filter((n) => n.folderId !== id));
         } else if (type === "notebook") {
-          setNotebooks((prev) => prev.filter((n) => n.id !== id));
+          setInternalNotebooks((prev) => prev.filter((n) => n.id !== id));
         } else if (type === "tag") {
-          setTags((prev) => prev.filter((t) => t.id !== id));
+          setInternalTags((prev) => prev.filter((t) => t.id !== id));
         }
       }
     } catch (error) {

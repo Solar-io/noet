@@ -768,19 +768,32 @@ const NoetTipTapApp = () => {
 
   // Load notebooks from backend
   const loadNotebooks = async () => {
+    console.log("📚 loadNotebooks called", {
+      hasUser: !!user,
+      hasBackendUrl: !!backendUrl,
+    });
+
     if (!validateUser(user) || !backendUrl) {
       console.warn("Cannot load notebooks: missing user or backend URL");
       return;
     }
 
     try {
-      const response = await fetch(`${backendUrl}/api/${user.id}/notebooks`);
+      const apiUrl = `${backendUrl}/api/${user.id}/notebooks`;
+      console.log("📚 Fetching notebooks from:", apiUrl);
+
+      const response = await fetch(apiUrl);
       if (!response.ok) {
         throw new Error(`Failed to load notebooks: ${response.status}`);
       }
       const notebooksData = await response.json();
-      console.log(`✅ Loaded ${notebooksData.length} notebooks`);
+      console.log(
+        `✅ Loaded ${notebooksData.length} notebooks:`,
+        notebooksData
+      );
       setNotebooks(notebooksData);
+
+      console.log("📚 Notebooks state updated");
     } catch (error) {
       // Handle network errors more gracefully during startup
       if (error.message.includes("Failed to fetch")) {
@@ -1853,6 +1866,9 @@ const NoetTipTapApp = () => {
           onShowAdminInterface={() => setShowAdminInterface(true)}
           onShowEvernoteImport={() => setShowEvernoteImport(true)}
           onNotesUpdate={loadNotes}
+          notebooks={notebooks}
+          folders={folders}
+          tags={tags}
         />
 
         <RobustErrorBoundary
@@ -1967,11 +1983,31 @@ const NoetTipTapApp = () => {
           <EvernoteImport
             userId={user?.id}
             onClose={() => setShowEvernoteImport(false)}
-            onImportComplete={() => {
+            onImportComplete={async (results) => {
+              console.log("🔄 Import complete callback triggered", results);
               setShowEvernoteImport(false);
-              loadNotes(); // Refresh notes after import
-              loadNotebooks(); // Refresh notebooks after import
-              loadTags(); // Refresh tags after import
+
+              // Add a small delay to ensure backend has finished processing
+              console.log("⏱️ Waiting 500ms for backend processing...");
+              await new Promise((resolve) => setTimeout(resolve, 500));
+
+              // Refresh all data to show imported content
+              console.log("🔄 Refreshing notes...");
+              await loadNotes(); // Refresh notes after import
+
+              console.log("🔄 Refreshing notebooks...");
+              await loadNotebooks(); // Refresh notebooks after import
+
+              console.log("🔄 Refreshing folders...");
+              await loadFolders(); // Refresh folders after import
+
+              console.log("🔄 Refreshing tags...");
+              await loadTags(); // Refresh tags after import
+
+              console.log("✅ Import complete, data refreshed");
+              console.log("📊 Current notebooks:", notebooks);
+              console.log("📊 Current folders:", folders);
+              console.log("📊 Current notes:", notes);
             }}
           />
         )}

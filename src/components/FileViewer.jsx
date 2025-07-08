@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import configService from "../configService.js";
 import PDFViewer from "./PDFViewer.jsx";
+import OfficeOnlineViewer from "./OfficeOnlineViewer.jsx";
+import PowerPointViewer from "./PowerPointViewer.jsx";
 
 // Dynamic imports for better performance
 const loadMammoth = () => import("mammoth");
@@ -79,22 +81,18 @@ const FileViewer = ({ attachment, userId, noteId, onClose }) => {
           );
         const text = await response.text();
         setContent({ type: "text", content: text });
+      } else if (
+        fileType.includes("presentation") ||
+        fileType.includes("powerpoint")
+      ) {
+        console.log("FileViewer: Setting up PowerPoint viewer");
+        setContent({ type: "powerpoint" });
       } else if (fileType.includes("word") || fileType.includes("document")) {
-        console.log("FileViewer: Loading Word document");
-        const response = await fetch(fileUrl);
-        if (!response.ok)
-          throw new Error(
-            `Failed to load file: ${response.status} ${response.statusText}`
-          );
-        await loadWordDocument(response);
+        console.log("FileViewer: Setting up Office Online viewer for Word");
+        setContent({ type: "office-online" });
       } else if (fileType.includes("sheet") || fileType.includes("excel")) {
-        console.log("FileViewer: Loading Excel document");
-        const response = await fetch(fileUrl);
-        if (!response.ok)
-          throw new Error(
-            `Failed to load file: ${response.status} ${response.statusText}`
-          );
-        await loadExcelDocument(response);
+        console.log("FileViewer: Setting up Office Online viewer for Excel");
+        setContent({ type: "office-online" });
       } else if (fileType === "application/json") {
         console.log("FileViewer: Loading JSON file");
         const response = await fetch(fileUrl);
@@ -391,6 +389,26 @@ const FileViewer = ({ attachment, userId, noteId, onClose }) => {
               Download to view
             </button>
           </div>
+        );
+
+      case "office-online":
+        return (
+          <OfficeOnlineViewer
+            attachment={attachment}
+            userId={userId}
+            noteId={noteId}
+            onClose={onClose}
+          />
+        );
+
+      case "powerpoint":
+        return (
+          <PowerPointViewer
+            attachment={attachment}
+            userId={userId}
+            noteId={noteId}
+            onClose={onClose}
+          />
         );
 
       case "download":
