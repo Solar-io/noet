@@ -17,6 +17,7 @@ class SyncStateManager {
     this.offlineQueue = [];
     this.conflictQueue = [];
     this.syncHistory = [];
+    this.pendingConflicts = [];
     this.maxHistoryEntries = 100;
     this.syncInterval = null;
     this.connectionCheckInterval = null;
@@ -31,6 +32,22 @@ class SyncStateManager {
    * Initialize the sync state manager
    */
   async _initialize() {
+    // Initialize sync state
+    await stateManager.setState(
+      this.domain,
+      {
+        pendingConflicts: 0,
+        offlineQueueSize: 0,
+        autoSyncEnabled: false,
+        isSyncing: false,
+        lastUpdate: Date.now(),
+      },
+      {
+        source: "SyncStateManager._initialize",
+        operation: "initializeState",
+      }
+    );
+
     // Check initial connection status
     await this._checkConnectionStatus();
 
@@ -429,10 +446,52 @@ class SyncStateManager {
   }
 
   /**
-   * Get pending conflicts
+   * Resolve a pending manual conflict
+   * @param {string} conflictId - ID of the conflict to resolve
+   * @param {string} resolution - Resolution strategy ('local', 'remote', 'merge', 'custom')
+   * @param {Object} customData - Custom data for custom resolution
+   */
+  async resolveManualConflict(conflictId, resolution, customData = {}) {
+    const pendingConflict = this.pendingConflicts.find(
+      (pc) => pc.id === conflictId
+    );
+
+    if (!pendingConflict) {
+      throw new Error(`No pending conflict found with ID: ${conflictId}`);
+    }
+
+    if (!pendingConflict.resolver) {
+      throw new Error(`Conflict ${conflictId} has no resolver function`);
+    }
+
+    try {
+      await pendingConflict.resolver(resolution, customData);
+
+      // Emit event that conflict was resolved
+      await this.eventBus.emit("sync:manualConflictResolved", {
+        conflictId,
+        resolution,
+        timestamp: Date.now(),
+      });
+
+      return { success: true, conflictId, resolution };
+    } catch (error) {
+      // Emit event that conflict resolution failed
+      await this.eventBus.emit("sync:manualConflictResolutionFailed", {
+        conflictId,
+        error: error.message,
+        timestamp: Date.now(),
+      });
+
+      throw error;
+    }
+  }
+
+  /**
+   * Get pending conflicts that need manual resolution
    */
   getPendingConflicts() {
-    return [...this.conflictQueue];
+    return [...this.pendingConflicts];
   }
 
   /**
@@ -443,10 +502,12 @@ class SyncStateManager {
       syncQueue: this.syncQueue.length,
       offlineQueue: this.offlineQueue.length,
       conflictQueue: this.conflictQueue.length,
+      pendingConflicts: this.pendingConflicts.length,
       totalPending:
         this.syncQueue.length +
         this.offlineQueue.length +
-        this.conflictQueue.length,
+        this.conflictQueue.length +
+        this.pendingConflicts.length,
     };
   }
 
@@ -779,8 +840,67 @@ class SyncStateManager {
         };
         return { applied: "merge", version: merged };
       case "manual":
-        // Manual resolution required
-        throw new Error("Manual resolution not implemented");
+        // Manual resolution - present conflict to user for resolution
+        const manualConflictEvent = {
+          id: this._generateConflictId(),
+          type: "manual_resolution_required",
+          conflict,
+          timestamp: Date.now(),
+          options: {
+            useLocal: () => this._resolveConflictManually(conflict, "local"),
+            useRemote: () => this._resolveConflictManually(conflict, "remote"),
+            merge: () => this._resolveConflictManually(conflict, "merge"),
+            custom: (customData) =>
+              this._resolveConflictManually(conflict, "custom", customData),
+          },
+        };
+
+        // Emit event to UI layer for user interaction
+        await this.eventBus.emit(
+          "sync:manualResolutionRequired",
+          manualConflictEvent
+        );
+
+        // Store pending conflict for later resolution
+        this.pendingConflicts.push(manualConflictEvent);
+
+        // Update state to indicate manual resolution pending
+        await stateManager.setState(
+          this.domain,
+          {
+            pendingConflicts: this.pendingConflicts.length,
+            lastConflictTime: Date.now(),
+          },
+          {
+            source: "SyncStateManager._applyConflictResolution",
+            operation: "manualResolutionPending",
+          }
+        );
+
+        // Return a promise that resolves when user makes a choice
+        return new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error("Manual resolution timeout (10 minutes)"));
+          }, 600000); // 10 minutes timeout
+
+          const resolveConflict = async (resolution, customData) => {
+            clearTimeout(timeout);
+            try {
+              const result = await this._applyConflictResolution(
+                conflict,
+                resolution,
+                customData
+              );
+              this._removePendingConflict(manualConflictEvent.id);
+              resolve(result);
+            } catch (error) {
+              reject(error);
+            }
+          };
+
+          // Store resolver for later use
+          manualConflictEvent.resolver = resolveConflict;
+        });
       default:
         throw new Error(`Unknown resolution strategy: ${resolution}`);
     }
@@ -949,6 +1069,13 @@ class SyncStateManager {
   }
 
   /**
+   * Private: Generate conflict ID
+   */
+  _generateConflictId() {
+    return `conflict-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
    * Private: Get backend URL
    */
   async _getBackendUrl() {
@@ -993,6 +1120,49 @@ class SyncStateManager {
     if (data.noteId) {
       await this.queueForSync(data, data.operation || "update");
     }
+  }
+
+  /**
+   * Private: Resolve conflict manually
+   * @param {Object} conflict - Conflict data
+   * @param {string} resolution - Resolution strategy
+   * @param {Object} customData - Custom data for manual resolution
+   */
+  async _resolveConflictManually(conflict, resolution, customData = {}) {
+    // Find the pending conflict by ID
+    const pendingConflict = this.pendingConflicts.find(
+      (pc) => pc.conflict.id === conflict.id
+    );
+
+    if (!pendingConflict) {
+      throw new Error("No pending conflict found for manual resolution.");
+    }
+
+    // Call the resolver with the chosen resolution
+    const resolver = pendingConflict.resolver;
+    await resolver(resolution, customData);
+  }
+
+  /**
+   * Private: Remove a pending conflict
+   * @param {string} conflictId - ID of the conflict to remove
+   */
+  _removePendingConflict(conflictId) {
+    this.pendingConflicts = this.pendingConflicts.filter(
+      (pc) => pc.id !== conflictId
+    );
+    // Update state
+    stateManager.setState(
+      this.domain,
+      {
+        pendingConflicts: this.pendingConflicts.length,
+      },
+      {
+        source: "SyncStateManager._removePendingConflict",
+        operation: "removePendingConflict",
+        conflictId,
+      }
+    );
   }
 
   /**

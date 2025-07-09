@@ -13,6 +13,8 @@ import PortManager from "./portManager.js";
 import TurndownService from "turndown";
 import { Buffer } from "buffer";
 import { marked } from "marked";
+import speakeasy from "speakeasy";
+import QRCode from "qrcode";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -201,6 +203,37 @@ async function loadUsers() {
     console.error("❌ Failed to load users, using defaults:", error.message);
     // Keep the default users that are already in the Map
   }
+}
+
+// Access history tracking
+const accessHistory = new Map(); // userId -> array of events
+
+// Helper function to add access history event
+function addAccessHistoryEvent(userId, eventType, details = {}) {
+  if (!accessHistory.has(userId)) {
+    accessHistory.set(userId, []);
+  }
+
+  const userHistory = accessHistory.get(userId);
+  const event = {
+    id: uuidv4(),
+    userId,
+    eventType, // 'login', 'logout', 'password_change', 'otp_enable', 'otp_disable', 'admin_action'
+    timestamp: new Date().toISOString(),
+    ipAddress: details.ipAddress || "unknown",
+    userAgent: details.userAgent || "unknown",
+    details: details.additionalInfo || {},
+    success: details.success !== undefined ? details.success : true,
+  };
+
+  userHistory.unshift(event); // Add to beginning (most recent first)
+
+  // Keep only last 1000 events per user
+  if (userHistory.length > 1000) {
+    userHistory.splice(1000);
+  }
+
+  accessHistory.set(userId, userHistory);
 }
 
 // In-memory storage for demo (in production, use a proper database)
@@ -1235,7 +1268,7 @@ app.post("/api/:userId/notes", async (req, res) => {
     if (!markdown && content) {
       markdownContent = turndownService.turndown(content);
     } else if (!markdown && !content) {
-      markdownContent = `# ${title}`;
+      markdownContent = "";
     }
 
     const metadata = {
@@ -2205,6 +2238,158 @@ app.post("/api/users/:userId/change-password", async (req, res) => {
   }
 });
 
+// Get user settings
+app.get("/api/users/:userId/settings", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = users.get(userId);
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const settings = user.settings || {
+      sessionTimeout: 20160, // 2 weeks in minutes
+      twoFAEnabled: false,
+      theme: "light",
+      autoSave: true,
+    };
+
+    res.json(settings);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update user settings
+app.put("/api/users/:userId/settings", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const updates = req.body;
+
+    const user = users.get(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Update user settings
+    user.settings = {
+      ...user.settings,
+      ...updates,
+    };
+
+    users.set(userId, user);
+
+    // Save users to disk
+    await saveUsers();
+
+    res.json({ success: true, settings: user.settings });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Enable/Disable 2FA
+app.post("/api/users/:userId/2fa", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = users.get(userId);
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Initialize settings if not exists
+    if (!user.settings) {
+      user.settings = {
+        sessionTimeout: 20160,
+        twoFAEnabled: false,
+        theme: "light",
+        autoSave: true,
+      };
+    }
+
+    // Enable 2FA
+    user.settings.twoFAEnabled = true;
+    users.set(userId, user);
+
+    // Save users to disk
+    await saveUsers();
+
+    res.json({ success: true, twoFAEnabled: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Disable 2FA
+app.delete("/api/users/:userId/2fa", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = users.get(userId);
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Initialize settings if not exists
+    if (!user.settings) {
+      user.settings = {
+        sessionTimeout: 20160,
+        twoFAEnabled: false,
+        theme: "light",
+        autoSave: true,
+      };
+    }
+
+    // Disable 2FA
+    user.settings.twoFAEnabled = false;
+    users.set(userId, user);
+
+    // Save users to disk
+    await saveUsers();
+
+    res.json({ success: true, twoFAEnabled: false });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Password recovery
+app.post("/api/auth/password-recovery", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    // Find user by email
+    const user = Array.from(users.values()).find(
+      (user) => user.email.toLowerCase() === email.toLowerCase()
+    );
+
+    if (!user) {
+      // Don't reveal if user exists for security
+      return res.json({
+        success: true,
+        message: "If the email exists, a recovery email has been sent",
+      });
+    }
+
+    // In a real application, you would send an email here
+    // For now, we'll just log it
+    console.log(`Password recovery requested for user: ${email}`);
+
+    res.json({
+      success: true,
+      message: "If the email exists, a recovery email has been sent",
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ==========================================
 // ENHANCED NOTES API
 // ==========================================
@@ -2317,14 +2502,35 @@ app.post("/api/auth/login", async (req, res) => {
     );
 
     if (!user) {
+      // Track failed login attempt (user not found)
+      addAccessHistoryEvent("unknown", "login", {
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.get("User-Agent"),
+        success: false,
+        additionalInfo: { email, reason: "user_not_found" },
+      });
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
     if (user.password !== password) {
+      // Track failed login attempt (wrong password)
+      addAccessHistoryEvent(user.id, "login", {
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.get("User-Agent"),
+        success: false,
+        additionalInfo: { email, reason: "invalid_password" },
+      });
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
     if (user.disabled) {
+      // Track failed login attempt (account disabled)
+      addAccessHistoryEvent(user.id, "login", {
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.get("User-Agent"),
+        success: false,
+        additionalInfo: { email, reason: "account_disabled" },
+      });
       return res.status(401).json({ error: "Account is disabled" });
     }
 
@@ -2333,6 +2539,14 @@ app.post("/api/auth/login", async (req, res) => {
 
     // Save users to disk (for lastLogin update)
     await saveUsers();
+
+    // Track successful login
+    addAccessHistoryEvent(user.id, "login", {
+      ipAddress: req.ip || req.connection.remoteAddress,
+      userAgent: req.get("User-Agent"),
+      success: true,
+      additionalInfo: { email },
+    });
 
     // Return user info without password
     const { password: _, ...userInfo } = user;
@@ -2764,6 +2978,19 @@ app.get("/api/admin/storage", requireAdmin, async (req, res) => {
   try {
     const userUsage = [];
 
+    const formatSize = (bytes) => {
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      if (bytes < 1024 * 1024 * 1024)
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+      return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+    };
+
+    // Calculate total system usage
+    let totalSystemSize = 0;
+    let totalSystemNotes = 0;
+    let totalSystemAttachments = 0;
+
     for (const [userId, user] of users.entries()) {
       try {
         const userNotesDir = join(NOTES_BASE_PATH, userId);
@@ -2772,29 +2999,48 @@ app.get("/api/admin/storage", requireAdmin, async (req, res) => {
           userUsage.push({
             userId,
             userName: user.name,
+            userEmail: user.email,
             noteCount: 0,
             attachmentCount: 0,
-            totalSize: "0 KB",
+            notesSizeBytes: 0,
+            attachmentsSizeBytes: 0,
+            totalSizeBytes: 0,
+            notesSize: "0 B",
+            attachmentsSize: "0 B",
+            totalSize: "0 B",
+            lastUpdated: null,
           });
           continue;
         }
 
-        const noteFiles = await fs.readdir(userNotesDir);
-        const jsonFiles = noteFiles.filter((file) => file.endsWith(".json"));
+        const entries = await fs.readdir(userNotesDir, { withFileTypes: true });
+        const noteDirectories = entries.filter((entry) => entry.isDirectory());
 
-        let totalSizeBytes = 0;
+        let notesSizeBytes = 0;
+        let attachmentsSizeBytes = 0;
         let attachmentCount = 0;
+        let lastUpdated = null;
 
-        // Calculate notes size
-        for (const file of jsonFiles) {
-          const filePath = join(userNotesDir, file);
-          const stats = await fs.stat(filePath);
-          totalSizeBytes += stats.size;
+        // Process each note directory
+        for (const noteDir of noteDirectories) {
+          const notePath = join(userNotesDir, noteDir.name);
 
-          // Check for attachments
-          const noteDir = join(userNotesDir, file.replace(".json", ""));
-          if (fsSync.existsSync(noteDir)) {
-            const attachmentsDir = join(noteDir, "attachments");
+          // Check if this is a valid note directory (has metadata.json)
+          const metadataPath = join(notePath, "metadata.json");
+          if (fsSync.existsSync(metadataPath)) {
+            // Calculate note metadata and content size
+            const metadataStats = await fs.stat(metadataPath);
+            notesSizeBytes += metadataStats.size;
+
+            // Check for note content
+            const contentPath = join(notePath, "note.md");
+            if (fsSync.existsSync(contentPath)) {
+              const contentStats = await fs.stat(contentPath);
+              notesSizeBytes += contentStats.size;
+            }
+
+            // Check for attachments
+            const attachmentsDir = join(notePath, "attachments");
             if (fsSync.existsSync(attachmentsDir)) {
               const attachments = await fs.readdir(attachmentsDir);
               attachmentCount += attachments.length;
@@ -2802,43 +3048,174 @@ app.get("/api/admin/storage", requireAdmin, async (req, res) => {
               for (const attachment of attachments) {
                 const attachmentPath = join(attachmentsDir, attachment);
                 const attachmentStats = await fs.stat(attachmentPath);
-                totalSizeBytes += attachmentStats.size;
+                attachmentsSizeBytes += attachmentStats.size;
               }
+            }
+
+            // Track last updated time
+            try {
+              const metadata = JSON.parse(
+                await fs.readFile(metadataPath, "utf8")
+              );
+              const updated = new Date(metadata.updated || metadata.created);
+              if (!lastUpdated || updated > lastUpdated) {
+                lastUpdated = updated;
+              }
+            } catch (error) {
+              // Ignore metadata parsing errors
             }
           }
         }
 
-        const formatSize = (bytes) => {
-          if (bytes < 1024) return `${bytes} B`;
-          if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-          if (bytes < 1024 * 1024 * 1024)
-            return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-          return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-        };
+        // Also check for legacy JSON files
+        const jsonFiles = entries.filter(
+          (entry) => entry.isFile() && entry.name.endsWith(".json")
+        );
+        for (const file of jsonFiles) {
+          const filePath = join(userNotesDir, file.name);
+          const stats = await fs.stat(filePath);
+          notesSizeBytes += stats.size;
+        }
+
+        const totalSizeBytes = notesSizeBytes + attachmentsSizeBytes;
+
+        // Update system totals
+        totalSystemSize += totalSizeBytes;
+        totalSystemNotes += noteDirectories.length + jsonFiles.length;
+        totalSystemAttachments += attachmentCount;
 
         userUsage.push({
           userId,
           userName: user.name,
-          noteCount: jsonFiles.length,
+          userEmail: user.email,
+          noteCount: noteDirectories.length + jsonFiles.length,
           attachmentCount,
+          notesSizeBytes,
+          attachmentsSizeBytes,
+          totalSizeBytes,
+          notesSize: formatSize(notesSizeBytes),
+          attachmentsSize: formatSize(attachmentsSizeBytes),
           totalSize: formatSize(totalSizeBytes),
+          lastUpdated: lastUpdated ? lastUpdated.toISOString() : null,
         });
       } catch (userError) {
         console.error(`Error calculating usage for user ${userId}:`, userError);
         userUsage.push({
           userId,
           userName: user.name,
+          userEmail: user.email,
           noteCount: 0,
           attachmentCount: 0,
+          notesSizeBytes: 0,
+          attachmentsSizeBytes: 0,
+          totalSizeBytes: 0,
+          notesSize: "Error",
+          attachmentsSize: "Error",
           totalSize: "Error",
+          lastUpdated: null,
         });
       }
     }
 
+    // Sort by total size descending
+    userUsage.sort((a, b) => b.totalSizeBytes - a.totalSizeBytes);
+
     res.json({
       location: NOTES_BASE_PATH,
+      systemTotals: {
+        totalSize: formatSize(totalSystemSize),
+        totalSizeBytes: totalSystemSize,
+        totalNotes: totalSystemNotes,
+        totalAttachments: totalSystemAttachments,
+        totalUsers: users.size,
+      },
       userUsage,
+      lastRefreshed: new Date().toISOString(),
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Validate storage location (admin only)
+app.post("/api/admin/storage/validate", requireAdmin, async (req, res) => {
+  try {
+    const { location } = req.body;
+
+    if (!location) {
+      return res.status(400).json({ error: "Storage location is required" });
+    }
+
+    const trimmedLocation = location.trim();
+
+    // Basic path validation
+    if (trimmedLocation.includes("..") || trimmedLocation.includes("~")) {
+      return res.status(400).json({
+        error: "Relative paths and home directory shortcuts are not allowed",
+      });
+    }
+
+    // Check if path is absolute
+    if (
+      !trimmedLocation.startsWith("/") &&
+      !trimmedLocation.match(/^[A-Za-z]:\\/)
+    ) {
+      return res.status(400).json({
+        error: "Please provide an absolute path",
+      });
+    }
+
+    // Check if path exists or can be created
+    try {
+      const pathExists = fsSync.existsSync(trimmedLocation);
+
+      if (!pathExists) {
+        // Try to create the directory
+        await ensureDir(trimmedLocation);
+
+        // Check if we can write to it
+        const testFile = join(trimmedLocation, `.test-${Date.now()}.tmp`);
+        await fs.writeFile(testFile, "test");
+        await fs.unlink(testFile);
+
+        res.json({
+          success: true,
+          message: "Location is valid and directory was created",
+          exists: false,
+          writable: true,
+        });
+      } else {
+        // Check if it's a directory
+        const stats = await fs.stat(trimmedLocation);
+        if (!stats.isDirectory()) {
+          return res.status(400).json({
+            error: "Path exists but is not a directory",
+          });
+        }
+
+        // Check if we can write to it
+        try {
+          const testFile = join(trimmedLocation, `.test-${Date.now()}.tmp`);
+          await fs.writeFile(testFile, "test");
+          await fs.unlink(testFile);
+
+          res.json({
+            success: true,
+            message: "Location is valid and writable",
+            exists: true,
+            writable: true,
+          });
+        } catch (writeError) {
+          return res.status(400).json({
+            error: "Directory exists but is not writable",
+          });
+        }
+      }
+    } catch (pathError) {
+      return res.status(400).json({
+        error: `Invalid storage location: ${pathError.message}`,
+      });
+    }
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -2853,18 +3230,32 @@ app.post("/api/admin/storage/location", requireAdmin, async (req, res) => {
       return res.status(400).json({ error: "Storage location is required" });
     }
 
+    const trimmedLocation = location.trim();
+
     // Validate the path exists or can be created
     try {
-      await ensureDir(location);
-      NOTES_BASE_PATH = location;
+      await ensureDir(trimmedLocation);
+      NOTES_BASE_PATH = trimmedLocation;
 
       console.log(
-        `Admin ${req.adminUser.email} updated storage location to: ${location}`
+        `Admin ${req.adminUser.email} updated storage location to: ${trimmedLocation}`
       );
+
+      // Track admin action
+      addAccessHistoryEvent(req.adminUser.id, "admin_action", {
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.get("User-Agent"),
+        success: true,
+        additionalInfo: {
+          action: "update_storage_location",
+          oldLocation: NOTES_BASE_PATH,
+          newLocation: trimmedLocation,
+        },
+      });
+
       res.json({ success: true, location: NOTES_BASE_PATH });
     } catch (pathError) {
       res
-
         .status(400)
         .json({ error: `Invalid storage location: ${pathError.message}` });
     }
@@ -2924,11 +3315,706 @@ app.post(
       console.log(
         `Admin ${req.adminUser.email} cleared unknown tags for user: ${user.email}, ${clearedCount} notes updated`
       );
+
+      // Track admin action
+      addAccessHistoryEvent(userId, "admin_action", {
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.get("User-Agent"),
+        success: true,
+        additionalInfo: {
+          adminId: req.adminUser.id,
+          adminEmail: req.adminUser.email,
+          action: "clear_unknown_tags",
+          notesUpdated: clearedCount,
+        },
+      });
+
       res.json({
         success: true,
         message: `Cleared unknown tags from ${clearedCount} notes`,
       });
     } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// Delete all notes for a user (admin only)
+app.delete(
+  "/api/admin/users/:userId/delete-all-notes",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+
+      const user = users.get(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const userNotesDir = join(NOTES_BASE_PATH, userId);
+      if (!fsSync.existsSync(userNotesDir)) {
+        return res.json({ success: true, message: "No notes found for user" });
+      }
+
+      // Get all note directories
+      const entries = await fs.readdir(userNotesDir, { withFileTypes: true });
+      const noteDirectories = entries.filter((entry) => entry.isDirectory());
+
+      let deletedCount = 0;
+
+      // Delete each note directory
+      for (const noteDir of noteDirectories) {
+        try {
+          const notePath = join(userNotesDir, noteDir.name);
+          await fs.rm(notePath, { recursive: true, force: true });
+          deletedCount++;
+        } catch (error) {
+          console.error(
+            `Error deleting note directory ${noteDir.name}:`,
+            error
+          );
+        }
+      }
+
+      // Also delete any loose metadata files (legacy format)
+      const files = await fs.readdir(userNotesDir);
+      const jsonFiles = files.filter((file) => file.endsWith(".json"));
+
+      for (const file of jsonFiles) {
+        try {
+          const filePath = join(userNotesDir, file);
+          await fs.unlink(filePath);
+          deletedCount++;
+        } catch (error) {
+          console.error(`Error deleting note file ${file}:`, error);
+        }
+      }
+
+      // Clear tags and notebooks files if they exist
+      const tagsFile = join(userNotesDir, "tags.json");
+      const notebooksFile = join(userNotesDir, "notebooks.json");
+      const foldersFile = join(userNotesDir, "folders.json");
+
+      try {
+        if (fsSync.existsSync(tagsFile)) {
+          await fs.writeFile(tagsFile, JSON.stringify([], null, 2));
+        }
+        if (fsSync.existsSync(notebooksFile)) {
+          await fs.writeFile(notebooksFile, JSON.stringify([], null, 2));
+        }
+        if (fsSync.existsSync(foldersFile)) {
+          await fs.writeFile(foldersFile, JSON.stringify([], null, 2));
+        }
+      } catch (error) {
+        console.error("Error clearing user metadata files:", error);
+      }
+
+      console.log(
+        `Admin ${req.adminUser.email} deleted all notes for user: ${user.email}, ${deletedCount} items deleted`
+      );
+
+      // Track admin action
+      addAccessHistoryEvent(userId, "admin_action", {
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.get("User-Agent"),
+        success: true,
+        additionalInfo: {
+          adminId: req.adminUser.id,
+          adminEmail: req.adminUser.email,
+          action: "delete_all_notes",
+          itemsDeleted: deletedCount,
+        },
+      });
+
+      res.json({
+        success: true,
+        message: `Deleted all notes for user (${deletedCount} items removed)`,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// Delete all attachments for a user (admin only)
+app.delete(
+  "/api/admin/users/:userId/delete-all-attachments",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+
+      const user = users.get(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const userNotesDir = join(NOTES_BASE_PATH, userId);
+      if (!fsSync.existsSync(userNotesDir)) {
+        return res.json({ success: true, message: "No notes found for user" });
+      }
+
+      // Get all note directories
+      const entries = await fs.readdir(userNotesDir, { withFileTypes: true });
+      const noteDirectories = entries.filter((entry) => entry.isDirectory());
+
+      let deletedCount = 0;
+      let totalSizeDeleted = 0;
+
+      // Process each note directory
+      for (const noteDir of noteDirectories) {
+        try {
+          const notePath = join(userNotesDir, noteDir.name);
+          const attachmentsPath = join(notePath, "attachments");
+
+          // Check if attachments directory exists
+          if (fsSync.existsSync(attachmentsPath)) {
+            const attachments = await fs.readdir(attachmentsPath);
+
+            for (const attachment of attachments) {
+              try {
+                const attachmentPath = join(attachmentsPath, attachment);
+                const stats = await fs.stat(attachmentPath);
+                totalSizeDeleted += stats.size;
+
+                await fs.unlink(attachmentPath);
+                deletedCount++;
+              } catch (error) {
+                console.error(
+                  `Error deleting attachment ${attachment}:`,
+                  error
+                );
+              }
+            }
+
+            // Remove the empty attachments directory
+            try {
+              await fs.rmdir(attachmentsPath);
+            } catch (error) {
+              console.error(
+                `Error removing attachments directory for ${noteDir.name}:`,
+                error
+              );
+            }
+          }
+
+          // Update note metadata to remove attachment references
+          const metadataPath = join(notePath, "metadata.json");
+          if (fsSync.existsSync(metadataPath)) {
+            try {
+              const metadataContent = await fs.readFile(metadataPath, "utf8");
+              const metadata = JSON.parse(metadataContent);
+
+              if (metadata.attachments && metadata.attachments.length > 0) {
+                metadata.attachments = [];
+                metadata.updated = new Date().toISOString();
+
+                await fs.writeFile(
+                  metadataPath,
+                  JSON.stringify(metadata, null, 2)
+                );
+              }
+            } catch (error) {
+              console.error(
+                `Error updating metadata for ${noteDir.name}:`,
+                error
+              );
+            }
+          }
+        } catch (error) {
+          console.error(
+            `Error processing note directory ${noteDir.name}:`,
+            error
+          );
+        }
+      }
+
+      // Format the size deleted
+      const formatSize = (bytes) => {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        if (bytes < 1024 * 1024 * 1024)
+          return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+        return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+      };
+
+      console.log(
+        `Admin ${req.adminUser.email} deleted all attachments for user: ${
+          user.email
+        }, ${deletedCount} files deleted (${formatSize(totalSizeDeleted)})`
+      );
+
+      // Track admin action
+      addAccessHistoryEvent(userId, "admin_action", {
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.get("User-Agent"),
+        success: true,
+        additionalInfo: {
+          adminId: req.adminUser.id,
+          adminEmail: req.adminUser.email,
+          action: "delete_all_attachments",
+          filesDeleted: deletedCount,
+          sizeFreed: totalSizeDeleted,
+        },
+      });
+
+      res.json({
+        success: true,
+        message: `Deleted all attachments for user (${deletedCount} files, ${formatSize(
+          totalSizeDeleted
+        )} freed)`,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// Generate backup codes
+function generateBackupCodes(count = 10) {
+  const codes = [];
+  for (let i = 0; i < count; i++) {
+    // Generate 8-digit codes
+    const code = Math.floor(10000000 + Math.random() * 90000000).toString();
+    codes.push(code);
+  }
+  return codes;
+}
+
+// Enable OTP for a user (admin only)
+app.post(
+  "/api/admin/users/:userId/enable-otp",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { force = false } = req.body;
+
+      const user = users.get(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Check if OTP is already enabled
+      if (user.otp?.enabled && !force) {
+        return res
+          .status(400)
+          .json({ error: "OTP is already enabled for this user" });
+      }
+
+      // Generate new OTP secret
+      const secret = speakeasy.generateSecret({
+        name: `Noet (${user.email})`,
+        issuer: "Noet Note App",
+        length: 32,
+      });
+
+      // Generate backup codes
+      const backupCodes = generateBackupCodes(10);
+
+      // Update user with OTP settings
+      user.otp = {
+        enabled: true,
+        secret: secret.base32,
+        backupCodes: backupCodes,
+        enabledAt: new Date().toISOString(),
+        enabledBy: req.adminUser.id,
+        qrCodeUrl: secret.otpauth_url,
+      };
+
+      users.set(userId, user);
+      await saveUsers();
+
+      console.log(
+        `Admin ${req.adminUser.email} enabled OTP for user: ${user.email}`
+      );
+
+      // Track OTP enable event
+      addAccessHistoryEvent(userId, "otp_enable", {
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.get("User-Agent"),
+        success: true,
+        additionalInfo: {
+          adminId: req.adminUser.id,
+          adminEmail: req.adminUser.email,
+          force: force,
+        },
+      });
+
+      res.json({
+        success: true,
+        message: "OTP enabled successfully",
+        secret: secret.base32,
+        qrCodeUrl: secret.otpauth_url,
+        backupCodes: backupCodes,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// Disable OTP for a user (admin only)
+app.post(
+  "/api/admin/users/:userId/disable-otp",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+
+      const user = users.get(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Check if OTP is enabled
+      if (!user.otp?.enabled) {
+        return res
+          .status(400)
+          .json({ error: "OTP is not enabled for this user" });
+      }
+
+      // Disable OTP
+      user.otp = {
+        enabled: false,
+        disabledAt: new Date().toISOString(),
+        disabledBy: req.adminUser.id,
+      };
+
+      users.set(userId, user);
+      await saveUsers();
+
+      console.log(
+        `Admin ${req.adminUser.email} disabled OTP for user: ${user.email}`
+      );
+
+      // Track OTP disable event
+      addAccessHistoryEvent(userId, "otp_disable", {
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.get("User-Agent"),
+        success: true,
+        additionalInfo: {
+          adminId: req.adminUser.id,
+          adminEmail: req.adminUser.email,
+        },
+      });
+
+      res.json({
+        success: true,
+        message: "OTP disabled successfully",
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// Reset OTP for a user (admin only)
+app.post(
+  "/api/admin/users/:userId/reset-otp",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+
+      const user = users.get(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Generate new OTP secret
+      const secret = speakeasy.generateSecret({
+        name: `Noet (${user.email})`,
+        issuer: "Noet Note App",
+        length: 32,
+      });
+
+      // Generate new backup codes
+      const backupCodes = generateBackupCodes(10);
+
+      // Update user with new OTP settings
+      user.otp = {
+        enabled: true,
+        secret: secret.base32,
+        backupCodes: backupCodes,
+        resetAt: new Date().toISOString(),
+        resetBy: req.adminUser.id,
+        qrCodeUrl: secret.otpauth_url,
+      };
+
+      users.set(userId, user);
+      await saveUsers();
+
+      console.log(
+        `Admin ${req.adminUser.email} reset OTP for user: ${user.email}`
+      );
+
+      // Track OTP reset event
+      addAccessHistoryEvent(userId, "otp_reset", {
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.get("User-Agent"),
+        success: true,
+        additionalInfo: {
+          adminId: req.adminUser.id,
+          adminEmail: req.adminUser.email,
+        },
+      });
+
+      res.json({
+        success: true,
+        message: "OTP reset successfully",
+        secret: secret.base32,
+        qrCodeUrl: secret.otpauth_url,
+        backupCodes: backupCodes,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// Get OTP status for a user (admin only)
+app.get(
+  "/api/admin/users/:userId/otp-status",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+
+      const user = users.get(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const otpStatus = {
+        enabled: user.otp?.enabled || false,
+        enabledAt: user.otp?.enabledAt || null,
+        enabledBy: user.otp?.enabledBy || null,
+        resetAt: user.otp?.resetAt || null,
+        resetBy: user.otp?.resetBy || null,
+        disabledAt: user.otp?.disabledAt || null,
+        disabledBy: user.otp?.disabledBy || null,
+        backupCodesCount: user.otp?.backupCodes?.length || 0,
+      };
+
+      res.json(otpStatus);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// Get access history for a user (admin only)
+app.get(
+  "/api/admin/users/:userId/access-history",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { limit = 100, offset = 0 } = req.query;
+
+      const user = users.get(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const userHistory = accessHistory.get(userId) || [];
+
+      // Apply pagination
+      const parsedLimit = parseInt(limit, 10);
+      const parsedOffset = parseInt(offset, 10);
+      const paginatedHistory = userHistory.slice(
+        parsedOffset,
+        parsedOffset + parsedLimit
+      );
+
+      res.json({
+        success: true,
+        history: paginatedHistory,
+        total: userHistory.length,
+        limit: parsedLimit,
+        offset: parsedOffset,
+        hasMore: parsedOffset + parsedLimit < userHistory.length,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// Complete user data wipe (admin only) - DELETE EVERYTHING
+app.delete(
+  "/api/admin/users/:userId/delete-all-data",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+
+      const user = users.get(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Prevent admin from deleting their own account
+      if (userId === req.adminUser.id) {
+        return res.status(400).json({
+          error: "Cannot delete your own admin account",
+        });
+      }
+
+      let results = {
+        notesDeleted: 0,
+        attachmentsDeleted: 0,
+        sizeFreed: 0,
+        otpCleared: false,
+        accessHistoryCleared: false,
+        userDeleted: false,
+        errors: [],
+      };
+
+      const userNotesDir = join(NOTES_BASE_PATH, userId);
+      let totalSizeDeleted = 0;
+
+      // 1. Delete all notes and attachments
+      if (fsSync.existsSync(userNotesDir)) {
+        try {
+          const entries = await fs.readdir(userNotesDir, {
+            withFileTypes: true,
+          });
+
+          // Delete note directories
+          const noteDirectories = entries.filter((entry) =>
+            entry.isDirectory()
+          );
+          for (const noteDir of noteDirectories) {
+            const notePath = join(userNotesDir, noteDir.name);
+
+            // Calculate attachments size before deletion
+            const attachmentsDir = join(notePath, "attachments");
+            if (fsSync.existsSync(attachmentsDir)) {
+              const attachments = await fs.readdir(attachmentsDir);
+              results.attachmentsDeleted += attachments.length;
+
+              for (const attachment of attachments) {
+                const attachmentPath = join(attachmentsDir, attachment);
+                const stats = await fs.stat(attachmentPath);
+                totalSizeDeleted += stats.size;
+              }
+            }
+
+            // Calculate note content size
+            const metadataPath = join(notePath, "metadata.json");
+            const contentPath = join(notePath, "note.md");
+
+            if (fsSync.existsSync(metadataPath)) {
+              const stats = await fs.stat(metadataPath);
+              totalSizeDeleted += stats.size;
+            }
+
+            if (fsSync.existsSync(contentPath)) {
+              const stats = await fs.stat(contentPath);
+              totalSizeDeleted += stats.size;
+            }
+
+            // Delete the entire note directory
+            await fs.rm(notePath, { recursive: true, force: true });
+            results.notesDeleted++;
+          }
+
+          // Delete legacy JSON files
+          const jsonFiles = entries.filter(
+            (entry) => entry.isFile() && entry.name.endsWith(".json")
+          );
+          for (const file of jsonFiles) {
+            const filePath = join(userNotesDir, file.name);
+            const stats = await fs.stat(filePath);
+            totalSizeDeleted += stats.size;
+            await fs.unlink(filePath);
+            results.notesDeleted++;
+          }
+
+          // Remove the user's notes directory
+          await fs.rmdir(userNotesDir);
+        } catch (error) {
+          results.errors.push(`Failed to delete notes: ${error.message}`);
+        }
+      }
+
+      // 2. Clear OTP settings
+      try {
+        if (user.otpSecret) {
+          user.otpSecret = null;
+          user.otpEnabled = false;
+          user.backupCodes = [];
+          results.otpCleared = true;
+        }
+      } catch (error) {
+        results.errors.push(`Failed to clear OTP: ${error.message}`);
+      }
+
+      // 3. Clear access history
+      try {
+        if (accessHistory.has(userId)) {
+          accessHistory.delete(userId);
+          results.accessHistoryCleared = true;
+        }
+      } catch (error) {
+        results.errors.push(`Failed to clear access history: ${error.message}`);
+      }
+
+      // 4. Delete user account from system
+      try {
+        users.delete(userId);
+        results.userDeleted = true;
+      } catch (error) {
+        results.errors.push(`Failed to delete user account: ${error.message}`);
+      }
+
+      results.sizeFreed = totalSizeDeleted;
+
+      // Save users to persist changes
+      await saveUsers();
+
+      const formatSize = (bytes) => {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        if (bytes < 1024 * 1024 * 1024)
+          return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+        return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+      };
+
+      console.log(
+        `Admin ${req.adminUser.email} completed data wipe for user: ${user.email}`
+      );
+      console.log("Wipe results:", results);
+
+      // Track admin action (but not for the deleted user since they're gone)
+      addAccessHistoryEvent(req.adminUser.id, "admin_action", {
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.get("User-Agent"),
+        success: true,
+        additionalInfo: {
+          action: "complete_user_data_wipe",
+          targetUserId: userId,
+          targetUserEmail: user.email,
+          notesDeleted: results.notesDeleted,
+          attachmentsDeleted: results.attachmentsDeleted,
+          sizeFreed: formatSize(results.sizeFreed),
+          errors: results.errors,
+        },
+      });
+
+      res.json({
+        success: true,
+        message: `Complete data wipe completed for user: ${user.email}`,
+        results: {
+          ...results,
+          sizeFreeFormatted: formatSize(results.sizeFreed),
+        },
+      });
+    } catch (error) {
+      console.error("Complete user data wipe error:", error);
       res.status(500).json({ error: error.message });
     }
   }
@@ -3498,6 +4584,233 @@ app.post("/api/admin/config/auto-save", requireAdmin, async (req, res) => {
 // Get auto-save configuration (public endpoint for frontend)
 app.get("/api/config/auto-save", (req, res) => {
   res.json(AUTO_SAVE_CONFIG);
+});
+
+// ==========================================
+// BACKUP CONFIGURATION
+// ==========================================
+
+// Default backup configuration
+const BACKUP_CONFIG = {
+  enableAutoBackup: true,
+  backupBeforeDestruction: true,
+  maxBackupsPerUser: 10,
+  backupLocation: "backups",
+};
+
+// Get backup configuration (admin only)
+app.get("/api/admin/backup-config", requireAdmin, (req, res) => {
+  res.json(BACKUP_CONFIG);
+});
+
+// Update backup configuration (admin only)
+app.put("/api/admin/backup-config", requireAdmin, async (req, res) => {
+  try {
+    const {
+      enableAutoBackup,
+      backupBeforeDestruction,
+      maxBackupsPerUser,
+      backupLocation,
+    } = req.body;
+
+    if (enableAutoBackup !== undefined) {
+      BACKUP_CONFIG.enableAutoBackup = Boolean(enableAutoBackup);
+    }
+    if (backupBeforeDestruction !== undefined) {
+      BACKUP_CONFIG.backupBeforeDestruction = Boolean(backupBeforeDestruction);
+    }
+    if (maxBackupsPerUser !== undefined) {
+      BACKUP_CONFIG.maxBackupsPerUser = Math.max(
+        1, // Minimum 1 backup
+        Math.min(100, maxBackupsPerUser) // Maximum 100 backups
+      );
+    }
+    if (backupLocation !== undefined) {
+      BACKUP_CONFIG.backupLocation = backupLocation.trim() || "backups";
+    }
+
+    console.log(
+      `Admin ${req.adminUser.email} updated backup configuration:`,
+      BACKUP_CONFIG
+    );
+    res.json(BACKUP_CONFIG);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create backup (admin only)
+app.post("/api/admin/backup", requireAdmin, async (req, res) => {
+  try {
+    const { userId, backupType, maxBackups, location } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+
+    const user = users.get(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Create backup directory if it doesn't exist
+    const backupBaseDir = join(process.cwd(), location || "backups");
+    await ensureDir(backupBaseDir);
+
+    const userBackupDir = join(backupBaseDir, userId);
+    await ensureDir(userBackupDir);
+
+    // Create timestamp for backup
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const backupId = `${backupType || "manual"}-${timestamp}`;
+    const backupDir = join(userBackupDir, backupId);
+    await ensureDir(backupDir);
+
+    // Copy user's notes directory
+    const userNotesDir = join(NOTES_BASE_PATH, userId);
+    const backupNotesDir = join(backupDir, "notes");
+
+    if (fsSync.existsSync(userNotesDir)) {
+      await fs.cp(userNotesDir, backupNotesDir, { recursive: true });
+    }
+
+    // Create backup metadata
+    const backupMetadata = {
+      id: backupId,
+      userId,
+      userEmail: user.email,
+      backupType: backupType || "manual",
+      timestamp: new Date().toISOString(),
+      createdBy: req.adminUser.id,
+      createdByEmail: req.adminUser.email,
+      location: backupDir,
+      size: 0, // Will be calculated after copying
+    };
+
+    // Calculate backup size
+    const calculateDirSize = async (dirPath) => {
+      let size = 0;
+      if (fsSync.existsSync(dirPath)) {
+        const files = await fs.readdir(dirPath, { withFileTypes: true });
+        for (const file of files) {
+          const filePath = join(dirPath, file.name);
+          if (file.isDirectory()) {
+            size += await calculateDirSize(filePath);
+          } else {
+            const stats = await fs.stat(filePath);
+            size += stats.size;
+          }
+        }
+      }
+      return size;
+    };
+
+    backupMetadata.size = await calculateDirSize(backupDir);
+
+    // Save backup metadata
+    const metadataPath = join(backupDir, "backup-metadata.json");
+    await fs.writeFile(metadataPath, JSON.stringify(backupMetadata, null, 2));
+
+    // Clean up old backups if needed
+    const maxBackupLimit = maxBackups || BACKUP_CONFIG.maxBackupsPerUser;
+    const backupFiles = await fs.readdir(userBackupDir);
+    const backupDirs = [];
+
+    for (const file of backupFiles) {
+      const filePath = join(userBackupDir, file);
+      const stats = await fs.stat(filePath);
+      if (stats.isDirectory()) {
+        backupDirs.push({ name: file, created: stats.birthtime });
+      }
+    }
+
+    // Sort by creation time (oldest first)
+    backupDirs.sort((a, b) => a.created - b.created);
+
+    // Remove old backups if we exceed the limit
+    if (backupDirs.length > maxBackupLimit) {
+      const toRemove = backupDirs.slice(0, backupDirs.length - maxBackupLimit);
+      for (const backup of toRemove) {
+        const backupPath = join(userBackupDir, backup.name);
+        await fs.rm(backupPath, { recursive: true, force: true });
+      }
+    }
+
+    console.log(
+      `Backup created for user ${user.email} by admin ${req.adminUser.email}: ${backupId}`
+    );
+
+    res.json({
+      success: true,
+      backup: backupMetadata,
+      message: "Backup created successfully",
+    });
+  } catch (error) {
+    console.error("Error creating backup:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get backup history (admin only)
+app.get("/api/admin/backup-history/:userId", requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = users.get(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const backupBaseDir = join(process.cwd(), BACKUP_CONFIG.backupLocation);
+    const userBackupDir = join(backupBaseDir, userId);
+
+    const backupHistory = [];
+
+    if (fsSync.existsSync(userBackupDir)) {
+      const backupFiles = await fs.readdir(userBackupDir);
+
+      for (const file of backupFiles) {
+        const backupPath = join(userBackupDir, file);
+        const stats = await fs.stat(backupPath);
+
+        if (stats.isDirectory()) {
+          const metadataPath = join(backupPath, "backup-metadata.json");
+
+          if (fsSync.existsSync(metadataPath)) {
+            try {
+              const metadata = JSON.parse(
+                await fs.readFile(metadataPath, "utf8")
+              );
+              backupHistory.push(metadata);
+            } catch (error) {
+              console.error(
+                `Error reading backup metadata for ${file}:`,
+                error
+              );
+            }
+          } else {
+            // Create basic metadata for backups without metadata files
+            backupHistory.push({
+              id: file,
+              userId,
+              backupType: "legacy",
+              timestamp: stats.birthtime.toISOString(),
+              size: 0,
+              location: backupPath,
+            });
+          }
+        }
+      }
+    }
+
+    // Sort by timestamp (newest first)
+    backupHistory.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    res.json(backupHistory);
+  } catch (error) {
+    console.error("Error getting backup history:", error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // ==========================================

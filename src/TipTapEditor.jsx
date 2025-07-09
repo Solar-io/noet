@@ -19,6 +19,8 @@ import HorizontalRule from "@tiptap/extension-horizontal-rule";
 import Strike from "@tiptap/extension-strike";
 import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
+import Placeholder from "@tiptap/extension-placeholder";
+import { FontSize } from "./extensions/FontSize.js";
 import {
   Bold,
   Italic,
@@ -387,6 +389,9 @@ const TipTapEditor = ({
           class: "text-style",
         },
       }),
+      FontSize.configure({
+        types: ["textStyle"],
+      }),
       Color.configure({
         types: ["textStyle"],
       }),
@@ -436,8 +441,12 @@ const TipTapEditor = ({
           class: "editor-hr",
         },
       }),
+      Placeholder.configure({
+        placeholder: "Start writing your note...",
+        emptyEditorClass: "is-editor-empty",
+      }),
     ],
-    content: note?.content || "<p>Start writing your note...</p>",
+    content: note?.content || "<p></p>",
     onUpdate: ({ editor }) => {
       const html = editor.getHTML();
       const markdown = turndownService.turndown(html);
@@ -524,6 +533,41 @@ const TipTapEditor = ({
         class:
           "prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none",
       },
+      handlePaste: (view, event) => {
+        // Handle clipboard paste for images
+        const clipboardData = event.clipboardData || window.clipboardData;
+        if (clipboardData && clipboardData.items) {
+          const items = Array.from(clipboardData.items);
+
+          for (const item of items) {
+            if (item.type.startsWith("image/")) {
+              event.preventDefault();
+
+              const file = item.getAsFile();
+              if (file) {
+                // Check file size
+                const maxSize = 100 * 1024 * 1024; // 100MB
+                if (file.size > maxSize) {
+                  alert(
+                    "Image file too large. Please choose a file under 100MB."
+                  );
+                  return true;
+                }
+
+                console.log(
+                  "📋 Pasting image from clipboard:",
+                  file.name || "clipboard-image"
+                );
+
+                // Upload the file using our existing upload function
+                handleFileUpload(file, true);
+                return true;
+              }
+            }
+          }
+        }
+        return false;
+      },
       handleDrop: (view, event, slice, moved) => {
         if (
           !moved &&
@@ -542,30 +586,10 @@ const TipTapEditor = ({
               return true;
             }
 
-            const reader = new FileReader();
-            reader.onload = (e) => {
-              const imageUrl = e.target?.result;
-              if (imageUrl) {
-                const { schema } = view.state;
-                const coordinates = view.posAtCoords({
-                  left: event.clientX,
-                  top: event.clientY,
-                });
-                if (coordinates) {
-                  const node = schema.nodes.image.create({
-                    src: imageUrl,
-                    alt: file.name,
-                    title: file.name,
-                  });
-                  const transaction = view.state.tr.insert(
-                    coordinates.pos,
-                    node
-                  );
-                  view.dispatch(transaction);
-                }
-              }
-            };
-            reader.readAsDataURL(file);
+            console.log("🔄 Dropping image:", file.name);
+
+            // Upload the file using our existing upload function
+            handleFileUpload(file, true);
             return true;
           }
         }
@@ -581,14 +605,20 @@ const TipTapEditor = ({
           if (file.type.startsWith("image/")) {
             event.preventDefault();
             event.dataTransfer.dropEffect = "copy";
-            view.dom.classList.add("drag-over");
+            view.dom.classList.add("drag-over-image");
             return true;
           }
         }
         return false;
       },
-      handleDragLeave: (view) => {
-        view.dom.classList.remove("drag-over");
+      handleDragLeave: (view, event) => {
+        // Only remove the class if we're leaving the editor area
+        if (!view.dom.contains(event.relatedTarget)) {
+          view.dom.classList.remove("drag-over-image");
+        }
+      },
+      handleDragEnd: (view) => {
+        view.dom.classList.remove("drag-over-image");
       },
     },
   });
@@ -625,7 +655,7 @@ const TipTapEditor = ({
     });
 
     if (editor && note && note.id) {
-      const newContent = note.content || "<p>Start writing your note...</p>";
+      const newContent = note.content || "<p></p>";
       const currentContent = editor.getHTML();
 
       // Only update if this is a different note (by ID) or a version switch
@@ -635,9 +665,7 @@ const TipTapEditor = ({
       const isVersionSwitch = note.tempVersionPreview; // Check if this is a version switch
       const hasSignificantChange =
         currentContent !== newContent &&
-        (currentContent === "<p>Start writing your note...</p>" ||
-          currentContent === "<p></p>" ||
-          !currentContent.trim());
+        (currentContent === "<p></p>" || !currentContent.trim());
 
       console.log("🔍 TipTap content update check:", {
         isNewNote,
@@ -971,252 +999,6 @@ const TipTapEditor = ({
   // Toolbar actions
   const toggleBold = () => editor?.chain().focus().toggleBold().run();
   const toggleItalic = () => editor?.chain().focus().toggleItalic().run();
-  const toggleBulletList = () => {
-    console.log("🔘 toggleBulletList clicked", {
-      isActive: editor?.isActive("bulletList"),
-      isTaskList: editor?.isActive("taskList"),
-      selection: editor?.state.selection,
-      isEmpty: editor?.isEmpty,
-    });
-
-    if (!editor) return;
-
-    const { selection } = editor.state;
-    const { $from, $to } = selection;
-
-    // Check if we're already in a list
-    if (editor.isActive("bulletList")) {
-      console.log("🔘 Already in bullet list, lifting item");
-      const result = editor.chain().focus().liftListItem("listItem").run();
-      console.log("🔘 Lift result:", result);
-      return;
-    }
-
-    // Get selected text or use empty string
-    const text = editor.state.doc.textBetween($from.pos, $to.pos, " ");
-    console.log("🔘 Selected text:", text);
-
-    if (text.trim()) {
-      // If there's selected text, convert it to a list
-      console.log("🔘 Converting selected text to bullet list");
-      const result = editor.chain().focus().toggleBulletList().run();
-      console.log("🔘 Toggle result:", result);
-    } else {
-      // If no text selected, try standard toggle first
-      console.log("🔘 No text selected, trying standard toggle");
-      const result = editor.chain().focus().toggleBulletList().run();
-      console.log("🔘 Standard toggle result:", result);
-
-      // Check if list was created
-      setTimeout(() => {
-        if (!editor.isActive("bulletList")) {
-          console.log("🔘 Standard toggle failed, trying direct insertion");
-          // Try direct insertion first
-          const insertResult = editor
-            .chain()
-            .focus()
-            .insertContent({
-              type: "bulletList",
-              content: [
-                {
-                  type: "listItem",
-                  content: [
-                    {
-                      type: "paragraph",
-                      content: [],
-                    },
-                  ],
-                },
-              ],
-            })
-            .run();
-          console.log("🔘 Direct insertion result:", insertResult);
-
-          // If direct insertion also fails, try force create
-          if (!insertResult) {
-            console.log("🔘 Direct insertion failed, trying force create");
-            forceCreateList("bulletList");
-          }
-        }
-      }, 50);
-    }
-
-    // Check state after command
-    setTimeout(() => {
-      console.log("🔘 After toggleBulletList:", {
-        isBulletListActive: editor?.isActive("bulletList"),
-        isListItemActive: editor?.isActive("listItem"),
-        currentSelection: editor?.state.selection,
-        content: editor?.getHTML(),
-      });
-    }, 100);
-  };
-  const toggleOrderedList = () => {
-    console.log("🔢 toggleOrderedList clicked", {
-      isActive: editor?.isActive("orderedList"),
-      isTaskList: editor?.isActive("taskList"),
-      selection: editor?.state.selection,
-      isEmpty: editor?.isEmpty,
-    });
-
-    if (!editor) return;
-
-    const { selection } = editor.state;
-    const { $from, $to } = selection;
-
-    // Check if we're already in a list
-    if (editor.isActive("orderedList")) {
-      console.log("🔢 Already in ordered list, lifting item");
-      const result = editor.chain().focus().liftListItem("listItem").run();
-      console.log("🔢 Lift result:", result);
-      return;
-    }
-
-    // Get selected text or use empty string
-    const text = editor.state.doc.textBetween($from.pos, $to.pos, " ");
-    console.log("🔢 Selected text:", text);
-
-    if (text.trim()) {
-      // If there's selected text, convert it to a list
-      console.log("🔢 Converting selected text to ordered list");
-      const result = editor.chain().focus().toggleOrderedList().run();
-      console.log("🔢 Toggle result:", result);
-    } else {
-      // If no text selected, try standard toggle first
-      console.log("🔢 No text selected, trying standard toggle");
-      const result = editor.chain().focus().toggleOrderedList().run();
-      console.log("🔢 Standard toggle result:", result);
-
-      // Check if list was created
-      setTimeout(() => {
-        if (!editor.isActive("orderedList")) {
-          console.log("🔢 Standard toggle failed, trying direct insertion");
-          // Try direct insertion first
-          const insertResult = editor
-            .chain()
-            .focus()
-            .insertContent({
-              type: "orderedList",
-              content: [
-                {
-                  type: "listItem",
-                  content: [
-                    {
-                      type: "paragraph",
-                      content: [],
-                    },
-                  ],
-                },
-              ],
-            })
-            .run();
-          console.log("🔢 Direct insertion result:", insertResult);
-
-          // If direct insertion also fails, try force create
-          if (!insertResult) {
-            console.log("🔢 Direct insertion failed, trying force create");
-            forceCreateList("orderedList");
-          }
-        }
-      }, 50);
-    }
-
-    // Check state after command
-    setTimeout(() => {
-      console.log("🔢 After toggleOrderedList:", {
-        isOrderedListActive: editor?.isActive("orderedList"),
-        isListItemActive: editor?.isActive("listItem"),
-        currentSelection: editor?.state.selection,
-        content: editor?.getHTML(),
-      });
-    }, 100);
-  };
-  const toggleTaskList = () => {
-    console.log("☑️ toggleTaskList clicked", {
-      isActive: editor?.isActive("taskList"),
-      isBulletList: editor?.isActive("bulletList"),
-      isOrderedList: editor?.isActive("orderedList"),
-      selection: editor?.state.selection,
-      isEmpty: editor?.isEmpty,
-    });
-
-    if (!editor) return;
-
-    const { selection } = editor.state;
-    const { $from, $to } = selection;
-
-    // Check if we're already in a task list
-    if (editor.isActive("taskList")) {
-      console.log("☑️ Already in task list, lifting item");
-      const result = editor.chain().focus().liftListItem("taskItem").run();
-      console.log("☑️ Lift result:", result);
-      return;
-    }
-
-    // Get selected text or use empty string
-    const text = editor.state.doc.textBetween($from.pos, $to.pos, " ");
-    console.log("☑️ Selected text:", text);
-
-    if (text.trim()) {
-      // If there's selected text, convert it to a task list
-      console.log("☑️ Converting selected text to task list");
-      const result = editor.chain().focus().toggleTaskList().run();
-      console.log("☑️ Toggle result:", result);
-    } else {
-      // If no text selected, try standard toggle first
-      console.log("☑️ No text selected, trying standard toggle");
-      const result = editor.chain().focus().toggleTaskList().run();
-      console.log("☑️ Standard toggle result:", result);
-
-      // Check if list was created
-      setTimeout(() => {
-        if (!editor.isActive("taskList")) {
-          console.log("☑️ Standard toggle failed, trying direct insertion");
-          // Try direct insertion first
-          const insertResult = editor
-            .chain()
-            .focus()
-            .insertContent({
-              type: "taskList",
-              content: [
-                {
-                  type: "taskItem",
-                  attrs: {
-                    checked: false,
-                  },
-                  content: [
-                    {
-                      type: "paragraph",
-                      content: [],
-                    },
-                  ],
-                },
-              ],
-            })
-            .run();
-          console.log("☑️ Direct insertion result:", insertResult);
-
-          // If direct insertion also fails, try force create
-          if (!insertResult) {
-            console.log("☑️ Direct insertion failed, trying force create");
-            forceCreateList("taskList");
-          }
-        }
-      }, 50);
-    }
-
-    // Check state after command
-    setTimeout(() => {
-      console.log("☑️ After toggleTaskList:", {
-        isTaskListActive: editor?.isActive("taskList"),
-        isTaskItemActive: editor?.isActive("taskItem"),
-        currentSelection: editor?.state.selection,
-        content: editor?.getHTML(),
-      });
-    }, 100);
-  };
-
-  // Advanced formatting actions
   const toggleStrike = () => editor?.chain().focus().toggleStrike().run();
   const toggleHighlight = () => editor?.chain().focus().toggleHighlight().run();
   const toggleSubscript = () => editor?.chain().focus().toggleSubscript().run();
@@ -1262,11 +1044,11 @@ const TipTapEditor = ({
     console.log("📏 Setting font size:", fontSize);
 
     if (fontSize === "default") {
-      // Remove any font size styling
-      editor.chain().focus().unsetMark("textStyle").run();
+      // Remove any font size styling using the fontSize extension
+      editor.chain().focus().unsetFontSize().run();
     } else {
-      // Apply font size using inline style
-      editor.chain().focus().setMark("textStyle", { fontSize }).run();
+      // Apply font size using the fontSize extension
+      editor.chain().focus().setFontSize(fontSize).run();
     }
   };
 
@@ -1326,6 +1108,7 @@ const TipTapEditor = ({
     await handleFileUpload(file, false); // false for other attachments
   };
 
+  // Enhanced file upload with better error handling and progress feedback
   const handleFileUpload = async (file, isImage) => {
     // Check file size (limit to 100MB)
     const maxSize = 100 * 1024 * 1024; // 100MB
@@ -1377,6 +1160,7 @@ const TipTapEditor = ({
       noteId: note.id,
       userId,
       fileName: file.name,
+      isImage,
     });
 
     try {
@@ -1414,6 +1198,8 @@ const TipTapEditor = ({
       // If it's an image, also insert it into the editor
       if (isImage) {
         const imageUrl = `${backendUrl}/api/${userId}/notes/${note.id}/attachments/${result.attachment.filename}`;
+
+        // Insert image with improved attributes
         editor
           ?.chain()
           .focus()
@@ -1421,10 +1207,14 @@ const TipTapEditor = ({
             src: imageUrl,
             alt: file.name,
             title: file.name,
+            "data-filename": result.attachment.filename,
+            "data-original-name": file.name,
+            "data-size": file.size,
           })
           .run();
-        // Add a new paragraph after the image so user can continue typing
-        editor?.chain().focus().insertContent("\n\n").run();
+
+        // Add a paragraph after the image so user can continue typing
+        editor?.chain().focus().insertContent("<p></p>").run();
       }
       // For non-image attachments, don't insert anything into the editor
       // They will be shown in the attachments panel below
@@ -1556,6 +1346,31 @@ const TipTapEditor = ({
     }
   };
 
+  // Handle title changes
+  const [noteTitle, setNoteTitle] = useState(note?.title || "");
+
+  // Update note title when note prop changes
+  useEffect(() => {
+    setNoteTitle(note?.title || "");
+  }, [note?.title]);
+
+  // Handle title blur event to save title changes
+  const handleTitleBlur = async () => {
+    if (!note || !onSave) return;
+
+    // Only save if title has changed
+    if (noteTitle !== note.title) {
+      try {
+        const updatedNote = { ...note, title: noteTitle };
+        const html = editor?.getHTML() || note.content || "";
+        const markdown = turndownService.turndown(html);
+        await onSave(html, markdown, updatedNote);
+      } catch (error) {
+        console.error("Error saving title:", error);
+      }
+    }
+  };
+
   // Add diagnostic function to global scope for testing
   useEffect(() => {
     window.testListRendering = () => {
@@ -1645,25 +1460,44 @@ const TipTapEditor = ({
       );
     };
 
+    // Expose editor globally for testing
+    window.editor = editor;
+
     console.log(
       "🔧 Diagnostic function added: Run window.testListRendering() to test list rendering"
+    );
+    console.log(
+      "🔧 FontSize extension: Run window.testFontSizeExtension() to test font size functionality"
     );
 
     return () => {
       delete window.testListRendering;
+      delete window.editor;
     };
   }, [editor]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="h-full bg-white flex flex-col">
+      {/* Title Section */}
+      <div className="flex-shrink-0 p-6 border-b border-gray-200">
+        <input
+          type="text"
+          value={noteTitle}
+          onChange={(e) => setNoteTitle(e.target.value)}
+          onBlur={handleTitleBlur}
+          className="w-full text-2xl font-bold bg-transparent border-none outline-none text-gray-900 placeholder-gray-400"
+          placeholder="Untitled Note"
+        />
+      </div>
+
       {/* Toolbar */}
-      <div className="border-b border-gray-200 p-4 bg-white">
-        <div className="flex items-center space-x-2 flex-wrap">
+      <div className="flex-shrink-0 p-4 border-b border-gray-200 bg-gray-50">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Text Formatting */}
-          <div className="flex space-x-1 border-r pr-2 mr-2">
+          <div className="flex items-center space-x-1 border-r border-gray-300 pr-2 mr-2">
             <button
-              onClick={toggleBold}
-              className={`p-2 rounded hover:bg-gray-100 ${
+              onClick={() => editor?.chain().focus().toggleBold().run()}
+              className={`p-2 rounded hover:bg-gray-100 transition-colors ${
                 editor?.isActive("bold") ? "bg-blue-100 text-blue-700" : ""
               }`}
               title="Bold (Ctrl+B)"
@@ -1671,8 +1505,8 @@ const TipTapEditor = ({
               <Bold size={16} />
             </button>
             <button
-              onClick={toggleItalic}
-              className={`p-2 rounded hover:bg-gray-100 ${
+              onClick={() => editor?.chain().focus().toggleItalic().run()}
+              className={`p-2 rounded hover:bg-gray-100 transition-colors ${
                 editor?.isActive("italic") ? "bg-blue-100 text-blue-700" : ""
               }`}
               title="Italic (Ctrl+I)"
@@ -1680,117 +1514,51 @@ const TipTapEditor = ({
               <Italic size={16} />
             </button>
             <button
-              onClick={toggleStrike}
-              className={`p-2 rounded hover:bg-gray-100 ${
-                editor?.isActive("strike") ? "bg-blue-100 text-blue-700" : ""
+              onClick={() => editor?.chain().focus().toggleUnderline().run()}
+              className={`p-2 rounded hover:bg-gray-100 transition-colors ${
+                editor?.isActive("underline") ? "bg-blue-100 text-blue-700" : ""
               }`}
-              title="Strikethrough"
+              title="Underline (Ctrl+U)"
             >
-              <Strikethrough size={16} />
-            </button>
-            <button
-              onClick={setHighlightColor}
-              className={`p-2 rounded hover:bg-gray-100 ${
-                editor?.isActive("highlight") ? "bg-blue-100 text-blue-700" : ""
-              }`}
-              title="Highlight"
-            >
-              <Highlighter size={16} />
-            </button>
-            <button
-              onClick={setTextColor}
-              className="p-2 rounded hover:bg-gray-100"
-              title="Text Color"
-            >
-              <Palette size={16} />
+              <Underline size={16} />
             </button>
           </div>
 
-          {/* Font Family */}
-          <div className="border-r pr-2 mr-2">
-            <select
-              onChange={(e) => setFontFamily(e.target.value)}
-              value={editor?.getAttributes("textStyle").fontFamily || "default"}
-              className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              title="Font Family"
-            >
-              <option value="default">Default</option>
-              <option value="Inter, system-ui, sans-serif">Inter</option>
-              <option value="Helvetica, Arial, sans-serif">Helvetica</option>
-              <option value="Times, serif">Times</option>
-              <option value="Georgia, serif">Georgia</option>
-              <option value="'Courier New', monospace">Courier New</option>
-              <option value="Monaco, 'Lucida Console', monospace">
-                Monaco
-              </option>
-              <option value="'Comic Sans MS', cursive">Comic Sans</option>
-              <option value="Impact, sans-serif">Impact</option>
-              <option value="Verdana, sans-serif">Verdana</option>
-            </select>
-          </div>
-
-          {/* Font Size */}
-          <div className="border-r pr-2 mr-2">
-            <select
-              onChange={(e) => setFontSize(e.target.value)}
-              value={editor?.getAttributes("textStyle").fontSize || "default"}
-              className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              title="Font Size"
-            >
-              <option value="default">Default</option>
-              <option value="12px">Small (12px)</option>
-              <option value="14px">Medium (14px)</option>
-              <option value="16px">Normal (16px)</option>
-              <option value="18px">Large (18px)</option>
-              <option value="20px">X-Large (20px)</option>
-              <option value="24px">XX-Large (24px)</option>
-              <option value="28px">Huge (28px)</option>
-              <option value="32px">Giant (32px)</option>
-            </select>
-          </div>
-
-          {/* Headings */}
-          <div className="flex space-x-1 border-r pr-2 mr-2">
+          {/* Heading Options */}
+          <div className="flex items-center space-x-1 border-r border-gray-300 pr-2 mr-2">
             <button
-              onClick={() => setHeading(1)}
-              className={`p-2 rounded hover:bg-gray-100 ${
+              onClick={() =>
+                editor?.chain().focus().toggleHeading({ level: 1 }).run()
+              }
+              className={`p-2 rounded hover:bg-gray-100 transition-colors ${
                 editor?.isActive("heading", { level: 1 })
                   ? "bg-blue-100 text-blue-700"
                   : ""
               }`}
               title="Heading 1"
             >
-              <Heading1 size={16} />
+              <Type size={16} />
             </button>
             <button
-              onClick={() => setHeading(2)}
-              className={`p-2 rounded hover:bg-gray-100 ${
+              onClick={() =>
+                editor?.chain().focus().toggleHeading({ level: 2 }).run()
+              }
+              className={`p-2 rounded hover:bg-gray-100 transition-colors ${
                 editor?.isActive("heading", { level: 2 })
                   ? "bg-blue-100 text-blue-700"
                   : ""
               }`}
               title="Heading 2"
             >
-              <Heading2 size={16} />
-            </button>
-            <button
-              onClick={() => setHeading(3)}
-              className={`p-2 rounded hover:bg-gray-100 ${
-                editor?.isActive("heading", { level: 3 })
-                  ? "bg-blue-100 text-blue-700"
-                  : ""
-              }`}
-              title="Heading 3"
-            >
-              <Heading3 size={16} />
+              <Type size={14} />
             </button>
           </div>
 
           {/* Lists */}
-          <div className="flex space-x-1 border-r pr-2 mr-2">
+          <div className="flex items-center space-x-1 border-r border-gray-300 pr-2 mr-2">
             <button
-              onClick={toggleBulletList}
-              className={`p-2 rounded hover:bg-gray-100 ${
+              onClick={() => editor?.chain().focus().toggleBulletList().run()}
+              className={`p-2 rounded hover:bg-gray-100 transition-colors ${
                 editor?.isActive("bulletList")
                   ? "bg-blue-100 text-blue-700"
                   : ""
@@ -1800,8 +1568,8 @@ const TipTapEditor = ({
               <List size={16} />
             </button>
             <button
-              onClick={toggleOrderedList}
-              className={`p-2 rounded hover:bg-gray-100 ${
+              onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+              className={`p-2 rounded hover:bg-gray-100 transition-colors ${
                 editor?.isActive("orderedList")
                   ? "bg-blue-100 text-blue-700"
                   : ""
@@ -1810,100 +1578,27 @@ const TipTapEditor = ({
             >
               <ListOrdered size={16} />
             </button>
-            <button
-              onClick={toggleTaskList}
-              className={`p-2 rounded hover:bg-gray-100 ${
-                editor?.isActive("taskList") ? "bg-blue-100 text-blue-700" : ""
-              }`}
-              title="Task List"
-            >
-              <CheckSquare size={16} />
-            </button>
-          </div>
-
-          {/* Code & Quote */}
-          <div className="flex space-x-1 border-r pr-2 mr-2">
-            <button
-              onClick={toggleCode}
-              className={`p-2 rounded hover:bg-gray-100 ${
-                editor?.isActive("code") ? "bg-blue-100 text-blue-700" : ""
-              }`}
-              title="Inline Code"
-            >
-              <Code size={16} />
-            </button>
-            <button
-              onClick={toggleCodeBlock}
-              className={`p-2 rounded hover:bg-gray-100 ${
-                editor?.isActive("codeBlock") ? "bg-blue-100 text-blue-700" : ""
-              }`}
-              title="Code Block"
-            >
-              <FileText size={16} />
-            </button>
-            <button
-              onClick={toggleBlockquote}
-              className={`p-2 rounded hover:bg-gray-100 ${
-                editor?.isActive("blockquote")
-                  ? "bg-blue-100 text-blue-700"
-                  : ""
-              }`}
-              title="Quote"
-            >
-              <Quote size={16} />
-            </button>
-          </div>
-
-          {/* Scripts & Special */}
-          <div className="flex space-x-1 border-r pr-2 mr-2">
-            <button
-              onClick={toggleSubscript}
-              className={`p-2 rounded hover:bg-gray-100 ${
-                editor?.isActive("subscript") ? "bg-blue-100 text-blue-700" : ""
-              }`}
-              title="Subscript"
-            >
-              <SubIcon size={16} />
-            </button>
-            <button
-              onClick={toggleSuperscript}
-              className={`p-2 rounded hover:bg-gray-100 ${
-                editor?.isActive("superscript")
-                  ? "bg-blue-100 text-blue-700"
-                  : ""
-              }`}
-              title="Superscript"
-            >
-              <SupIcon size={16} />
-            </button>
-            <button
-              onClick={addHorizontalRule}
-              className="p-2 rounded hover:bg-gray-100"
-              title="Horizontal Rule"
-            >
-              <Minus size={16} />
-            </button>
           </div>
 
           {/* Links and Media */}
-          <div className="flex space-x-1 border-r pr-2 mr-2">
+          <div className="flex items-center space-x-1 border-r border-gray-300 pr-2 mr-2">
             <button
               onClick={addLink}
-              className="p-2 rounded hover:bg-gray-100"
+              className="p-2 rounded hover:bg-gray-100 transition-colors"
               title="Add Link"
             >
-              <LinkIcon size={16} />
+              <Link size={16} />
             </button>
             <button
               onClick={addImage}
-              className="p-2 rounded hover:bg-gray-100"
+              className="p-2 rounded hover:bg-gray-100 transition-colors"
               title="Upload Image"
             >
               <ImageIcon size={16} />
             </button>
             <button
               onClick={addAttachment}
-              className="p-2 rounded hover:bg-gray-100"
+              className="p-2 rounded hover:bg-gray-100 transition-colors"
               title="Upload Attachment"
             >
               <Paperclip size={16} />
@@ -1914,7 +1609,7 @@ const TipTapEditor = ({
           <button
             onClick={saveNote}
             disabled={isLoading}
-            className="p-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+            className="p-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
             title="Save Note (Ctrl+S)"
           >
             <Save size={16} />
@@ -1922,11 +1617,11 @@ const TipTapEditor = ({
         </div>
       </div>
 
-      {/* Editor */}
-      <div className="flex-1 overflow-y-auto p-6">
+      {/* Editor - Scrollable Content Area */}
+      <div className="flex-1 overflow-y-auto min-h-0 p-6">
         <EditorContent editor={editor} />
 
-        {/* Attachments Panel - placed after editor but ensure space below */}
+        {/* Attachments Panel */}
         {attachments.length > 0 && (
           <div className="mt-6 p-4 bg-gray-50 rounded-lg border">
             <h4 className="font-medium text-gray-700 mb-3 flex items-center">
@@ -1934,39 +1629,38 @@ const TipTapEditor = ({
               Attachments ({attachments.length})
             </h4>
             <div className="space-y-2">
-              {attachments.map((attachment, index) => (
+              {attachments.map((attachment) => (
                 <div
-                  key={index}
-                  className="flex items-center justify-between bg-white p-3 rounded border"
+                  key={attachment.id}
+                  className="flex items-center justify-between p-3 bg-white rounded border"
                 >
                   <div className="flex items-center space-x-3">
-                    <span className="text-lg">
-                      {getFileIcon(attachment.type)}
-                    </span>
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <FileText size={16} className="text-blue-600" />
+                    </div>
                     <div>
-                      <div className="font-medium text-sm text-gray-800">
-                        {attachment.originalName || attachment.filename}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {formatFileSize(attachment.size)} •{" "}
-                        {new Date(attachment.uploaded).toLocaleDateString()}
-                      </div>
+                      <p className="font-medium text-gray-900">
+                        {attachment.filename}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {attachment.size} • {attachment.type}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
                     <button
-                      onClick={() => setViewingAttachment(attachment)}
-                      className="p-1 rounded hover:bg-gray-100"
-                      title="View/Download"
+                      onClick={() => downloadAttachment(attachment)}
+                      className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                      title="Download"
                     >
-                      <Eye size={14} />
+                      <Download size={16} />
                     </button>
                     <button
-                      onClick={() => removeAttachment(attachment.filename)}
-                      className="p-1 rounded hover:bg-red-100 text-red-600"
+                      onClick={() => removeAttachment(attachment.id)}
+                      className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
                       title="Remove"
                     >
-                      <X size={14} />
+                      <X size={16} />
                     </button>
                   </div>
                 </div>
@@ -1974,103 +1668,22 @@ const TipTapEditor = ({
             </div>
           </div>
         )}
-
-        {/* Hidden file inputs */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleImageUpload}
-          style={{ display: "none" }}
-        />
-        <input
-          ref={attachmentInputRef}
-          type="file"
-          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.zip,.json"
-          onChange={handleAttachmentUpload}
-          style={{ display: "none" }}
-        />
       </div>
 
-      {/* Status Bar */}
-      <div className="border-t border-gray-200 px-4 py-2 bg-gray-50 text-sm text-gray-600">
-        <div className="flex justify-between items-center">
-          <span>
-            {editor?.storage.characterCount?.characters() || 0} characters,{" "}
-            {editor?.storage.characterCount?.words() || 0} words
-          </span>
-          <span className="text-xs">
-            Auto-save: {(autoSaveConfig.autoSaveDelayMs / 1000).toFixed(1)}s (≥
-            {autoSaveConfig.minChangePercentage}% change) • Press Ctrl+S to save
-            manually • Smart change detection
-          </span>
-        </div>
-      </div>
-
-      {/* Color Picker Overlays */}
-      {showColorPicker && (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setShowColorPicker(false)}
-          />
-          <div
-            className="fixed z-50"
-            style={{
-              left: `${colorPickerPosition.x}px`,
-              top: `${colorPickerPosition.y}px`,
-              transform: "translateX(-50%)",
-            }}
-          >
-            <ComprehensiveColorPicker
-              title="Text Color"
-              color="#000000"
-              onChange={handleColorChange}
-              onChangeComplete={(color) => {
-                handleColorChange(color);
-                setShowColorPicker(false);
-              }}
-            />
-          </div>
-        </>
-      )}
-
-      {showHighlightPicker && (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setShowHighlightPicker(false)}
-          />
-          <div
-            className="fixed z-50"
-            style={{
-              left: `${colorPickerPosition.x}px`,
-              top: `${colorPickerPosition.y}px`,
-              transform: "translateX(-50%)",
-            }}
-          >
-            <ComprehensiveColorPicker
-              title="Highlight Color"
-              color="#ffff00"
-              onChange={handleHighlightChange}
-              onChangeComplete={(color) => {
-                handleHighlightChange(color);
-                setShowHighlightPicker(false);
-              }}
-            />
-          </div>
-        </>
-      )}
-
-      {/* File Viewer */}
-      {viewingAttachment && (
-        <FileViewer
-          attachment={viewingAttachment}
-          userId={userId}
-          noteId={note.id}
-          onClose={() => setViewingAttachment(null)}
-        />
-      )}
+      {/* Hidden file inputs */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleImageUpload}
+        className="hidden"
+      />
+      <input
+        ref={attachmentInputRef}
+        type="file"
+        onChange={handleAttachmentUpload}
+        className="hidden"
+      />
     </div>
   );
 };

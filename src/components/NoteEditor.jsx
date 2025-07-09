@@ -283,7 +283,7 @@ const NoteEditor = ({
           "⚠️ Attempted to store empty content as original - using fallback"
         );
         // Use a fallback that indicates this is a restored/empty state
-        contentToStore.content = "<p>Start writing your note...</p>";
+        contentToStore.content = "<p></p>";
       }
 
       setOriginalCurrentContent(contentToStore);

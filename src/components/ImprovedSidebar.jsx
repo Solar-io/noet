@@ -22,6 +22,7 @@ import {
   Bookmark,
   Filter,
   Shield,
+  LogOut,
 } from "lucide-react";
 import configService from "../configService.js";
 
@@ -822,7 +823,7 @@ const ImprovedSidebar = ({
         )}
 
         <div
-          className={`flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 cursor-pointer group relative ${
+          className={`flex items-start justify-between p-2 rounded-lg hover:bg-gray-100 cursor-pointer group relative ${
             isDragTarget ? "bg-blue-50" : ""
           } ${
             currentView === "folder" && currentView.folderId === folder.id
@@ -869,12 +870,13 @@ const ImprovedSidebar = ({
             toggleFolder(folder.id);
           }}
         >
-          <div className="flex items-center space-x-2 flex-1">
+          <div className="flex items-start space-x-2 flex-1 min-w-0">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 toggleFolder(folder.id);
               }}
+              className="flex-shrink-0 mt-0.5"
             >
               {isExpanded ? (
                 <ChevronDown size={16} />
@@ -885,6 +887,7 @@ const ImprovedSidebar = ({
             <FolderOpen
               size={16}
               style={{ color: folder.color || "#3b82f6" }}
+              className="flex-shrink-0 mt-0.5"
             />
             {isEditing ? (
               <div className="flex-1" onClick={(e) => e.stopPropagation()}>
@@ -935,10 +938,19 @@ const ImprovedSidebar = ({
                 </div>
               </div>
             ) : (
-              <span className="text-sm">{folder.name}</span>
+              <span
+                className="text-sm break-words overflow-wrap-anywhere flex-1 min-w-0 leading-relaxed"
+                style={{
+                  whiteSpace: "normal",
+                  overflow: "visible",
+                  textOverflow: "clip",
+                }}
+              >
+                {folder.name}
+              </span>
             )}
           </div>
-          <div className="opacity-0 group-hover:opacity-100 flex items-center space-x-1">
+          <div className="opacity-0 group-hover:opacity-100 flex items-center space-x-1 flex-shrink-0 ml-2 mt-0.5">
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -1001,7 +1013,7 @@ const ImprovedSidebar = ({
         )}
 
         <div
-          className={`flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 cursor-pointer group relative ${
+          className={`flex items-start justify-between p-2 rounded-lg hover:bg-gray-100 cursor-pointer group relative ${
             isDragTarget ? "bg-green-50" : ""
           } ${
             currentView === "notebook" && currentView.notebookId === notebook.id
@@ -1045,8 +1057,12 @@ const ImprovedSidebar = ({
           onDragStart={(e) => handleDragStart(e, "notebook", notebook.id)}
           onClick={() => onViewChange("notebook", { notebookId: notebook.id })}
         >
-          <div className="flex items-center space-x-2 flex-1">
-            <Book size={16} style={{ color: notebook.color || "#10b981" }} />
+          <div className="flex items-start space-x-2 flex-1 min-w-0">
+            <Book
+              size={16}
+              style={{ color: notebook.color || "#10b981" }}
+              className="flex-shrink-0 mt-0.5"
+            />
             {isEditing ? (
               <div className="flex-1" onClick={(e) => e.stopPropagation()}>
                 <div
@@ -1096,15 +1112,26 @@ const ImprovedSidebar = ({
                 </div>
               </div>
             ) : (
-              <span className="text-sm">{notebook.name}</span>
-            )}
-            {notebook.noteCount > 0 && (
-              <span className="text-xs text-gray-500">
-                ({notebook.noteCount})
-              </span>
+              <div className="flex-1 flex items-center justify-between min-w-0">
+                <span
+                  className="text-sm break-words overflow-wrap-anywhere flex-1 min-w-0 leading-relaxed"
+                  style={{
+                    whiteSpace: "normal",
+                    overflow: "visible",
+                    textOverflow: "clip",
+                  }}
+                >
+                  {notebook.name}
+                </span>
+                {notebook.noteCount > 0 && (
+                  <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
+                    ({notebook.noteCount})
+                  </span>
+                )}
+              </div>
             )}
           </div>
-          <div className="opacity-0 group-hover:opacity-100 flex items-center space-x-1">
+          <div className="opacity-0 group-hover:opacity-100 flex items-center space-x-1 flex-shrink-0 ml-2 mt-0.5">
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -1150,7 +1177,7 @@ const ImprovedSidebar = ({
         )}
 
         <div
-          className={`flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 cursor-pointer group relative ${
+          className={`flex items-start justify-between p-2 rounded-lg hover:bg-gray-100 cursor-pointer group relative ${
             isDragTarget ? "bg-yellow-50" : ""
           } ${
             currentView === "tag" && currentView.tagId === tag.id
@@ -1194,8 +1221,12 @@ const ImprovedSidebar = ({
           onDragStart={(e) => handleDragStart(e, "tag", tag.id)}
           onClick={() => onViewChange("tag", { tagId: tag.id })}
         >
-          <div className="flex items-center space-x-2 flex-1">
-            <Hash size={16} style={{ color: tag.color || "#f59e0b" }} />
+          <div className="flex items-start space-x-2 flex-1 min-w-0">
+            <Hash
+              size={16}
+              style={{ color: tag.color || "#f59e0b" }}
+              className="flex-shrink-0 mt-0.5"
+            />
             {isEditing ? (
               <div className="flex-1" onClick={(e) => e.stopPropagation()}>
                 <div
@@ -1245,18 +1276,27 @@ const ImprovedSidebar = ({
                 </div>
               </div>
             ) : (
-              <span
-                className="text-sm"
-                title={`Tag ID: ${tag.id}, Name: ${tag.name}`}
-              >
-                {tag.name || tag.id}
-              </span>
-            )}
-            {(tag.noteCount || 0) > 0 && (
-              <span className="text-xs text-gray-500">({tag.noteCount})</span>
+              <div className="flex-1 flex items-center justify-between min-w-0">
+                <span
+                  className="text-sm break-words overflow-wrap-anywhere flex-1 min-w-0 leading-relaxed"
+                  style={{
+                    whiteSpace: "normal",
+                    overflow: "visible",
+                    textOverflow: "clip",
+                  }}
+                  title={`Tag ID: ${tag.id}, Name: ${tag.name}`}
+                >
+                  {tag.name || tag.id}
+                </span>
+                {(tag.noteCount || 0) > 0 && (
+                  <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
+                    ({tag.noteCount})
+                  </span>
+                )}
+              </div>
             )}
           </div>
-          <div className="opacity-0 group-hover:opacity-100 flex items-center space-x-1">
+          <div className="opacity-0 group-hover:opacity-100 flex items-center space-x-1 flex-shrink-0 ml-2 mt-0.5">
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -1288,7 +1328,7 @@ const ImprovedSidebar = ({
 
   if (loading) {
     return (
-      <div className="w-64 bg-white border-r border-gray-200 flex items-center justify-center">
+      <div className="bg-white flex items-center justify-center h-full w-full">
         <div className="text-gray-500">Loading...</div>
       </div>
     );
@@ -1298,42 +1338,40 @@ const ImprovedSidebar = ({
   const rootNotebooks = notebooksByFolder.root || [];
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
+    <div className="bg-white flex flex-col h-full w-full">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Noet</h2>
+      <div className="flex-shrink-0 p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <FileText size={16} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold text-gray-900">Noet</h1>
+              <p className="text-xs text-gray-500">Sidebar</p>
+            </div>
+          </div>
           <div className="flex items-center space-x-1">
             <button
               onClick={onShowSettings}
-              className="p-1 hover:bg-gray-100 rounded"
+              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               title="Settings"
             >
               <Settings size={16} />
             </button>
-            {user?.isAdmin && (
-              <button
-                onClick={onShowAdminInterface}
-                className="p-1 hover:bg-red-100 rounded text-red-600"
-                title="Admin Interface"
-              >
-                <Shield size={16} />
-              </button>
-            )}
             <button
               onClick={onLogout}
-              className="p-1 hover:bg-gray-100 rounded text-red-600"
+              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               title="Logout"
             >
-              <X size={16} />
+              <LogOut size={16} />
             </button>
           </div>
         </div>
-        <div className="text-sm text-gray-600">{user?.name || user?.email}</div>
       </div>
 
-      {/* Navigation */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Scrollable Content Area */}
+      <div className="flex-1 overflow-y-auto min-h-0">
         <div className="p-2 space-y-1">
           {/* Main Views */}
           <div
@@ -1387,216 +1425,63 @@ const ImprovedSidebar = ({
           </div>
         </div>
 
-        {/* Folders & Notebooks */}
+        {/* Folders Section */}
         <div className="p-2">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-700">
-              Folders & Notebooks
-            </h3>
-            <div className="flex space-x-1">
-              <button
-                onClick={() => startCreating("folder")}
-                className="p-1 hover:bg-gray-100 rounded"
-                title="New Folder"
-              >
-                <FolderOpen size={14} />
-              </button>
-              <button
-                onClick={() => startCreating("notebook")}
-                className="p-1 hover:bg-gray-100 rounded"
-                title="New Notebook"
-              >
-                <Book size={14} />
-              </button>
-            </div>
-          </div>
-
-          {/* Creation Form for Folders/Notebooks */}
-          {(creating.type === "folder" || creating.type === "notebook") && (
-            <div className="mb-2 p-3 bg-blue-50 rounded border">
-              <div className="flex items-center space-x-2 mb-2">
-                {creating.type === "folder" ? (
-                  <FolderOpen size={14} style={{ color: creating.color }} />
-                ) : (
-                  <Book size={14} style={{ color: creating.color }} />
-                )}
-                <input
-                  value={creating.name}
-                  onChange={(e) =>
-                    setCreating((prev) => ({ ...prev, name: e.target.value }))
-                  }
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") submitCreation();
-                    if (e.key === "Escape") cancelCreating();
-                  }}
-                  placeholder={`${
-                    creating.type === "folder" ? "Folder" : "Notebook"
-                  } name...`}
-                  className="flex-1 px-2 py-1 border rounded text-sm"
-                  autoFocus
-                />
-              </div>
-              <div className="mb-2">
-                <ColorPicker
-                  value={creating.color}
-                  onChange={(color) =>
-                    setCreating((prev) => ({ ...prev, color }))
-                  }
-                />
-              </div>
-              <div className="flex justify-end space-x-2">
-                <button
-                  onClick={submitCreation}
-                  className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-                >
-                  ✓
-                </button>
-                <button
-                  onClick={cancelCreating}
-                  className="px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Root-level drop zone for unnesting notebooks */}
-          <div
-            className={`h-6 mx-2 mb-2 transition-all rounded flex items-center justify-center text-xs text-gray-500 ${
-              dragOver?.type === "root-top"
-                ? "bg-blue-400 text-white font-medium"
-                : "bg-gray-100 hover:bg-gray-200 border-2 border-dashed border-gray-300"
-            }`}
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              e.dataTransfer.dropEffect = "move";
-              console.log("📍 Root top drag over");
-              setDragOver({ type: "root-top", id: null });
-            }}
-            onDragLeave={handleDragLeave}
-            onDrop={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              console.log("📦 Root top drop");
-              setDragOver(null);
-              handleRootDrop(e);
-            }}
-          >
-            {dragOver?.type === "root-top"
-              ? "Drop to unnest"
-              : "Drop notebooks here to unnest"}
-          </div>
-
-          <div className="space-y-1">
-            {rootFolders.map((folder) => renderFolder(folder))}
-            {rootNotebooks.map((notebook) => renderNotebook(notebook))}
-          </div>
-
-          {/* Root-level drop zone for unnesting notebooks */}
-          <div
-            className={`h-6 mx-2 mt-2 transition-all rounded flex items-center justify-center text-xs text-gray-500 ${
-              dragOver?.type === "root-bottom"
-                ? "bg-blue-400 text-white font-medium"
-                : "bg-gray-100 hover:bg-gray-200 border-2 border-dashed border-gray-300"
-            }`}
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              e.dataTransfer.dropEffect = "move";
-              console.log("📍 Root bottom drag over");
-              setDragOver({ type: "root-bottom", id: null });
-            }}
-            onDragLeave={handleDragLeave}
-            onDrop={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              console.log("📦 Root bottom drop");
-              setDragOver(null);
-              handleRootDrop(e);
-            }}
-          >
-            {dragOver?.type === "root-bottom"
-              ? "Drop to unnest"
-              : "Drop notebooks here to unnest"}
-          </div>
-        </div>
-
-        {/* Tags */}
-        <div className="p-2">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-700">Tags</h3>
+            <h3 className="text-sm font-medium text-gray-900">Folders</h3>
             <button
-              onClick={() => startCreating("tag")}
-              className="p-1 hover:bg-gray-100 rounded"
-              title="New Tag"
+              onClick={() => startCreating("folder")}
+              className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+              title="Create Folder"
             >
-              <Plus size={14} />
+              <Plus size={12} />
             </button>
           </div>
-
-          {/* Creation Form for Tags */}
-          {creating.type === "tag" && (
-            <div className="mb-2 p-3 bg-yellow-50 rounded border">
-              <div className="flex items-center space-x-2 mb-2">
-                <Hash size={14} style={{ color: creating.color }} />
-                <input
-                  value={creating.name}
-                  onChange={(e) =>
-                    setCreating((prev) => ({ ...prev, name: e.target.value }))
-                  }
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") submitCreation();
-                    if (e.key === "Escape") cancelCreating();
-                  }}
-                  placeholder="Tag name..."
-                  className="flex-1 px-2 py-1 border rounded text-sm"
-                  autoFocus
-                />
-              </div>
-              <div className="mb-2">
-                <ColorPicker
-                  value={creating.color}
-                  onChange={(color) =>
-                    setCreating((prev) => ({ ...prev, color }))
-                  }
-                />
-              </div>
-              <div className="flex justify-end space-x-2">
-                <button
-                  onClick={submitCreation}
-                  className="px-3 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700"
-                >
-                  ✓
-                </button>
-                <button
-                  onClick={cancelCreating}
-                  className="px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-1">{tags.map((tag) => renderTag(tag))}</div>
+          <div className="space-y-1">
+            {folders.map((folder) => renderFolder(folder))}
+          </div>
         </div>
 
-        {/* User Actions */}
-        <div className="p-2 border-t border-gray-200 mt-4">
-          <button
-            onClick={onShowUserManagement}
-            className="w-full text-left p-2 hover:bg-gray-100 rounded-lg text-sm"
-          >
-            Account Settings
-          </button>
-          <button
-            onClick={onShowEvernoteImport}
-            className="w-full text-left p-2 hover:bg-gray-100 rounded-lg text-sm"
-          >
-            Import from Evernote
-          </button>
+        {/* Notebooks Section */}
+        <div className="p-2">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-gray-900">Notebooks</h3>
+            <button
+              onClick={() => startCreating("notebook")}
+              className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+              title="Create Notebook"
+            >
+              <Plus size={12} />
+            </button>
+          </div>
+          <div className="space-y-1">
+            {notebooks.map((notebook) => renderNotebook(notebook))}
+          </div>
+        </div>
+
+        {/* Tags Section */}
+        <div className="p-2">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-gray-900">Tags</h3>
+            <button
+              onClick={() => startCreating("tag")}
+              className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+              title="Create Tag"
+            >
+              <Plus size={12} />
+            </button>
+          </div>
+          <div className="space-y-1">{tags.map((tag) => renderTag(tag))}</div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex-shrink-0 p-4 border-t border-gray-200">
+        <div className="flex items-center space-x-2">
+          <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+          </div>
+          <span className="text-xs text-gray-500">Connected</span>
         </div>
       </div>
     </div>

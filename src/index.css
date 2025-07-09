@@ -16,11 +16,55 @@ code {
     monospace;
 }
 
-/* TipTap Editor Styles */
+/* Force proper height constraints for main layout */
+html,
+body {
+  height: 100%;
+  overflow: hidden; /* Prevent body scrolling */
+}
+
+#root {
+  height: 100%;
+  overflow: hidden; /* Prevent root scrolling */
+}
+
+/* Main layout container fixes */
+.main-layout-container {
+  height: 100vh !important;
+  overflow: hidden !important;
+  position: relative;
+}
+
+/* Panel container fixes - ensure they respect flex layout */
+/* Only apply overflow hidden to resize handles, not all direct children */
+.main-layout-container .resize-handle {
+  overflow: hidden;
+}
+
+/* Ensure flex children with overflow handle height properly */
+.flex-1.overflow-y-auto.min-h-0 {
+  height: 0; /* Allows flex-1 to work with overflow */
+  flex-grow: 1;
+  overflow-y: auto;
+}
+
+/* Fix for TipTap editor content */
 .ProseMirror {
   outline: none;
-  padding: 1rem;
-  min-height: 200px;
+  min-height: auto;
+  overflow: visible; /* Let parent handle scrolling */
+}
+
+/* Ensure proper scrolling in individual components */
+.bg-white.flex.flex-col.h-full .flex-1.overflow-y-auto {
+  flex-basis: 0; /* Ensures proper flex behavior */
+  min-height: 0; /* Critical for flex + overflow */
+}
+
+/* Fix sidebar scrolling */
+.bg-white.flex.flex-col.h-full.w-full .flex-1.overflow-y-auto.min-h-0 {
+  height: 0; /* Reset height for proper flex behavior */
+  flex-grow: 1;
 }
 
 /* Override Tailwind's list style reset for TipTap editor */
@@ -49,45 +93,9 @@ code {
   line-height: 1.2;
 }
 
-/* High specificity rule to force font-size in lists */
-.ProseMirror ul li span[style*="font-size"],
-.ProseMirror ol li span[style*="font-size"],
-.ProseMirror li p span[style*="font-size"] {
-  font-size: var(--font-size) !important;
-}
-
-/* CSS custom property support for dynamic font sizes */
-.ProseMirror span[style*="font-size: 12px"] {
-  --font-size: 12px;
-  font-size: 12px !important;
-}
-.ProseMirror span[style*="font-size: 14px"] {
-  --font-size: 14px;
-  font-size: 14px !important;
-}
-.ProseMirror span[style*="font-size: 16px"] {
-  --font-size: 16px;
-  font-size: 16px !important;
-}
-.ProseMirror span[style*="font-size: 18px"] {
-  --font-size: 18px;
-  font-size: 18px !important;
-}
-.ProseMirror span[style*="font-size: 20px"] {
-  --font-size: 20px;
-  font-size: 20px !important;
-}
-.ProseMirror span[style*="font-size: 24px"] {
-  --font-size: 24px;
-  font-size: 24px !important;
-}
-.ProseMirror span[style*="font-size: 28px"] {
-  --font-size: 28px;
-  font-size: 28px !important;
-}
-.ProseMirror span[style*="font-size: 32px"] {
-  --font-size: 32px;
-  font-size: 32px !important;
+/* Font size support for spans created by FontSize extension */
+.ProseMirror span[style*="font-size"] {
+  line-height: 1.2;
 }
 
 /* Fix for double-line lists - Remove extra paragraph spacing */
@@ -250,20 +258,86 @@ code {
 .ProseMirror img.editor-image {
   max-width: 100%;
   height: auto;
-  border-radius: 0.375rem;
+  border-radius: 0.5rem;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-  margin: 0.5rem 0;
+  margin: 1rem 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
 }
 
 .ProseMirror img.editor-image:hover {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
     0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border-color: #e5e7eb;
+  transform: translateY(-1px);
+}
+
+.ProseMirror img.editor-image:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+/* Image size variants */
+.ProseMirror img.editor-image.image-small {
+  max-width: 300px;
+}
+
+.ProseMirror img.editor-image.image-medium {
+  max-width: 600px;
+}
+
+.ProseMirror img.editor-image.image-large {
+  max-width: 100%;
+}
+
+/* Image alignment */
+.ProseMirror img.editor-image.align-left {
+  float: left;
+  margin-right: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.ProseMirror img.editor-image.align-right {
+  float: right;
+  margin-left: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.ProseMirror img.editor-image.align-center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* Drag and drop styling */
 .ProseMirror.drag-over {
   background-color: #eff6ff;
   border: 2px dashed #3b82f6;
+}
+
+.ProseMirror.drag-over-image {
+  background-color: #f0f9ff;
+  border: 2px dashed #0ea5e9;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.ProseMirror.drag-over-image::before {
+  content: "📸 Drop image here to insert inline";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(14, 165, 233, 0.1);
+  color: #0ea5e9;
+  padding: 1rem 2rem;
+  border-radius: 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 500;
+  z-index: 10;
+  pointer-events: none;
+  backdrop-filter: blur(2px);
 }
 
 /* Attachment Management Styles */
@@ -608,6 +682,97 @@ code {
   color: #1f2937;
 }
 
+/* Resizable Panes Styles */
+.main-layout-container {
+  position: relative;
+}
+
+.resize-handle {
+  position: relative;
+  z-index: 10;
+  transition: all 0.2s ease;
+}
+
+.resize-handle:hover {
+  background-color: #3b82f6;
+}
+
+.resize-handle:active {
+  background-color: #1d4ed8;
+}
+
+/* Prevent text selection during resize */
+.main-layout-container.resizing * {
+  user-select: none !important;
+  pointer-events: none !important;
+}
+
+/* Allow pointer events on resize handles during resize */
+.main-layout-container.resizing .resize-handle {
+  pointer-events: auto !important;
+}
+
+/* Smooth transitions for panel widths */
+.resizable-panel {
+  transition: none; /* Remove transitions during resize for smooth experience */
+}
+
+/* Resize cursor for the entire container when resizing */
+.main-layout-container.resizing {
+  cursor: col-resize;
+}
+
+/* Visual feedback for resize handles */
+.resize-handle::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 20px;
+  background-color: rgba(148, 163, 184, 0.5);
+  border-radius: 2px;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.resize-handle:hover::before {
+  opacity: 1;
+}
+
+.resize-handle:active::before {
+  background-color: rgba(59, 130, 246, 0.8);
+  opacity: 1;
+}
+
+/* Sidebar text wrapping */
+.sidebar-text-wrap {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+  white-space: normal;
+}
+
+/* Force text wrapping in sidebar items */
+[class*="flex items-start"] span[class*="text-sm"],
+[class*="flex-1"] span[class*="text-sm"] {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  word-break: break-word !important;
+}
+
+/* Specific override for sidebar items */
+.bg-white.flex.flex-col.h-full.w-full span[class*="text-sm"] {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
 .prose h3 {
   font-size: 1.25rem;
   font-weight: 600;
@@ -744,4 +909,56 @@ code {
 .ProseMirror li.list-item span,
 .ProseMirror li.list-item p {
   line-height: 1.5 !important;
+}
+
+/* TipTap Placeholder Styles */
+.ProseMirror.is-editor-empty::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  font-style: italic;
+  pointer-events: none;
+  height: 0;
+  float: left;
+  width: 100%;
+}
+
+.ProseMirror p.is-editor-empty::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  font-style: italic;
+  pointer-events: none;
+  height: 0;
+  float: left;
+  width: 100%;
+}
+
+.ProseMirror .is-editor-empty::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  font-style: italic;
+  pointer-events: none;
+  height: 0;
+  float: left;
+  width: 100%;
+}
+
+/* Ensure placeholder doesn't interfere with editor content */
+.ProseMirror .is-editor-empty p:first-child::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  font-style: italic;
+  pointer-events: none;
+  height: 0;
+  float: left;
+  width: 100%;
+}
+
+.ProseMirror[data-placeholder]::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  font-style: italic;
+  pointer-events: none;
+  height: 0;
+  float: left;
+  width: 100%;
 }

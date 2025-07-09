@@ -81,14 +81,17 @@ const UserManagement = ({ user, onUserUpdate, onClose }) => {
 
     setLoading(true);
     try {
-      const response = await fetch(`${backendUrl}/api/users/${user.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: profileData.name.trim(),
-          email: profileData.email.trim(),
-        }),
-      });
+      const response = await fetch(
+        `${backendUrl}/api/users/${user.id}/profile`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: profileData.name.trim(),
+            email: profileData.email.trim(),
+          }),
+        }
+      );
 
       if (!response.ok) throw new Error("Failed to update profile");
 
@@ -122,9 +125,9 @@ const UserManagement = ({ user, onUserUpdate, onClose }) => {
     setLoading(true);
     try {
       const response = await fetch(
-        `${backendUrl}/api/users/${user.id}/password`,
+        `${backendUrl}/api/users/${user.id}/change-password`,
         {
-          method: "PUT",
+          method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             currentPassword: profileData.currentPassword,
