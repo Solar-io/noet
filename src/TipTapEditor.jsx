@@ -19,8 +19,6 @@ import HorizontalRule from "@tiptap/extension-horizontal-rule";
 import Strike from "@tiptap/extension-strike";
 import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
-import Placeholder from "@tiptap/extension-placeholder";
-import { FontSize } from "./extensions/FontSize.js";
 import {
   Bold,
   Italic,
@@ -56,7 +54,6 @@ import { v4 as uuidv4 } from "uuid";
 import TurndownService from "turndown";
 import { gfm } from "turndown-plugin-gfm";
 import ComprehensiveColorPicker from "./components/ComprehensiveColorPicker.jsx";
-import FileViewer from "./components/FileViewer.jsx";
 import configService from "./configService.js";
 
 // Initialize markdown converter
@@ -66,75 +63,8 @@ const turndownService = new TurndownService({
 });
 turndownService.use(gfm);
 
-// Custom ListItem extension to prevent paragraph wrapping (fixes double-line issue)
-const CustomListItem = ListItem.extend({
-  name: "listItem",
-  content: "inline*",
-
-  parseHTML() {
-    return [
-      {
-        tag: "li",
-        // Only match li elements that are NOT task items
-        getAttrs: (node) => {
-          if (
-            node.hasAttribute("data-type") &&
-            node.getAttribute("data-type") === "taskItem"
-          ) {
-            return false; // Don't match task items
-          }
-          if (node.hasAttribute("data-checked")) {
-            return false; // Don't match task items
-          }
-          if (node.classList.contains("task-item")) {
-            return false; // Don't match task items
-          }
-          return {}; // Match regular list items
-        },
-      },
-    ];
-  },
-
-  renderHTML({ HTMLAttributes }) {
-    return ["li", HTMLAttributes, 0];
-  },
-
-  addKeyboardShortcuts() {
-    return {
-      Enter: () => {
-        // Handle Enter key in lists properly
-        if (this.editor.isActive("listItem")) {
-          return this.editor.commands.splitListItem("listItem");
-        }
-        return false;
-      },
-      Tab: () => {
-        // Handle Tab for nesting lists
-        if (this.editor.isActive("listItem")) {
-          return this.editor.commands.sinkListItem("listItem");
-        }
-        return false;
-      },
-      "Shift-Tab": () => {
-        // Handle Shift-Tab for lifting lists
-        if (this.editor.isActive("listItem")) {
-          return this.editor.commands.liftListItem("listItem");
-        }
-        return false;
-      },
-    };
-  },
-});
-
 // TipTap Editor Component
-const TipTapEditor = ({
-  note,
-  onSave,
-  onContentChange,
-  userId,
-  availableTags = [],
-  onTagsUpdate,
-}) => {
+const TipTapEditor = ({ note, onSave, onContentChange, userId, availableTags = [], onTagsUpdate }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState(note?.attachments || []);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -143,7 +73,6 @@ const TipTapEditor = ({
     x: 0,
     y: 0,
   });
-  const [viewingAttachment, setViewingAttachment] = useState(null);
   const fileInputRef = useRef(null);
   const attachmentInputRef = useRef(null);
   const autoSaveTimeoutRef = useRef(null);
@@ -176,151 +105,54 @@ const TipTapEditor = ({
     editor._customStorage = { ...editor._customStorage, currentNoteId: noteId };
   };
 
-  // Smart auto-save functionality with configurable timing and change detection
-  const [lastSavedContent, setLastSavedContent] = useState(note?.content || "");
-  const [autoSaveConfig, setAutoSaveConfig] = useState({
-    autoSaveDelayMs: 10000, // Default 10 seconds
-    minChangePercentage: 5, // Default 5% change
-  });
-
-  // Load auto-save configuration from backend
-  useEffect(() => {
-    const loadAutoSaveConfig = async () => {
-      try {
-        const backendUrl = await configService.getBackendUrl();
-        const response = await fetch(
-          `${backendUrl}/api/admin/config/auto-save`
-        );
-
-        // Handle 401 Unauthorized - use defaults (expected for non-admin users)
-        if (response.status === 401) {
-          console.log(
-            "ℹ️ Auto-save config requires admin access, using defaults"
-          );
-          return;
-        }
-
-        if (response.ok) {
-          const config = await response.json();
-          setAutoSaveConfig({
-            autoSaveDelayMs: config.autoSaveDelayMs || 10000,
-            minChangePercentage: config.minChangePercentage || 5,
-          });
-          console.log("📋 Loaded auto-save config:", config);
-        } else {
-          console.warn(
-            "⚠️ Failed to load auto-save config:",
-            response.status,
-            response.statusText
-          );
-        }
-      } catch (error) {
-        // Network errors are common during app startup - use defaults silently
-        if (error.message.includes("Failed to fetch")) {
-          console.log(
-            "ℹ️ Auto-save config unavailable (network), using defaults"
-          );
-        } else {
-          console.warn(
-            "⚠️ Failed to load auto-save config, using defaults:",
-            error.message
-          );
-        }
-      }
-    };
-    loadAutoSaveConfig();
-  }, []);
-
-  // Update last saved content when note changes
-  useEffect(() => {
-    if (note?.content) {
-      setLastSavedContent(note.content);
-    }
-  }, [note?.id]); // Only update when switching to different note
-
-  const smartAutoSave = async () => {
-    if (!note || !editor || !userId) return;
-
-    try {
-      const currentContent = editor.getHTML();
-      const markdown = turndownService.turndown(currentContent);
-
-      // Check if content has actually changed
-      if (currentContent === lastSavedContent) {
-        console.log("⏭️ Auto-save skipped: No changes detected");
-        return;
-      }
-
-      // Calculate content change percentage
-      const oldLength = lastSavedContent.length || 1;
-      const newLength = currentContent.length;
-      const changePercentage =
-        (Math.abs(newLength - oldLength) / oldLength) * 100;
-
-      // Only save if change exceeds threshold or is first save
-      if (
-        changePercentage < autoSaveConfig.minChangePercentage &&
-        lastSavedContent
-      ) {
-        console.log(
-          `⏭️ Auto-save skipped: Change ${changePercentage.toFixed(
-            1
-          )}% < threshold ${autoSaveConfig.minChangePercentage}%`
-        );
-        return;
-      }
-
-      // Get backend URL
-      const backendUrl = await configService.getBackendUrl();
-
-      // Smart save with change detection
-      const response = await fetch(
-        `${backendUrl}/api/${userId}/notes/${note.id}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: note.title,
-            content: currentContent,
-            markdown,
-            tags: note.tags,
-            notebook: note.notebook,
-            folder: note.folder,
-          }),
-        }
-      );
-
-      if (response.ok) {
-        console.log(
-          `💾 Smart auto-save successful: ${changePercentage.toFixed(
-            1
-          )}% change in "${note.title}"`
-        );
-        setLastSavedContent(currentContent); // Update saved content reference
-
-        // Call parent's onSave if provided
-        onSave?.({
-          ...note,
-          content: currentContent,
-          markdown,
-        });
-      } else {
-        console.error("❌ Smart auto-save failed:", response.statusText);
-      }
-    } catch (error) {
-      console.error("❌ Smart auto-save error:", error);
-    }
-  };
-
+  // Auto-save functionality
   const triggerAutoSave = async () => {
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
     }
 
-    // Configurable delay with smart change detection
     autoSaveTimeoutRef.current = setTimeout(async () => {
-      await smartAutoSave();
-    }, autoSaveConfig.autoSaveDelayMs);
+      if (note && editor && userId) {
+        try {
+          const content = editor.getHTML();
+          const markdown = turndownService.turndown(content);
+
+          // Get backend URL
+          const backendUrl = await configService.getBackendUrl();
+
+          // Save to backend using the correct API format
+          const response = await fetch(
+            `${backendUrl}/api/${userId}/notes/${note.id}`,
+            {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                title: note.title,
+                content,
+                markdown,
+                tags: note.tags,
+                notebook: note.notebook,
+                folder: note.folder,
+              }),
+            }
+          );
+
+          if (response.ok) {
+            console.log("� Auto-saved note:", note.title);
+            // Also call the parent's onSave if provided
+            onSave?.({
+              ...note,
+              content,
+              markdown,
+            });
+          } else {
+            console.error("❌ Auto-save failed:", response.statusText);
+          }
+        } catch (error) {
+          console.error("❌ Auto-save error:", error);
+        }
+      }
+    }, 2000); // Auto-save after 2 seconds of inactivity
   };
 
   const editor = useEditor({
@@ -339,17 +171,12 @@ const TipTapEditor = ({
           depth: 100,
         },
       }),
-      // List extensions - ORDER MATTERS! Put regular lists before task lists
       BulletList.configure({
-        keepMarks: true,
-        keepAttributes: false,
         HTMLAttributes: {
           class: "bullet-list",
         },
       }),
       OrderedList.configure({
-        keepMarks: true,
-        keepAttributes: false,
         HTMLAttributes: {
           class: "ordered-list",
         },
@@ -359,12 +186,10 @@ const TipTapEditor = ({
           class: "list-item",
         },
       }),
-      // Task list extensions AFTER regular lists
       TaskList.configure({
         HTMLAttributes: {
           class: "task-list",
         },
-        itemTypeName: "taskItem", // Ensure it uses the correct item type
       }),
       TaskItem.configure({
         nested: true,
@@ -384,14 +209,7 @@ const TipTapEditor = ({
         },
       }),
       // Advanced text formatting
-      TextStyle.configure({
-        HTMLAttributes: {
-          class: "text-style",
-        },
-      }),
-      FontSize.configure({
-        types: ["textStyle"],
-      }),
+      TextStyle,
       Color.configure({
         types: ["textStyle"],
       }),
@@ -441,90 +259,11 @@ const TipTapEditor = ({
           class: "editor-hr",
         },
       }),
-      Placeholder.configure({
-        placeholder: "Start writing your note...",
-        emptyEditorClass: "is-editor-empty",
-      }),
     ],
-    content: note?.content || "<p></p>",
+    content: note?.content || "<p>Start writing your note...</p>",
     onUpdate: ({ editor }) => {
       const html = editor.getHTML();
       const markdown = turndownService.turndown(html);
-
-      // Debug: Check for double-line list issues
-      const listItems = editor.view.dom.querySelectorAll("li");
-      const problematicItems = Array.from(listItems).filter((li) => {
-        const paragraphs = li.querySelectorAll("p");
-        return (
-          paragraphs.length > 1 ||
-          (paragraphs.length === 1 && paragraphs[0].parentNode === li)
-        );
-      });
-
-      if (problematicItems.length > 0) {
-        console.warn(
-          "🚨 Found list items with paragraph wrapping:",
-          problematicItems.length
-        );
-        problematicItems.forEach((item, index) => {
-          console.warn(`Item ${index + 1}:`, item.innerHTML);
-        });
-      } else {
-        console.log(
-          "✅ All list items are properly formatted (no double-line issues)"
-        );
-      }
-
-      // Debug: Check list structure and CSS classes
-      const bulletLists = editor.view.dom.querySelectorAll("ul");
-      const numberedLists = editor.view.dom.querySelectorAll("ol");
-
-      if (bulletLists.length > 0) {
-        console.log("🔍 Bullet lists found:", bulletLists.length);
-        bulletLists.forEach((list, index) => {
-          console.log(`Bullet list ${index + 1}:`, {
-            classList: Array.from(list.classList),
-            style: list.style.cssText,
-            computedStyle: window.getComputedStyle(list).listStyleType,
-            innerHTML: list.innerHTML,
-            dataType: list.getAttribute("data-type"),
-            isTaskList: list.getAttribute("data-type") === "taskList",
-            listItems: Array.from(list.querySelectorAll("li")).map((li) => ({
-              className: li.className,
-              dataType: li.getAttribute("data-type"),
-              dataChecked: li.getAttribute("data-checked"),
-              hasCheckbox: li.querySelector('input[type="checkbox"]') !== null,
-              isTaskItem:
-                li.classList.contains("task-item") ||
-                li.getAttribute("data-type") === "taskItem",
-            })),
-          });
-        });
-      }
-
-      if (numberedLists.length > 0) {
-        console.log("🔍 Numbered lists found:", numberedLists.length);
-        numberedLists.forEach((list, index) => {
-          console.log(`Numbered list ${index + 1}:`, {
-            classList: Array.from(list.classList),
-            style: list.style.cssText,
-            computedStyle: window.getComputedStyle(list).listStyleType,
-            innerHTML: list.innerHTML,
-            dataType: list.getAttribute("data-type"),
-            isTaskList: list.getAttribute("data-type") === "taskList",
-            listItems: Array.from(list.querySelectorAll("li")).map((li) => ({
-              className: li.className,
-              dataType: li.getAttribute("data-type"),
-              dataChecked: li.getAttribute("data-checked"),
-              hasCheckbox: li.querySelector('input[type="checkbox"]') !== null,
-              isTaskItem:
-                li.classList.contains("task-item") ||
-                li.getAttribute("data-type") === "taskItem",
-            })),
-          });
-        });
-      }
-
       onContentChange?.(note, html, markdown);
       triggerAutoSave(); // Trigger auto-save on content change
     },
@@ -532,41 +271,6 @@ const TipTapEditor = ({
       attributes: {
         class:
           "prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none",
-      },
-      handlePaste: (view, event) => {
-        // Handle clipboard paste for images
-        const clipboardData = event.clipboardData || window.clipboardData;
-        if (clipboardData && clipboardData.items) {
-          const items = Array.from(clipboardData.items);
-
-          for (const item of items) {
-            if (item.type.startsWith("image/")) {
-              event.preventDefault();
-
-              const file = item.getAsFile();
-              if (file) {
-                // Check file size
-                const maxSize = 100 * 1024 * 1024; // 100MB
-                if (file.size > maxSize) {
-                  alert(
-                    "Image file too large. Please choose a file under 100MB."
-                  );
-                  return true;
-                }
-
-                console.log(
-                  "📋 Pasting image from clipboard:",
-                  file.name || "clipboard-image"
-                );
-
-                // Upload the file using our existing upload function
-                handleFileUpload(file, true);
-                return true;
-              }
-            }
-          }
-        }
-        return false;
       },
       handleDrop: (view, event, slice, moved) => {
         if (
@@ -586,10 +290,30 @@ const TipTapEditor = ({
               return true;
             }
 
-            console.log("🔄 Dropping image:", file.name);
-
-            // Upload the file using our existing upload function
-            handleFileUpload(file, true);
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const imageUrl = e.target?.result;
+              if (imageUrl) {
+                const { schema } = view.state;
+                const coordinates = view.posAtCoords({
+                  left: event.clientX,
+                  top: event.clientY,
+                });
+                if (coordinates) {
+                  const node = schema.nodes.image.create({
+                    src: imageUrl,
+                    alt: file.name,
+                    title: file.name,
+                  });
+                  const transaction = view.state.tr.insert(
+                    coordinates.pos,
+                    node
+                  );
+                  view.dispatch(transaction);
+                }
+              }
+            };
+            reader.readAsDataURL(file);
             return true;
           }
         }
@@ -605,400 +329,66 @@ const TipTapEditor = ({
           if (file.type.startsWith("image/")) {
             event.preventDefault();
             event.dataTransfer.dropEffect = "copy";
-            view.dom.classList.add("drag-over-image");
+            view.dom.classList.add("drag-over");
             return true;
           }
         }
         return false;
       },
-      handleDragLeave: (view, event) => {
-        // Only remove the class if we're leaving the editor area
-        if (!view.dom.contains(event.relatedTarget)) {
-          view.dom.classList.remove("drag-over-image");
-        }
-      },
-      handleDragEnd: (view) => {
-        view.dom.classList.remove("drag-over-image");
+      handleDragLeave: (view) => {
+        view.dom.classList.remove("drag-over");
       },
     },
   });
-
-  // Debug: Track when note prop changes
-  useEffect(() => {
-    console.log("🔍 TipTap component received new note prop:", {
-      noteId: note?.id,
-      noteTitle: note?.title,
-      tempVersionPreview: note?.tempVersionPreview,
-      previewingVersion: note?.previewingVersion,
-      contentLength: note?.content?.length,
-      contentPreview:
-        note?.content?.substring(0, 50) +
-        (note?.content?.length > 50 ? "..." : ""),
-    });
-  }, [note]);
 
   // Update attachments when note changes
   useEffect(() => {
     setAttachments(note?.attachments || []);
   }, [note]);
 
-  // Update editor content when note changes (only when switching notes or versions, not during editing)
+  // Update editor content when note changes (only when switching notes, not during editing)
   useEffect(() => {
-    console.log("🔍 TipTap useEffect triggered:", {
-      hasEditor: !!editor,
-      hasNote: !!note,
-      noteId: note?.id,
-      noteTitle: note?.title,
-      tempVersionPreview: note?.tempVersionPreview,
-      previewingVersion: note?.previewingVersion,
-      contentLength: note?.content?.length,
-    });
-
     if (editor && note && note.id) {
-      const newContent = note.content || "<p></p>";
+      const newContent = note.content || "<p>Start writing your note...</p>";
       const currentContent = editor.getHTML();
 
-      // Only update if this is a different note (by ID) or a version switch
-      // NEVER update during normal typing to prevent cursor jumps
+      // Only update if this is a different note (by ID) or if the content is significantly different
+      // Don't update during typing to prevent cursor jumps
       const currentNoteId = getEditorNoteId(editor);
       const isNewNote = currentNoteId !== note.id;
-      const isVersionSwitch = note.tempVersionPreview; // Check if this is a version switch
       const hasSignificantChange =
         currentContent !== newContent &&
-        (currentContent === "<p></p>" || !currentContent.trim());
+        (currentContent === "<p>Start writing your note...</p>" ||
+          currentContent === "<p></p>" ||
+          !currentContent.trim());
 
-      console.log("🔍 TipTap content update check:", {
-        isNewNote,
-        isVersionSwitch,
-        hasSignificantChange,
-        currentNoteId,
-        noteId: note.id,
-        tempVersionPreview: note.tempVersionPreview,
-        previewingVersion: note.previewingVersion,
-        currentContentLength: currentContent?.length,
-        newContentLength: newContent?.length,
-        contentsEqual: currentContent === newContent,
-      });
-
-      // ONLY update for note switches or version switches - NEVER during normal typing
-      if (isNewNote || isVersionSwitch || hasSignificantChange) {
-        console.log("📝 Updating TipTap editor content:", {
-          isNewNote,
-          isVersionSwitch,
-          hasSignificantChange,
-          previewingVersion: note.previewingVersion,
-          noteTitle: note.title,
-          newContent:
-            newContent.substring(0, 100) +
-            (newContent.length > 100 ? "..." : ""),
-        });
-
-        // Force clear and set content for version switches to ensure update
-        if (isVersionSwitch) {
-          console.log("🔄 Force updating TipTap content for version switch");
-          // Destroy and recreate the editor content to ensure a clean update
-          editor.commands.clearContent(false);
-          // Use requestAnimationFrame to ensure DOM update
-          requestAnimationFrame(() => {
-            editor.commands.setContent(newContent, false, {
-              preserveWhitespace: true,
-            });
-            editor.commands.focus("end");
-            console.log("✅ Version content set successfully");
-          });
-        } else {
-          editor.commands.setContent(newContent);
-        }
-
+      if (isNewNote || hasSignificantChange) {
+        editor.commands.setContent(newContent);
         setEditorNoteId(editor, note.id);
-        console.log("✅ TipTap editor content updated for note:", note.title);
-      } else {
-        console.log(
-          "⏭️ Skipping TipTap content update - normal typing detected"
-        );
+        console.log("📝 Updated editor content for note:", note.title);
       }
-    } else {
-      console.log("⚠️ TipTap useEffect - missing editor, note, or note.id");
     }
-  }, [
-    editor,
-    note?.id,
-    note?.tempVersionPreview,
-    note?.previewingVersion,
-    note?.content,
-  ]); // Added note?.previewingVersion and note?.content for version switches
+  }, [editor, note?.id]); // Only depend on note ID, not content
 
-  // Cleanup auto-save timeout on unmount and add beforeunload protection
+  // Cleanup auto-save timeout on unmount
   useEffect(() => {
-    // Add beforeunload listener to save when user tries to close browser/tab
-    const handleBeforeUnload = async (event) => {
-      if (note && editor && userId) {
-        // Cancel any pending auto-save
-        if (autoSaveTimeoutRef.current) {
-          clearTimeout(autoSaveTimeoutRef.current);
-        }
-
-        // Force save before page unload (bypass change threshold for safety)
-        const currentContent = editor.getHTML();
-        if (currentContent !== lastSavedContent) {
-          console.log("🚪 BeforeUnload: Forcing save of unsaved changes");
-          try {
-            const markdown = turndownService.turndown(currentContent);
-            const backendUrl = await configService.getBackendUrl();
-
-            // Use fetch for synchronous save on page unload
-            const response = await fetch(
-              `${backendUrl}/api/${userId}/notes/${note.id}`,
-              {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  title: note.title,
-                  content: currentContent,
-                  markdown,
-                  tags: note.tags,
-                  notebook: note.notebook,
-                  folder: note.folder,
-                }),
-                keepalive: true, // Keep request alive during page unload
-              }
-            );
-
-            if (response.ok) {
-              console.log("✅ BeforeUnload save successful");
-            }
-          } catch (error) {
-            console.error("❌ BeforeUnload save failed:", error);
-          }
-        }
-      }
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-
     return () => {
-      // Cleanup timeout
       if (autoSaveTimeoutRef.current) {
         clearTimeout(autoSaveTimeoutRef.current);
       }
-
-      // Remove beforeunload listener
-      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, [note, editor, userId]); // Dependencies needed for beforeunload handler
-
-  // Debug helper - log editor state and create global test function
-  useEffect(() => {
-    if (editor) {
-      // Log editor state when trying to create lists
-      const logEditorState = () => {
-        console.log("🔍 Editor state:", {
-          isEmpty: editor.isEmpty,
-          isActive: {
-            bulletList: editor.isActive("bulletList"),
-            orderedList: editor.isActive("orderedList"),
-            taskList: editor.isActive("taskList"),
-            listItem: editor.isActive("listItem"),
-          },
-          selection: editor.state.selection,
-          content: editor.getHTML(),
-        });
-      };
-
-      // Create global test function for browser console debugging
-      window.testListRendering = () => {
-        console.log("🧪 Testing list rendering...");
-        logEditorState();
-
-        // Test bullet list creation
-        console.log("🔘 Testing bullet list creation...");
-        const bulletResult = editor
-          .chain()
-          .focus()
-          .insertContent({
-            type: "bulletList",
-            content: [
-              {
-                type: "listItem",
-                content: [
-                  {
-                    type: "paragraph",
-                    content: [{ type: "text", text: "Test bullet item" }],
-                  },
-                ],
-              },
-            ],
-          })
-          .run();
-        console.log("🔘 Bullet list creation result:", bulletResult);
-
-        setTimeout(() => {
-          console.log("🔘 After bullet list creation:");
-          logEditorState();
-
-          // Test task list creation
-          console.log("☑️ Testing task list creation...");
-          const taskResult = editor
-            .chain()
-            .focus()
-            .insertContent({
-              type: "taskList",
-              content: [
-                {
-                  type: "taskItem",
-                  attrs: {
-                    checked: false,
-                  },
-                  content: [
-                    {
-                      type: "paragraph",
-                      content: [{ type: "text", text: "Test task item" }],
-                    },
-                  ],
-                },
-              ],
-            })
-            .run();
-          console.log("☑️ Task list creation result:", taskResult);
-
-          setTimeout(() => {
-            console.log("☑️ After task list creation:");
-            logEditorState();
-          }, 100);
-        }, 100);
-      };
-
-      // Notify about global test function
-      console.log(
-        "🔧 TipTap Editor Debug: Use `window.testListRendering()` in console to test list creation"
-      );
-
-      // Log state after each update
-      editor.on("update", logEditorState);
-
-      return () => {
-        editor.off("update", logEditorState);
-        // Clean up global function
-        if (window.testListRendering) {
-          delete window.testListRendering;
-        }
-      };
-    }
-  }, [editor]);
-
-  // Helper function to validate list creation
-  const validateListCreation = (listType) => {
-    if (!editor) return false;
-
-    // Check if TipTap thinks the list is active
-    const isActive = editor.isActive(listType);
-
-    // Check if the list actually exists in the DOM
-    let listTag, domLists;
-    if (listType === "bulletList") {
-      listTag = "ul";
-      domLists = editor.view.dom.querySelectorAll(
-        "ul:not([data-type='taskList'])"
-      );
-    } else if (listType === "orderedList") {
-      listTag = "ol";
-      domLists = editor.view.dom.querySelectorAll(
-        "ol:not([data-type='taskList'])"
-      );
-    } else if (listType === "taskList") {
-      listTag = "ul[data-type='taskList']";
-      domLists = editor.view.dom.querySelectorAll("ul[data-type='taskList']");
-    }
-
-    const hasDomList = domLists.length > 0;
-
-    console.log(`🔍 Validating ${listType} creation:`, {
-      isActive,
-      hasDomList,
-      domListCount: domLists.length,
-      listTag,
-    });
-
-    return isActive && hasDomList;
-  };
-
-  // Helper function to create a list when toggle fails
-  const forceCreateList = (listType) => {
-    if (!editor) return false;
-
-    console.log(`🔧 Force creating ${listType} list`);
-
-    try {
-      // Clear selection and focus
-      editor.commands.focus();
-
-      // Insert a new paragraph if editor is empty
-      if (editor.isEmpty) {
-        editor.commands.insertContent("<p></p>");
-      }
-
-      // Build the content structure based on list type
-      let contentStructure;
-      if (listType === "taskList") {
-        contentStructure = {
-          type: "taskList",
-          content: [
-            {
-              type: "taskItem",
-              attrs: {
-                checked: false,
-              },
-              content: [
-                {
-                  type: "paragraph",
-                  content: [],
-                },
-              ],
-            },
-          ],
-        };
-      } else {
-        contentStructure = {
-          type: listType,
-          content: [
-            {
-              type: "listItem",
-              content: [
-                {
-                  type: "paragraph",
-                  content: [],
-                },
-              ],
-            },
-          ],
-        };
-      }
-
-      // Insert the list structure
-      const result = editor
-        .chain()
-        .focus()
-        .insertContent(contentStructure)
-        .run();
-
-      console.log(`🔧 Force create ${listType} result:`, result);
-
-      // Validate the creation
-      setTimeout(() => {
-        const isValid = validateListCreation(listType);
-        console.log(`🔧 Force create ${listType} validation:`, isValid);
-      }, 100);
-
-      return result;
-    } catch (error) {
-      console.error(`❌ Failed to force create ${listType}:`, error);
-      return false;
-    }
-  };
+  }, []);
 
   // Toolbar actions
   const toggleBold = () => editor?.chain().focus().toggleBold().run();
   const toggleItalic = () => editor?.chain().focus().toggleItalic().run();
+  const toggleBulletList = () =>
+    editor?.chain().focus().toggleBulletList().run();
+  const toggleOrderedList = () =>
+    editor?.chain().focus().toggleOrderedList().run();
+  const toggleTaskList = () => editor?.chain().focus().toggleTaskList().run();
+
+  // Advanced formatting actions
   const toggleStrike = () => editor?.chain().focus().toggleStrike().run();
   const toggleHighlight = () => editor?.chain().focus().toggleHighlight().run();
   const toggleSubscript = () => editor?.chain().focus().toggleSubscript().run();
@@ -1030,25 +420,10 @@ const TipTapEditor = ({
 
   // Font family action
   const setFontFamily = (fontFamily) => {
-    if (fontFamily === "default") {
+    if (fontFamily === 'default') {
       editor?.chain().focus().unsetFontFamily().run();
     } else {
       editor?.chain().focus().setFontFamily(fontFamily).run();
-    }
-  };
-
-  // Font size action
-  const setFontSize = (fontSize) => {
-    if (!editor) return;
-
-    console.log("📏 Setting font size:", fontSize);
-
-    if (fontSize === "default") {
-      // Remove any font size styling using the fontSize extension
-      editor.chain().focus().unsetFontSize().run();
-    } else {
-      // Apply font size using the fontSize extension
-      editor.chain().focus().setFontSize(fontSize).run();
     }
   };
 
@@ -1108,7 +483,6 @@ const TipTapEditor = ({
     await handleFileUpload(file, false); // false for other attachments
   };
 
-  // Enhanced file upload with better error handling and progress feedback
   const handleFileUpload = async (file, isImage) => {
     // Check file size (limit to 100MB)
     const maxSize = 100 * 1024 * 1024; // 100MB
@@ -1160,7 +534,6 @@ const TipTapEditor = ({
       noteId: note.id,
       userId,
       fileName: file.name,
-      isImage,
     });
 
     try {
@@ -1198,8 +571,6 @@ const TipTapEditor = ({
       // If it's an image, also insert it into the editor
       if (isImage) {
         const imageUrl = `${backendUrl}/api/${userId}/notes/${note.id}/attachments/${result.attachment.filename}`;
-
-        // Insert image with improved attributes
         editor
           ?.chain()
           .focus()
@@ -1207,36 +578,16 @@ const TipTapEditor = ({
             src: imageUrl,
             alt: file.name,
             title: file.name,
-            "data-filename": result.attachment.filename,
-            "data-original-name": file.name,
-            "data-size": file.size,
           })
           .run();
-
-        // Add a paragraph after the image so user can continue typing
-        editor?.chain().focus().insertContent("<p></p>").run();
+        // Add a new paragraph after the image so user can continue typing
+        editor?.chain().focus().insertContent("\n\n").run();
       }
       // For non-image attachments, don't insert anything into the editor
       // They will be shown in the attachments panel below
 
-      // Fetch updated note data from server to get current attachment metadata
-      try {
-        const noteResponse = await fetch(
-          `${backendUrl}/api/${userId}/notes/${note.id}`
-        );
-        if (noteResponse.ok) {
-          const updatedNote = await noteResponse.json();
-          // Call onSave with the updated note to refresh the notes list
-          onSave?.(updatedNote.content, updatedNote.markdown, updatedNote);
-        } else {
-          // Fallback: trigger a basic save
-          onSave?.();
-        }
-      } catch (error) {
-        console.error("Error fetching updated note:", error);
-        // Fallback: trigger a basic save
-        onSave?.();
-      }
+      // Trigger a save to update the note metadata
+      onSave?.();
     } catch (error) {
       console.error("Error uploading file:", error);
       console.error("Error details:", {
@@ -1283,24 +634,8 @@ const TipTapEditor = ({
       // Update local attachments state
       setAttachments((prev) => prev.filter((att) => att.filename !== filename));
 
-      // Fetch updated note data from server to get current attachment metadata
-      try {
-        const noteResponse = await fetch(
-          `${backendUrl}/api/${userId}/notes/${note.id}`
-        );
-        if (noteResponse.ok) {
-          const updatedNote = await noteResponse.json();
-          // Call onSave with the updated note to refresh the notes list
-          onSave?.(updatedNote.content, updatedNote.markdown, updatedNote);
-        } else {
-          // Fallback: trigger a basic save
-          onSave?.();
-        }
-      } catch (error) {
-        console.error("Error fetching updated note:", error);
-        // Fallback: trigger a basic save
-        onSave?.();
-      }
+      // Trigger a save to update the note metadata
+      onSave?.();
     } catch (error) {
       console.error("Error removing attachment:", error);
       alert("Failed to remove attachment. Please try again.");
@@ -1346,158 +681,16 @@ const TipTapEditor = ({
     }
   };
 
-  // Handle title changes
-  const [noteTitle, setNoteTitle] = useState(note?.title || "");
-
-  // Update note title when note prop changes
-  useEffect(() => {
-    setNoteTitle(note?.title || "");
-  }, [note?.title]);
-
-  // Handle title blur event to save title changes
-  const handleTitleBlur = async () => {
-    if (!note || !onSave) return;
-
-    // Only save if title has changed
-    if (noteTitle !== note.title) {
-      try {
-        const updatedNote = { ...note, title: noteTitle };
-        const html = editor?.getHTML() || note.content || "";
-        const markdown = turndownService.turndown(html);
-        await onSave(html, markdown, updatedNote);
-      } catch (error) {
-        console.error("Error saving title:", error);
-      }
-    }
-  };
-
-  // Add diagnostic function to global scope for testing
-  useEffect(() => {
-    window.testListRendering = () => {
-      if (!editor) {
-        console.error("❌ Editor not available");
-        return;
-      }
-
-      console.log("🧪 Testing list rendering...");
-
-      const testCases = [
-        {
-          name: "Bullet List",
-          content:
-            '<ul class="bullet-list list-disc"><li class="list-item">Item 1</li><li class="list-item">Item 2</li></ul>',
-          expectedLines: 2,
-        },
-        {
-          name: "Numbered List",
-          content:
-            '<ol class="ordered-list list-decimal"><li class="list-item">Item 1</li><li class="list-item">Item 2</li></ol>',
-          expectedLines: 2,
-        },
-        {
-          name: "Task List",
-          content:
-            '<ul data-type="taskList" class="task-list"><li data-type="taskItem" class="task-item" data-checked="false">Task 1</li><li data-type="taskItem" class="task-item" data-checked="false">Task 2</li></ul>',
-          expectedLines: 2,
-        },
-      ];
-
-      for (const test of testCases) {
-        console.log(`\n📝 Testing ${test.name}:`);
-
-        // Set test content
-        editor.commands.setContent(test.content);
-
-        // Check for issues
-        const listItems = editor.view.dom.querySelectorAll("li");
-        const actualLines = listItems.length;
-
-        console.log(
-          `Expected lines: ${test.expectedLines}, Actual lines: ${actualLines}`
-        );
-
-        if (actualLines !== test.expectedLines) {
-          console.error(
-            `❌ ${test.name} failed: Expected ${test.expectedLines} lines, got ${actualLines}`
-          );
-        } else {
-          console.log(`✅ ${test.name} passed`);
-        }
-
-        // Check for double paragraphs
-        const doubleParagraphs = Array.from(listItems).filter((li) => {
-          const paragraphs = li.querySelectorAll("p");
-          return paragraphs.length > 1;
-        });
-
-        if (doubleParagraphs.length > 0) {
-          console.error(
-            `❌ Found ${doubleParagraphs.length} list items with nested paragraphs!`
-          );
-          doubleParagraphs.forEach((li, index) => {
-            console.error(`Double paragraph ${index + 1}:`, li.innerHTML);
-          });
-        } else {
-          console.log(`✅ No nested paragraphs found`);
-        }
-
-        // Check for proper CSS classes
-        const hasProperClasses = Array.from(listItems).every((li) => {
-          return (
-            li.classList.contains("list-item") ||
-            li.classList.contains("task-item")
-          );
-        });
-
-        console.log(
-          `CSS classes: ${hasProperClasses ? "✅ Correct" : "❌ Missing"}`
-        );
-      }
-
-      console.log("\n🧪 List rendering test complete!");
-      console.log(
-        "💡 To test manually: Create lists using the toolbar buttons and check the console for warnings."
-      );
-    };
-
-    // Expose editor globally for testing
-    window.editor = editor;
-
-    console.log(
-      "🔧 Diagnostic function added: Run window.testListRendering() to test list rendering"
-    );
-    console.log(
-      "🔧 FontSize extension: Run window.testFontSizeExtension() to test font size functionality"
-    );
-
-    return () => {
-      delete window.testListRendering;
-      delete window.editor;
-    };
-  }, [editor]);
-
   return (
-    <div className="h-full bg-white flex flex-col">
-      {/* Title Section */}
-      <div className="flex-shrink-0 p-6 border-b border-gray-200">
-        <input
-          type="text"
-          value={noteTitle}
-          onChange={(e) => setNoteTitle(e.target.value)}
-          onBlur={handleTitleBlur}
-          className="w-full text-2xl font-bold bg-transparent border-none outline-none text-gray-900 placeholder-gray-400"
-          placeholder="Untitled Note"
-        />
-      </div>
-
+    <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex-shrink-0 p-4 border-b border-gray-200 bg-gray-50">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="border-b border-gray-200 p-4 bg-white">
+        <div className="flex items-center space-x-2 flex-wrap">
           {/* Text Formatting */}
-          <div className="flex items-center space-x-1 border-r border-gray-300 pr-2 mr-2">
+          <div className="flex space-x-1 border-r pr-2 mr-2">
             <button
-              onClick={() => editor?.chain().focus().toggleBold().run()}
-              className={`p-2 rounded hover:bg-gray-100 transition-colors ${
+              onClick={toggleBold}
+              className={`p-2 rounded hover:bg-gray-100 ${
                 editor?.isActive("bold") ? "bg-blue-100 text-blue-700" : ""
               }`}
               title="Bold (Ctrl+B)"
@@ -1505,8 +698,8 @@ const TipTapEditor = ({
               <Bold size={16} />
             </button>
             <button
-              onClick={() => editor?.chain().focus().toggleItalic().run()}
-              className={`p-2 rounded hover:bg-gray-100 transition-colors ${
+              onClick={toggleItalic}
+              className={`p-2 rounded hover:bg-gray-100 ${
                 editor?.isActive("italic") ? "bg-blue-100 text-blue-700" : ""
               }`}
               title="Italic (Ctrl+I)"
@@ -1514,51 +707,95 @@ const TipTapEditor = ({
               <Italic size={16} />
             </button>
             <button
-              onClick={() => editor?.chain().focus().toggleUnderline().run()}
-              className={`p-2 rounded hover:bg-gray-100 transition-colors ${
-                editor?.isActive("underline") ? "bg-blue-100 text-blue-700" : ""
+              onClick={toggleStrike}
+              className={`p-2 rounded hover:bg-gray-100 ${
+                editor?.isActive("strike") ? "bg-blue-100 text-blue-700" : ""
               }`}
-              title="Underline (Ctrl+U)"
+              title="Strikethrough"
             >
-              <Underline size={16} />
+              <Strikethrough size={16} />
+            </button>
+            <button
+              onClick={setHighlightColor}
+              className={`p-2 rounded hover:bg-gray-100 ${
+                editor?.isActive("highlight") ? "bg-blue-100 text-blue-700" : ""
+              }`}
+              title="Highlight"
+            >
+              <Highlighter size={16} />
+            </button>
+            <button
+              onClick={setTextColor}
+              className="p-2 rounded hover:bg-gray-100"
+              title="Text Color"
+            >
+              <Palette size={16} />
             </button>
           </div>
 
-          {/* Heading Options */}
-          <div className="flex items-center space-x-1 border-r border-gray-300 pr-2 mr-2">
+          {/* Font Family */}
+          <div className="border-r pr-2 mr-2">
+            <select
+              onChange={(e) => setFontFamily(e.target.value)}
+              value={editor?.getAttributes('textStyle').fontFamily || 'default'}
+              className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              title="Font Family"
+            >
+              <option value="default">Default</option>
+              <option value="Inter, system-ui, sans-serif">Inter</option>
+              <option value="Helvetica, Arial, sans-serif">Helvetica</option>
+              <option value="Times, serif">Times</option>
+              <option value="Georgia, serif">Georgia</option>
+              <option value="'Courier New', monospace">Courier New</option>
+              <option value="Monaco, 'Lucida Console', monospace">Monaco</option>
+              <option value="'Comic Sans MS', cursive">Comic Sans</option>
+              <option value="Impact, sans-serif">Impact</option>
+              <option value="Verdana, sans-serif">Verdana</option>
+            </select>
+          </div>
+
+          {/* Headings */}
+          <div className="flex space-x-1 border-r pr-2 mr-2">
             <button
-              onClick={() =>
-                editor?.chain().focus().toggleHeading({ level: 1 }).run()
-              }
-              className={`p-2 rounded hover:bg-gray-100 transition-colors ${
+              onClick={() => setHeading(1)}
+              className={`p-2 rounded hover:bg-gray-100 ${
                 editor?.isActive("heading", { level: 1 })
                   ? "bg-blue-100 text-blue-700"
                   : ""
               }`}
               title="Heading 1"
             >
-              <Type size={16} />
+              <Heading1 size={16} />
             </button>
             <button
-              onClick={() =>
-                editor?.chain().focus().toggleHeading({ level: 2 }).run()
-              }
-              className={`p-2 rounded hover:bg-gray-100 transition-colors ${
+              onClick={() => setHeading(2)}
+              className={`p-2 rounded hover:bg-gray-100 ${
                 editor?.isActive("heading", { level: 2 })
                   ? "bg-blue-100 text-blue-700"
                   : ""
               }`}
               title="Heading 2"
             >
-              <Type size={14} />
+              <Heading2 size={16} />
+            </button>
+            <button
+              onClick={() => setHeading(3)}
+              className={`p-2 rounded hover:bg-gray-100 ${
+                editor?.isActive("heading", { level: 3 })
+                  ? "bg-blue-100 text-blue-700"
+                  : ""
+              }`}
+              title="Heading 3"
+            >
+              <Heading3 size={16} />
             </button>
           </div>
 
           {/* Lists */}
-          <div className="flex items-center space-x-1 border-r border-gray-300 pr-2 mr-2">
+          <div className="flex space-x-1 border-r pr-2 mr-2">
             <button
-              onClick={() => editor?.chain().focus().toggleBulletList().run()}
-              className={`p-2 rounded hover:bg-gray-100 transition-colors ${
+              onClick={toggleBulletList}
+              className={`p-2 rounded hover:bg-gray-100 ${
                 editor?.isActive("bulletList")
                   ? "bg-blue-100 text-blue-700"
                   : ""
@@ -1568,8 +805,8 @@ const TipTapEditor = ({
               <List size={16} />
             </button>
             <button
-              onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-              className={`p-2 rounded hover:bg-gray-100 transition-colors ${
+              onClick={toggleOrderedList}
+              className={`p-2 rounded hover:bg-gray-100 ${
                 editor?.isActive("orderedList")
                   ? "bg-blue-100 text-blue-700"
                   : ""
@@ -1578,27 +815,100 @@ const TipTapEditor = ({
             >
               <ListOrdered size={16} />
             </button>
+            <button
+              onClick={toggleTaskList}
+              className={`p-2 rounded hover:bg-gray-100 ${
+                editor?.isActive("taskList") ? "bg-blue-100 text-blue-700" : ""
+              }`}
+              title="Task List"
+            >
+              <CheckSquare size={16} />
+            </button>
+          </div>
+
+          {/* Code & Quote */}
+          <div className="flex space-x-1 border-r pr-2 mr-2">
+            <button
+              onClick={toggleCode}
+              className={`p-2 rounded hover:bg-gray-100 ${
+                editor?.isActive("code") ? "bg-blue-100 text-blue-700" : ""
+              }`}
+              title="Inline Code"
+            >
+              <Code size={16} />
+            </button>
+            <button
+              onClick={toggleCodeBlock}
+              className={`p-2 rounded hover:bg-gray-100 ${
+                editor?.isActive("codeBlock") ? "bg-blue-100 text-blue-700" : ""
+              }`}
+              title="Code Block"
+            >
+              <FileText size={16} />
+            </button>
+            <button
+              onClick={toggleBlockquote}
+              className={`p-2 rounded hover:bg-gray-100 ${
+                editor?.isActive("blockquote")
+                  ? "bg-blue-100 text-blue-700"
+                  : ""
+              }`}
+              title="Quote"
+            >
+              <Quote size={16} />
+            </button>
+          </div>
+
+          {/* Scripts & Special */}
+          <div className="flex space-x-1 border-r pr-2 mr-2">
+            <button
+              onClick={toggleSubscript}
+              className={`p-2 rounded hover:bg-gray-100 ${
+                editor?.isActive("subscript") ? "bg-blue-100 text-blue-700" : ""
+              }`}
+              title="Subscript"
+            >
+              <SubIcon size={16} />
+            </button>
+            <button
+              onClick={toggleSuperscript}
+              className={`p-2 rounded hover:bg-gray-100 ${
+                editor?.isActive("superscript")
+                  ? "bg-blue-100 text-blue-700"
+                  : ""
+              }`}
+              title="Superscript"
+            >
+              <SupIcon size={16} />
+            </button>
+            <button
+              onClick={addHorizontalRule}
+              className="p-2 rounded hover:bg-gray-100"
+              title="Horizontal Rule"
+            >
+              <Minus size={16} />
+            </button>
           </div>
 
           {/* Links and Media */}
-          <div className="flex items-center space-x-1 border-r border-gray-300 pr-2 mr-2">
+          <div className="flex space-x-1 border-r pr-2 mr-2">
             <button
               onClick={addLink}
-              className="p-2 rounded hover:bg-gray-100 transition-colors"
+              className="p-2 rounded hover:bg-gray-100"
               title="Add Link"
             >
-              <Link size={16} />
+              <LinkIcon size={16} />
             </button>
             <button
               onClick={addImage}
-              className="p-2 rounded hover:bg-gray-100 transition-colors"
+              className="p-2 rounded hover:bg-gray-100"
               title="Upload Image"
             >
               <ImageIcon size={16} />
             </button>
             <button
               onClick={addAttachment}
-              className="p-2 rounded hover:bg-gray-100 transition-colors"
+              className="p-2 rounded hover:bg-gray-100"
               title="Upload Attachment"
             >
               <Paperclip size={16} />
@@ -1609,7 +919,7 @@ const TipTapEditor = ({
           <button
             onClick={saveNote}
             disabled={isLoading}
-            className="p-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="p-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
             title="Save Note (Ctrl+S)"
           >
             <Save size={16} />
@@ -1617,11 +927,11 @@ const TipTapEditor = ({
         </div>
       </div>
 
-      {/* Editor - Scrollable Content Area */}
-      <div className="flex-1 overflow-y-auto min-h-0 p-6">
+      {/* Editor */}
+      <div className="flex-1 overflow-y-auto p-6">
         <EditorContent editor={editor} />
 
-        {/* Attachments Panel */}
+        {/* Attachments Panel - placed after editor but ensure space below */}
         {attachments.length > 0 && (
           <div className="mt-6 p-4 bg-gray-50 rounded-lg border">
             <h4 className="font-medium text-gray-700 mb-3 flex items-center">
@@ -1629,38 +939,45 @@ const TipTapEditor = ({
               Attachments ({attachments.length})
             </h4>
             <div className="space-y-2">
-              {attachments.map((attachment) => (
+              {attachments.map((attachment, index) => (
                 <div
-                  key={attachment.id}
-                  className="flex items-center justify-between p-3 bg-white rounded border"
+                  key={index}
+                  className="flex items-center justify-between bg-white p-3 rounded border"
                 >
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <FileText size={16} className="text-blue-600" />
-                    </div>
+                    <span className="text-lg">
+                      {getFileIcon(attachment.type)}
+                    </span>
                     <div>
-                      <p className="font-medium text-gray-900">
-                        {attachment.filename}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {attachment.size} • {attachment.type}
-                      </p>
+                      <div className="font-medium text-sm text-gray-800">
+                        {attachment.originalName || attachment.filename}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {formatFileSize(attachment.size)} •{" "}
+                        {new Date(attachment.uploaded).toLocaleDateString()}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
                     <button
-                      onClick={() => downloadAttachment(attachment)}
-                      className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
-                      title="Download"
+                      onClick={async () => {
+                        const backendUrl = await configService.getBackendUrl();
+                        window.open(
+                          `${backendUrl}/api/${userId}/notes/${note.id}/attachments/${attachment.filename}`,
+                          "_blank"
+                        );
+                      }}
+                      className="p-1 rounded hover:bg-gray-100"
+                      title="View/Download"
                     >
-                      <Download size={16} />
+                      <Eye size={14} />
                     </button>
                     <button
-                      onClick={() => removeAttachment(attachment.id)}
-                      className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
+                      onClick={() => removeAttachment(attachment.filename)}
+                      className="p-1 rounded hover:bg-red-100 text-red-600"
                       title="Remove"
                     >
-                      <X size={16} />
+                      <X size={14} />
                     </button>
                   </div>
                 </div>
@@ -1668,22 +985,91 @@ const TipTapEditor = ({
             </div>
           </div>
         )}
+
+        {/* Hidden file inputs */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleImageUpload}
+          style={{ display: "none" }}
+        />
+        <input
+          ref={attachmentInputRef}
+          type="file"
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.zip,.json"
+          onChange={handleAttachmentUpload}
+          style={{ display: "none" }}
+        />
       </div>
 
-      {/* Hidden file inputs */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleImageUpload}
-        className="hidden"
-      />
-      <input
-        ref={attachmentInputRef}
-        type="file"
-        onChange={handleAttachmentUpload}
-        className="hidden"
-      />
+      {/* Status Bar */}
+      <div className="border-t border-gray-200 px-4 py-2 bg-gray-50 text-sm text-gray-600">
+        <div className="flex justify-between items-center">
+          <span>
+            {editor?.storage.characterCount?.characters() || 0} characters,{" "}
+            {editor?.storage.characterCount?.words() || 0} words
+          </span>
+          <span className="text-xs">
+            Auto-save enabled • Press Ctrl+S to save manually
+          </span>
+        </div>
+      </div>
+
+      {/* Color Picker Overlays */}
+      {showColorPicker && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setShowColorPicker(false)}
+          />
+          <div
+            className="fixed z-50"
+            style={{
+              left: `${colorPickerPosition.x}px`,
+              top: `${colorPickerPosition.y}px`,
+              transform: "translateX(-50%)",
+            }}
+          >
+            <ComprehensiveColorPicker
+              title="Text Color"
+              color="#000000"
+              onChange={handleColorChange}
+              onChangeComplete={(color) => {
+                handleColorChange(color);
+                setShowColorPicker(false);
+              }}
+            />
+          </div>
+        </>
+      )}
+
+      {showHighlightPicker && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setShowHighlightPicker(false)}
+          />
+          <div
+            className="fixed z-50"
+            style={{
+              left: `${colorPickerPosition.x}px`,
+              top: `${colorPickerPosition.y}px`,
+              transform: "translateX(-50%)",
+            }}
+          >
+            <ComprehensiveColorPicker
+              title="Highlight Color"
+              color="#ffff00"
+              onChange={handleHighlightChange}
+              onChangeComplete={(color) => {
+                handleHighlightChange(color);
+                setShowHighlightPicker(false);
+              }}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 };
