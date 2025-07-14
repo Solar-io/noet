@@ -1362,22 +1362,27 @@ const ImprovedNotesList = ({
             <div className="p-4">
               <h3 className="font-medium text-gray-900 mb-2">Filter by Tags</h3>
               <div className="space-y-2 max-h-40 overflow-y-auto">
-                {availableTags.map((tag) => (
+                {getTagWithNoteCounts().map((tag) => (
                   <label
                     key={tag.id}
-                    className="flex items-center space-x-2 text-sm"
+                    className="flex items-center justify-between space-x-2 text-sm"
                   >
-                    <input
-                      type="checkbox"
-                      checked={selectedTagFilters.includes(tag.id)}
-                      onChange={() => toggleTagFilter(tag.id)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <div
-                      className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: tag.color }}
-                    />
-                    <span className="truncate">{tag.name}</span>
+                    <div className="flex items-center space-x-2 flex-1">
+                      <input
+                        type="checkbox"
+                        checked={selectedTagFilters.includes(tag.id)}
+                        onChange={() => toggleTagFilter(tag.id)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <div
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: tag.color }}
+                      />
+                      <span className="truncate">{tag.name}</span>
+                    </div>
+                    <span className="text-xs text-gray-500 ml-2 font-medium">
+                      {tag.noteCount}
+                    </span>
                   </label>
                 ))}
               </div>
