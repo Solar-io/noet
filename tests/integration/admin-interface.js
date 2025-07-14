@@ -7,7 +7,7 @@
  * - Admin authentication and access control
  */
 
-import configService from "./src/configService.js";
+import configService from "../../src/configService.js";
 
 async function testAdminInterface() {
   console.log("🧪 Testing Admin Interface...\n");
@@ -27,7 +27,7 @@ async function testAdminInterface() {
   try {
     // Test 1: Admin Authentication
     console.log("🔐 Test 1: Admin Authentication...");
-    
+
     // Test admin access
     const adminUsersResponse = await fetch(`${backendUrl}/api/admin/users`, {
       headers: {
@@ -59,14 +59,18 @@ async function testAdminInterface() {
     console.log("\n👥 Test 2: Get All Users...");
     const users = await adminUsersResponse.json();
     console.log(`  📊 Found ${users.length} users:`);
-    
+
     for (const user of users) {
-      console.log(`    - ${user.name} (${user.email}) - ${user.isAdmin ? 'Admin' : 'User'} - ${user.disabled ? 'Disabled' : 'Active'}`);
+      console.log(
+        `    - ${user.name} (${user.email}) - ${
+          user.isAdmin ? "Admin" : "User"
+        } - ${user.disabled ? "Disabled" : "Active"}`
+      );
     }
 
     // Test 3: Create New User
     console.log("\n➕ Test 3: Create New User...");
-    
+
     const newUserData = {
       name: "Test Admin User",
       email: `test-admin-${Date.now()}@example.com`,
@@ -85,11 +89,13 @@ async function testAdminInterface() {
 
     if (createUserResponse.ok) {
       const createdUser = await createUserResponse.json();
-      console.log(`  ✅ User created: ${createdUser.name} (${createdUser.email})`);
-      
+      console.log(
+        `  ✅ User created: ${createdUser.name} (${createdUser.email})`
+      );
+
       // Test 4: Update User Information
       console.log("\n✏️ Test 4: Update User Information...");
-      
+
       const updateUserResponse = await fetch(
         `${backendUrl}/api/admin/users/${createdUser.id}`,
         {
@@ -107,14 +113,16 @@ async function testAdminInterface() {
 
       if (updateUserResponse.ok) {
         const updatedUser = await updateUserResponse.json();
-        console.log(`  ✅ User updated: ${updatedUser.name}, Admin: ${updatedUser.isAdmin}`);
+        console.log(
+          `  ✅ User updated: ${updatedUser.name}, Admin: ${updatedUser.isAdmin}`
+        );
       } else {
         console.log("  ❌ Failed to update user");
       }
 
       // Test 5: Reset Password
       console.log("\n🔄 Test 5: Reset Password...");
-      
+
       const resetPasswordResponse = await fetch(
         `${backendUrl}/api/admin/users/${createdUser.id}/reset-password`,
         {
@@ -135,7 +143,7 @@ async function testAdminInterface() {
 
       // Test 6: Disable User
       console.log("\n🚫 Test 6: Disable User...");
-      
+
       const disableUserResponse = await fetch(
         `${backendUrl}/api/admin/users/${createdUser.id}/disable`,
         {
@@ -154,7 +162,7 @@ async function testAdminInterface() {
 
       // Test 7: Enable User
       console.log("\n✅ Test 7: Enable User...");
-      
+
       const enableUserResponse = await fetch(
         `${backendUrl}/api/admin/users/${createdUser.id}/enable`,
         {
@@ -173,7 +181,7 @@ async function testAdminInterface() {
 
       // Test 8: Delete User (cleanup)
       console.log("\n🗑️ Test 8: Delete User...");
-      
+
       const deleteUserResponse = await fetch(
         `${backendUrl}/api/admin/users/${createdUser.id}`,
         {
@@ -197,7 +205,7 @@ async function testAdminInterface() {
 
     // Test 9: Storage Information
     console.log("\n💾 Test 9: Storage Information...");
-    
+
     const storageResponse = await fetch(`${backendUrl}/api/admin/storage`, {
       headers: {
         Authorization: `Bearer ${adminUserId}`,
@@ -208,9 +216,11 @@ async function testAdminInterface() {
       const storageData = await storageResponse.json();
       console.log(`  📁 Storage location: ${storageData.location}`);
       console.log(`  📊 User storage usage:`);
-      
+
       for (const usage of storageData.userUsage) {
-        console.log(`    - ${usage.userName}: ${usage.noteCount} notes, ${usage.attachmentCount} attachments, ${usage.totalSize}`);
+        console.log(
+          `    - ${usage.userName}: ${usage.noteCount} notes, ${usage.attachmentCount} attachments, ${usage.totalSize}`
+        );
       }
     } else {
       console.log("  ❌ Failed to get storage information");
@@ -218,7 +228,7 @@ async function testAdminInterface() {
 
     // Test 10: Clear Unknown Tags
     console.log("\n🏷️ Test 10: Clear Unknown Tags...");
-    
+
     const clearTagsResponse = await fetch(
       `${backendUrl}/api/admin/users/${regularUserId}/clear-unknown-tags`,
       {
@@ -238,7 +248,7 @@ async function testAdminInterface() {
 
     // Test 11: Input Validation
     console.log("\n🛡️ Test 11: Input Validation...");
-    
+
     // Test creating user with invalid data
     const invalidUserResponse = await fetch(`${backendUrl}/api/admin/users`, {
       method: "POST",
@@ -260,7 +270,6 @@ async function testAdminInterface() {
     }
 
     console.log("\n🎉 Admin Interface testing completed!");
-
   } catch (error) {
     console.error("❌ Test failed:", error);
   }
@@ -278,19 +287,19 @@ function validatePassword(password) {
 
 function validateUserData(userData) {
   const errors = [];
-  
+
   if (!userData.name || userData.name.trim().length === 0) {
     errors.push("Name is required");
   }
-  
+
   if (!validateEmail(userData.email)) {
     errors.push("Valid email is required");
   }
-  
+
   if (!validatePassword(userData.password)) {
     errors.push("Password must be at least 6 characters long");
   }
-  
+
   return errors;
 }
 
