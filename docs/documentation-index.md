@@ -22,6 +22,7 @@
 
 ### Core Fixes & Solutions
 
+- `COMPREHENSIVE_TAG_SYSTEM_RESTORATION.md` - **🔥 NEW: Complete restoration of all tag system functionality - PRIORITY READ**
 - `TAG_APPLICATION_AND_PERFORMANCE_FIX.md` - **🔥 Complete solution for tag application and 99.95% performance improvement**
 - `BATCH_TAGGING_REGRESSION_FIX.md` - **🔥 Complete fix for batch tagging regression - backend API compatibility**
 - `UI_IMPROVEMENTS_TAG_COUNTS_AND_DISPLAY.md` - **🔥 UI improvements for tag counts and header display**
