@@ -70,7 +70,8 @@ const AuthenticationFlow = ({ onLoginSuccess }) => {
     }
 
     try {
-      const response = await fetch("/api/auth/login", {
+      const backendUrl = await configService.getBackendUrl();
+      const response = await fetch(`${backendUrl}/api/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

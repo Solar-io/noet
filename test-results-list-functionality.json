@@ -1,0 +1,90 @@
+{
+  "testDate": "2025-07-14T16:06:42.104Z",
+  "environment": {
+    "node": "v22.17.0",
+    "frontend": "http://localhost:3001",
+    "backend": "http://localhost:3004"
+  },
+  "testResults": [
+    {
+      "name": "Bullet List Exit Behavior",
+      "description": "Pressing Enter twice should exit bullet lists",
+      "expectedBehavior": "Exit list, create paragraph",
+      "actualBehavior": "TO BE FILLED",
+      "status": "PENDING",
+      "notes": "",
+      "consoleErrors": [],
+      "screenshots": []
+    },
+    {
+      "name": "Ordered List Exit Behavior",
+      "description": "Pressing Enter twice should exit ordered lists",
+      "expectedBehavior": "Exit list, create paragraph",
+      "actualBehavior": "TO BE FILLED",
+      "status": "PENDING",
+      "notes": "",
+      "consoleErrors": [],
+      "screenshots": []
+    },
+    {
+      "name": "Task List Exit Behavior",
+      "description": "Pressing Enter twice should exit task lists",
+      "expectedBehavior": "Exit list, create paragraph",
+      "actualBehavior": "TO BE FILLED",
+      "status": "PENDING",
+      "notes": "",
+      "consoleErrors": [],
+      "screenshots": []
+    },
+    {
+      "name": "Backspace at List Item Start",
+      "description": "Backspace at start of list item should lift item out of list",
+      "expectedBehavior": "Lift item out of list or merge with previous",
+      "actualBehavior": "TO BE FILLED",
+      "status": "PENDING",
+      "notes": "",
+      "consoleErrors": [],
+      "screenshots": []
+    },
+    {
+      "name": "List Nesting with Tab",
+      "description": "Tab should indent list items to create nested lists",
+      "expectedBehavior": "Create nested list structure",
+      "actualBehavior": "TO BE FILLED",
+      "status": "PENDING",
+      "notes": "",
+      "consoleErrors": [],
+      "screenshots": []
+    },
+    {
+      "name": "List Nesting with Shift+Tab",
+      "description": "Shift+Tab should outdent list items",
+      "expectedBehavior": "Outdent to higher level",
+      "actualBehavior": "TO BE FILLED",
+      "status": "PENDING",
+      "notes": "",
+      "consoleErrors": [],
+      "screenshots": []
+    },
+    {
+      "name": "List Type Switching",
+      "description": "Should be able to switch between list types",
+      "expectedBehavior": "Convert list type",
+      "actualBehavior": "TO BE FILLED",
+      "status": "PENDING",
+      "notes": "",
+      "consoleErrors": [],
+      "screenshots": []
+    },
+    {
+      "name": "Mixed Content in Lists",
+      "description": "Lists should handle mixed content (text, formatting, etc.)",
+      "expectedBehavior": "Maintain list structure with formatting",
+      "actualBehavior": "TO BE FILLED",
+      "status": "PENDING",
+      "notes": "",
+      "consoleErrors": [],
+      "screenshots": []
+    }
+  ]
+}

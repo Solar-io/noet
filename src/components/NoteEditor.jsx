@@ -77,35 +77,36 @@ const NoteEditor = ({
   }, [userId]);
 
   // Helper function to filter out UUID tags
-  const filterUUIDTags = (tagIds) => {
+  const filterValidTags = (tagIds) => {
     if (!tagIds || !Array.isArray(tagIds)) return [];
     const UUID_REGEX =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    return tagIds.filter((tagId) => !UUID_REGEX.test(tagId));
+    // Return only valid UUID tags (the opposite of the previous logic)
+    return tagIds.filter((tagId) => UUID_REGEX.test(tagId));
   };
 
   const getTagNames = (tagIds) => {
-    const filteredTagIds = filterUUIDTags(tagIds);
+    const validTagIds = filterValidTags(tagIds);
 
     console.log(
       "NoteEditor: Getting tag names for IDs:",
-      filteredTagIds,
+      validTagIds,
       "from available tags:",
       availableTags,
-      "(filtered out UUIDs from:",
+      "(filtered valid UUIDs from:",
       tagIds,
       ")"
     );
 
     if (availableTags.length === 0) {
       // If tags haven't loaded yet, show loading state or just the IDs temporarily
-      return filteredTagIds.map((tagId) => `Loading...`);
+      return validTagIds.map((tagId) => `Loading...`);
     }
 
-    return filteredTagIds.map((tagId) => {
+    return validTagIds.map((tagId) => {
       const tag = availableTags.find((t) => t.id === tagId);
       console.log("NoteEditor: Tag ID", tagId, "mapped to:", tag);
-      return tag ? tag.name : tagId; // Use the tagId directly if no tag object found
+      return tag ? tag.name : `Tag ${tagId.substring(0, 8)}...`; // Show a truncated ID if no tag object found
     });
   };
 
@@ -627,7 +628,7 @@ const NoteEditor = ({
 
           {/* Quick tag display and management */}
           <div className="flex items-center space-x-2">
-            {filterUUIDTags(noteTags).length > 0 && (
+            {filterValidTags(noteTags).length > 0 && (
               <div className="flex items-center space-x-2 text-sm">
                 <Hash size={14} className="text-gray-400" />
                 <div className="flex flex-wrap gap-1">
@@ -647,9 +648,9 @@ const NoteEditor = ({
                         {tagName}
                       </span>
                     ))}
-                  {filterUUIDTags(noteTags).length > 3 && (
+                  {filterValidTags(noteTags).length > 3 && (
                     <span className="text-xs text-gray-600">
-                      +{filterUUIDTags(noteTags).length - 3} more
+                      +{filterValidTags(noteTags).length - 3} more
                     </span>
                   )}
                 </div>
@@ -720,16 +721,13 @@ const NoteEditor = ({
                         </div>
                       )}
                     </div>
-                    {filterUUIDTags(noteTags).length > 0 && (
+                    {filterValidTags(noteTags).length > 0 && (
                       <div className="pt-2 mt-2 border-t border-gray-200">
                         <button
                           onClick={() => {
-                            // Keep UUID tags but clear non-UUID tags
-                            const UUIDTags = noteTags.filter(
-                              (tagId) => !filterUUIDTags([tagId]).length
-                            );
-                            setNoteTags(UUIDTags);
-                            updateNoteMetadata({ tags: UUIDTags });
+                            // Clear all valid tags
+                            setNoteTags([]);
+                            updateNoteMetadata({ tags: [] });
                           }}
                           className="text-sm text-red-600 hover:text-red-700"
                         >

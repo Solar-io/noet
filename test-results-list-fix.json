@@ -1,0 +1,35 @@
+{
+  "testDate": "2025-07-14T16:08:50.238Z",
+  "fixApplied": "Custom key handling in TipTap editor",
+  "branch": "fix/list-functionality-broken",
+  "commit": "Added handleKeyDown to editorProps",
+  "testResults": [
+    {
+      "feature": "Enter key list exit",
+      "bulletList": "TO BE TESTED",
+      "orderedList": "TO BE TESTED",
+      "taskList": "TO BE TESTED",
+      "status": "PENDING"
+    },
+    {
+      "feature": "Backspace list lifting",
+      "withContent": "TO BE TESTED",
+      "emptyItem": "TO BE TESTED",
+      "status": "PENDING"
+    },
+    {
+      "feature": "Tab key handling",
+      "shiftTab": "TO BE TESTED",
+      "regularTab": "TO BE TESTED",
+      "status": "PENDING"
+    },
+    {
+      "feature": "List type switching",
+      "bulletToOrdered": "TO BE TESTED",
+      "orderedToBullet": "TO BE TESTED",
+      "status": "PENDING"
+    }
+  ],
+  "consoleErrors": [],
+  "overallStatus": "PENDING"
+}

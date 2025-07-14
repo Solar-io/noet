@@ -1393,7 +1393,7 @@ app.put("/api/:userId/notes/:noteId", async (req, res) => {
     const { userId, noteId } = req.params;
 
     // Handle both direct field updates and metadata wrapper format
-    let { content, markdown, title, tags, notebook, folder, ...otherFields } =
+    let { content, markdown, title, tags, notebook, folder, starred, archived, deleted, ...otherFields } =
       req.body;
 
     // If metadata wrapper is used, extract fields from it
@@ -1405,6 +1405,9 @@ app.put("/api/:userId/notes/:noteId", async (req, res) => {
       folder = folder || metadataFields.folder;
       content = content || metadataFields.content;
       markdown = markdown || metadataFields.markdown;
+      starred = starred !== undefined ? starred : metadataFields.starred;
+      archived = archived !== undefined ? archived : metadataFields.archived;
+      deleted = deleted !== undefined ? deleted : metadataFields.deleted;
     }
 
     const metadata = await readMetadata(userId, noteId);
@@ -1458,6 +1461,9 @@ app.put("/api/:userId/notes/:noteId", async (req, res) => {
     if (tags !== undefined) updatedMetadata.tags = tags;
     if (notebook !== undefined) updatedMetadata.notebook = notebook;
     if (folder !== undefined) updatedMetadata.folder = folder;
+    if (starred !== undefined) updatedMetadata.starred = starred;
+    if (archived !== undefined) updatedMetadata.archived = archived;
+    if (deleted !== undefined) updatedMetadata.deleted = deleted;
 
     await writeMetadata(userId, noteId, updatedMetadata);
 
