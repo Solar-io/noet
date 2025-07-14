@@ -354,7 +354,11 @@ const TipTapEditor = ({
 
         // Handle Enter key for list exit behavior
         if (event.key === "Enter") {
-          // Check if we're in a list item
+          // Check if we're in a list item (need at least depth 2 for valid list item)
+          if ($from.depth < 2) {
+            return false; // Not in a list item, let default behavior handle
+          }
+
           const listItem = $from.node($from.depth - 1);
           const listItemPos = $from.before($from.depth - 1);
 
@@ -366,7 +370,11 @@ const TipTapEditor = ({
               // This is an empty list item - exit the list
               event.preventDefault();
 
-              // Get the list container
+              // Get the list container (need at least depth 3 for valid list container)
+              if ($from.depth < 3) {
+                return false; // Not deep enough for nested list operations
+              }
+
               const listContainer = $from.node($from.depth - 2);
               const listContainerPos = $from.before($from.depth - 2);
 
@@ -410,7 +418,11 @@ const TipTapEditor = ({
 
         // Handle Backspace key for list item lifting
         if (event.key === "Backspace") {
-          // Check if we're at the start of a list item
+          // Check if we're at the start of a list item (need at least depth 2 for valid list item)
+          if ($from.depth < 2) {
+            return false; // Not in a list item, let default behavior handle
+          }
+
           const listItem = $from.node($from.depth - 1);
 
           if (
