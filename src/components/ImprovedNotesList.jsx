@@ -1384,7 +1384,7 @@ const ImprovedNotesList = ({
                 <ChevronDown size={14} />
               </button>
 
-              {/* Filter Menu - positioned relative to button */}
+              {/* Filter Menu - positioned relative to button with tag counts */}
               {showFilterMenu && (
                 <div
                   className="filter-menu-container absolute left-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50"
@@ -1392,57 +1392,49 @@ const ImprovedNotesList = ({
                     zIndex: 9999,
                   }}
                 >
-                  <div className="p-3">
-                    <div className="mb-2">
-                      <h3 className="text-sm font-medium text-gray-900 mb-2">
-                        Filter by Tags
-                      </h3>
-                      <div className="space-y-1 max-h-48 overflow-y-auto">
-                        {availableTags.length > 0 ? (
-                          availableTags.map((tag) => (
-                            <label
-                              key={tag.id}
-                              className="flex items-center space-x-2 text-sm cursor-pointer hover:bg-gray-50 p-1 rounded"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={selectedTagFilters.includes(tag.id)}
-                                onChange={() => toggleTagFilter(tag.id)}
-                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                              />
-                              <div
-                                className="w-3 h-3 rounded-full flex-shrink-0"
-                                style={{ backgroundColor: tag.color }}
-                              />
-                              <span className="truncate flex-1">
-                                {tag.name}
-                              </span>
-                              {tag.noteCount && (
-                                <span className="text-xs text-gray-500">
-                                  ({tag.noteCount})
-                                </span>
-                              )}
-                            </label>
-                          ))
-                        ) : (
-                          <p className="text-sm text-gray-500 py-2">
-                            No tags available
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    {selectedTagFilters.length > 0 && (
-                      <div className="pt-2 border-t border-gray-100">
-                        <button
-                          onClick={clearTagFilters}
-                          className="text-xs text-gray-500 hover:text-gray-700"
+                  <div className="p-4">
+                    <h3 className="font-medium text-gray-900 mb-2">
+                      Filter by Tags
+                    </h3>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {getTagWithNoteCounts().map((tag) => (
+                        <label
+                          key={tag.id}
+                          className="flex items-center justify-between space-x-2 text-sm"
                         >
-                          Clear all filters
-                        </button>
-                      </div>
-                    )}
+                          <div className="flex items-center space-x-2 flex-1">
+                            <input
+                              type="checkbox"
+                              checked={selectedTagFilters.includes(tag.id)}
+                              onChange={() => toggleTagFilter(tag.id)}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <div
+                              className="w-3 h-3 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: tag.color }}
+                            />
+                            <span className="truncate">{tag.name}</span>
+                          </div>
+                          <span className="text-xs text-gray-500 ml-2 font-medium">
+                            {tag.noteCount}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    <div className="mt-3 flex space-x-2">
+                      <button
+                        onClick={clearTagFilters}
+                        className="text-xs text-gray-500 hover:text-gray-700"
+                      >
+                        Clear All
+                      </button>
+                      <button
+                        onClick={() => setShowFilterMenu(false)}
+                        className="text-xs text-blue-600 hover:text-blue-700"
+                      >
+                        Close
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
