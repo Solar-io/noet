@@ -4,7 +4,7 @@
 # Source config and run commands in the project directory
 
 # Source the simple configuration
-source "$(dirname "${BASH_SOURCE[0]}")/scripts/simple-config.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../simple-config.sh"
 
 # Always work from the project directory
 cd "$NOET_PROJECT_PATH"

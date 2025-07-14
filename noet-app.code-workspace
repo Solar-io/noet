@@ -8,7 +8,17 @@
   "settings": {
     "terminal.integrated.cwd": "/Users/sgallant/sync/rygel/noet-app",
     "terminal.integrated.defaultLocation": "view",
-    "terminal.integrated.defaultProfile.osx": "bash"
+    "terminal.integrated.defaultProfile.osx": "bash",
+    "files.exclude": {
+      "../**": true,
+      "/Users/sgallant/sync/rygel/[!n]*": true
+    },
+    "search.exclude": {
+      "../**": true
+    },
+    "files.watcherExclude": {
+      "../**": true
+    }
   },
   "extensions": {
     "recommendations": [

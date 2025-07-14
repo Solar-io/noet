@@ -54,6 +54,7 @@ import { v4 as uuidv4 } from "uuid";
 import TurndownService from "turndown";
 import { gfm } from "turndown-plugin-gfm";
 import ComprehensiveColorPicker from "./components/ComprehensiveColorPicker.jsx";
+import FileViewer from "./components/FileViewer.jsx";
 import configService from "./configService.js";
 
 // Initialize markdown converter
@@ -64,7 +65,14 @@ const turndownService = new TurndownService({
 turndownService.use(gfm);
 
 // TipTap Editor Component
-const TipTapEditor = ({ note, onSave, onContentChange, userId, availableTags = [], onTagsUpdate }) => {
+const TipTapEditor = ({
+  note,
+  onSave,
+  onContentChange,
+  userId,
+  availableTags = [],
+  onTagsUpdate,
+}) => {
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState(note?.attachments || []);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -73,6 +81,7 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId, availableTags = [
     x: 0,
     y: 0,
   });
+  const [viewingAttachment, setViewingAttachment] = useState(null);
   const fileInputRef = useRef(null);
   const attachmentInputRef = useRef(null);
   const autoSaveTimeoutRef = useRef(null);
@@ -420,7 +429,7 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId, availableTags = [
 
   // Font family action
   const setFontFamily = (fontFamily) => {
-    if (fontFamily === 'default') {
+    if (fontFamily === "default") {
       editor?.chain().focus().unsetFontFamily().run();
     } else {
       editor?.chain().focus().setFontFamily(fontFamily).run();
@@ -737,7 +746,7 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId, availableTags = [
           <div className="border-r pr-2 mr-2">
             <select
               onChange={(e) => setFontFamily(e.target.value)}
-              value={editor?.getAttributes('textStyle').fontFamily || 'default'}
+              value={editor?.getAttributes("textStyle").fontFamily || "default"}
               className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
               title="Font Family"
             >
@@ -747,7 +756,9 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId, availableTags = [
               <option value="Times, serif">Times</option>
               <option value="Georgia, serif">Georgia</option>
               <option value="'Courier New', monospace">Courier New</option>
-              <option value="Monaco, 'Lucida Console', monospace">Monaco</option>
+              <option value="Monaco, 'Lucida Console', monospace">
+                Monaco
+              </option>
               <option value="'Comic Sans MS', cursive">Comic Sans</option>
               <option value="Impact, sans-serif">Impact</option>
               <option value="Verdana, sans-serif">Verdana</option>
@@ -960,13 +971,7 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId, availableTags = [
                   </div>
                   <div className="flex items-center space-x-2">
                     <button
-                      onClick={async () => {
-                        const backendUrl = await configService.getBackendUrl();
-                        window.open(
-                          `${backendUrl}/api/${userId}/notes/${note.id}/attachments/${attachment.filename}`,
-                          "_blank"
-                        );
-                      }}
+                      onClick={() => setViewingAttachment(attachment)}
                       className="p-1 rounded hover:bg-gray-100"
                       title="View/Download"
                     >
@@ -1069,6 +1074,16 @@ const TipTapEditor = ({ note, onSave, onContentChange, userId, availableTags = [
             />
           </div>
         </>
+      )}
+
+      {/* File Viewer Modal */}
+      {viewingAttachment && (
+        <FileViewer
+          attachment={viewingAttachment}
+          userId={userId}
+          noteId={note.id}
+          onClose={() => setViewingAttachment(null)}
+        />
       )}
     </div>
   );

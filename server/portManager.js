@@ -27,7 +27,7 @@ class PortManager {
         },
         production: {
           frontend: { port: 3000, host: "0.0.0.0" },
-          backend: { port: 3001, host: "0.0.0.0" },
+          backend: { port: 3004, host: "0.0.0.0" },
         },
       };
     }

@@ -42,19 +42,13 @@ export default defineConfig({
     port: parseInt(process.env.VITE_PREVIEW_PORT) || 3000,
     host: process.env.VITE_HOST || config.frontend.host,
   },
-  optimizeDeps: {
-    include: ["pdfjs-dist"],
-  },
+  // Removed unused pdfjs-dist to avoid unresolved dependency errors
+  optimizeDeps: {},
   assetsInclude: ["**/*.pdf"],
   define: {
     global: "globalThis",
   },
   worker: {
     format: "es",
-  },
-  build: {
-    rollupOptions: {
-      external: [],
-    },
   },
 });

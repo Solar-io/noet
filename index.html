@@ -2,27 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Noet - Modern Note Taking</title>
-    <!-- PDF.js CDN - using working version -->
+    <title>Noet</title>
+    <link rel="icon" href="/images/noet-logo.svg" />
+    <!-- PDF.js CDN for PDF viewing functionality -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   </head>
   <body>
-    <div id="root">
-      <div style="padding: 20px; color: blue">Loading React app...</div>
-    </div>
-    <script>
-      console.log("Basic JavaScript is working");
-      setTimeout(() => {
-        const root = document.getElementById("root");
-        if (root && root.innerHTML.includes("Loading React app")) {
-          root.innerHTML =
-            '<div style="padding: 20px; color: red;">React failed to load. Check console for errors.</div>';
-        }
-      }, 5000);
-    </script>
-    <script src="/verify-font-size-extension.js"></script>
+    <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

@@ -274,6 +274,41 @@ const users = new Map([
 
 // All data is now loaded on-demand from disk - no more memory maps!
 
+// Simple in-memory cache for performance
+const dataCache = new Map();
+const CACHE_EXPIRY = 300000; // 5 minutes cache expiry for better performance
+
+// Cache helper functions
+function getCacheKey(type, userId) {
+  return `${type}_${userId}`;
+}
+
+function getCachedData(type, userId) {
+  const key = getCacheKey(type, userId);
+  const cached = dataCache.get(key);
+
+  if (cached && Date.now() - cached.timestamp < CACHE_EXPIRY) {
+    return cached.data;
+  }
+
+  return null;
+}
+
+function setCachedData(type, userId, data) {
+  const key = getCacheKey(type, userId);
+  dataCache.set(key, {
+    data,
+    timestamp: Date.now(),
+  });
+}
+
+function clearUserCache(userId) {
+  const keys = Array.from(dataCache.keys()).filter((key) =>
+    key.includes(userId)
+  );
+  keys.forEach((key) => dataCache.delete(key));
+}
+
 // Initialize demo notebooks for existing notes
 const demoNotebooks = [
   {
@@ -597,6 +632,15 @@ function getTagsFilePath(userId) {
 // Load all tags for a user from disk
 async function loadAllUserTagsFromDisk(userId) {
   try {
+    // Check cache first
+    const cached = getCachedData("tags", userId);
+    if (cached) {
+      console.log(
+        `🏷️ Loaded ${cached.length} tags for user ${userId} from cache`
+      );
+      return cached;
+    }
+
     const tagsFilePath = getTagsFilePath(userId);
     if (fsSync.existsSync(tagsFilePath)) {
       const data = await fs.readFile(tagsFilePath, "utf8");
@@ -604,10 +648,15 @@ async function loadAllUserTagsFromDisk(userId) {
       console.log(
         `🏷️ Loaded ${userTags.length} tags for user ${userId} from disk`
       );
+
+      // Cache the result
+      setCachedData("tags", userId, userTags);
       return userTags;
     } else {
       console.log(`🏷️ No tags file found for user ${userId}, starting fresh`);
-      return [];
+      const emptyTags = [];
+      setCachedData("tags", userId, emptyTags);
+      return emptyTags;
     }
   } catch (error) {
     console.error(`❌ Error loading tags for user ${userId}:`, error);
@@ -647,6 +696,9 @@ async function saveTagToDisk(userId, tagId, tag) {
     await fs.writeFile(tagsFilePath, JSON.stringify(userTags, null, 2));
 
     console.log(`💾 Saved tag ${tagId} for user ${userId} to disk`);
+
+    // Update cache with new data
+    setCachedData("tags", userId, userTags);
   } catch (error) {
     console.error(`Error saving tag ${tagId} for user ${userId}:`, error);
     throw error;
@@ -709,6 +761,15 @@ function getNotebooksFilePath(userId) {
 // Load all notebooks for a user from disk
 async function loadAllUserNotebooksFromDisk(userId) {
   try {
+    // Check cache first
+    const cached = getCachedData("notebooks", userId);
+    if (cached) {
+      console.log(
+        `📚 Loaded ${cached.length} notebooks for user ${userId} from cache`
+      );
+      return cached;
+    }
+
     const notebooksPath = getNotebooksFilePath(userId);
     if (fsSync.existsSync(notebooksPath)) {
       const content = await fs.readFile(notebooksPath, "utf8");
@@ -716,12 +777,17 @@ async function loadAllUserNotebooksFromDisk(userId) {
       console.log(
         `📚 Loaded ${userNotebooks.length} notebooks for user ${userId} from disk`
       );
+
+      // Cache the result
+      setCachedData("notebooks", userId, userNotebooks);
       return userNotebooks;
     } else {
       console.log(
         `📚 No notebooks file found for user ${userId}, starting fresh`
       );
-      return [];
+      const emptyNotebooks = [];
+      setCachedData("notebooks", userId, emptyNotebooks);
+      return emptyNotebooks;
     }
   } catch (error) {
     console.error(`Error loading notebooks for user ${userId}:`, error);
@@ -768,6 +834,9 @@ async function saveNotebookToDisk(userId, notebookId, notebook) {
     );
 
     console.log(`💾 Saved notebook ${notebookId} for user ${userId} to disk`);
+
+    // Update cache with new data
+    setCachedData("notebooks", userId, userNotebooks);
   } catch (error) {
     console.error(
       `Error saving notebook ${notebookId} for user ${userId}:`,
@@ -850,6 +919,15 @@ function getFoldersFilePath(userId) {
 // Load all folders for a user from disk
 async function loadAllUserFoldersFromDisk(userId) {
   try {
+    // Check cache first
+    const cached = getCachedData("folders", userId);
+    if (cached) {
+      console.log(
+        `📁 Loaded ${cached.length} folders for user ${userId} from cache`
+      );
+      return cached;
+    }
+
     const foldersPath = getFoldersFilePath(userId);
     if (fsSync.existsSync(foldersPath)) {
       const content = await fs.readFile(foldersPath, "utf8");
@@ -857,12 +935,17 @@ async function loadAllUserFoldersFromDisk(userId) {
       console.log(
         `📁 Loaded ${userFolders.length} folders for user ${userId} from disk`
       );
+
+      // Cache the result
+      setCachedData("folders", userId, userFolders);
       return userFolders;
     } else {
       console.log(
         `📁 No folders file found for user ${userId}, starting fresh`
       );
-      return [];
+      const emptyFolders = [];
+      setCachedData("folders", userId, emptyFolders);
+      return emptyFolders;
     }
   } catch (error) {
     console.error(`Error loading folders for user ${userId}:`, error);
@@ -909,6 +992,9 @@ async function saveFolderToDisk(userId, folderId, folder) {
     );
 
     console.log(`💾 Saved folder ${folderId} for user ${userId} to disk`);
+
+    // Update cache with new data
+    setCachedData("folders", userId, userFolders);
   } catch (error) {
     console.error(`Error saving folder ${folderId} for user ${userId}:`, error);
     throw error;
@@ -1366,6 +1452,11 @@ app.put("/api/:userId/notes/:noteId", async (req, res) => {
       await writeNoteContent(userId, noteId, markdownContent);
     }
 
+    // Invalidate tags cache if tags were updated to ensure accurate note counts
+    if (tags !== undefined && versionTrigger === "tags_change") {
+      clearUserCache(userId);
+    }
+
     // Convert markdown back to HTML for response
     const htmlContent = markdownContent ? marked(markdownContent) : undefined;
 
@@ -1752,18 +1843,33 @@ app.get("/api/:userId/tags", async (req, res) => {
   try {
     const { userId } = req.params;
 
+    // Check cache first
+    const cacheKey = `tags_with_counts_${userId}`;
+    const cached = getCachedData("tags_with_counts", userId);
+    if (cached) {
+      console.log(`🏷️ Loaded ${cached.length} tags with counts from cache`);
+      return res.json(cached);
+    }
+
     // Get explicitly created tags from disk (filter out any with missing names)
     const allUserTags = await loadAllUserTagsFromDisk(userId);
     const explicitTags = allUserTags
       .filter((tag) => tag.userId === userId && tag.name && tag.name.trim())
       .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
 
-    // Generate dynamic tags from notes
+    // Single-pass scan to build both dynamic tags and explicit tag counts
     const dynamicTagCounts = new Map();
+    const explicitTagCounts = new Map();
     const userNotesPath = join(NOTES_BASE_PATH, userId);
 
+    // Initialize explicit tag counts
+    explicitTags.forEach((tag) => {
+      explicitTagCounts.set(tag.name, 0);
+      explicitTagCounts.set(tag.id, 0);
+    });
+
     if (fsSync.existsSync(userNotesPath)) {
-      const scanForTags = (dirPath) => {
+      const scanAllTags = (dirPath) => {
         const entries = fsSync.readdirSync(dirPath, { withFileTypes: true });
 
         for (const entry of entries) {
@@ -1771,7 +1877,7 @@ app.get("/api/:userId/tags", async (req, res) => {
 
           if (entry.isDirectory()) {
             // Recursively scan subdirectories
-            scanForTags(fullPath);
+            scanAllTags(fullPath);
           } else if (entry.name === "metadata.json") {
             try {
               const metadata = JSON.parse(
@@ -1782,18 +1888,26 @@ app.get("/api/:userId/tags", async (req, res) => {
                   if (typeof tagRef === "string" && tagRef.trim()) {
                     const tagName = tagRef.trim();
 
-                    // Filter out UUID tags or convert them to "unknown"
+                    // Filter out UUID tags
                     const UUID_REGEX =
                       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
                     if (UUID_REGEX.test(tagName)) {
-                      // Skip UUID tags entirely
-                      return;
+                      return; // Skip UUID tags entirely
                     }
 
+                    // Count for dynamic tags
                     dynamicTagCounts.set(
                       tagName,
                       (dynamicTagCounts.get(tagName) || 0) + 1
                     );
+
+                    // Count for explicit tags (by name or ID)
+                    if (explicitTagCounts.has(tagName)) {
+                      explicitTagCounts.set(
+                        tagName,
+                        explicitTagCounts.get(tagName) + 1
+                      );
+                    }
                   }
                 });
               }
@@ -1805,65 +1919,21 @@ app.get("/api/:userId/tags", async (req, res) => {
         }
       };
 
-      scanForTags(userNotesPath);
+      scanAllTags(userNotesPath);
     }
 
     // Create combined tag list
     const allTags = new Map();
 
     // Add explicit tags with their counts
-    for (const tag of explicitTags) {
-      let noteCount = 0;
-
-      // Count notes that reference this tag (by name or ID)
-      const userNotesPath = join(NOTES_BASE_PATH, userId);
-      if (fsSync.existsSync(userNotesPath)) {
-        const countTagUsage = (dirPath) => {
-          const entries = fsSync.readdirSync(dirPath, { withFileTypes: true });
-
-          for (const entry of entries) {
-            const fullPath = join(dirPath, entry.name);
-
-            if (entry.isDirectory()) {
-              countTagUsage(fullPath);
-            } else if (entry.name === "metadata.json") {
-              try {
-                const metadata = JSON.parse(
-                  fsSync.readFileSync(fullPath, "utf8")
-                );
-                if (metadata.tags && Array.isArray(metadata.tags)) {
-                  const hasTag = metadata.tags.some((noteTag) => {
-                    if (typeof noteTag === "string") {
-                      // Skip UUID tags when counting explicit tag usage
-                      const UUID_REGEX =
-                        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-                      if (UUID_REGEX.test(noteTag)) {
-                        return false;
-                      }
-                      return noteTag === tag.name || noteTag === tag.id;
-                    }
-                    return noteTag === tag.id || noteTag.id === tag.id;
-                  });
-
-                  if (hasTag) {
-                    noteCount++;
-                  }
-                }
-              } catch (error) {
-                console.warn(`Skipping invalid metadata: ${fullPath}`);
-              }
-            }
-          }
-        };
-
-        countTagUsage(userNotesPath);
-      }
-
+    explicitTags.forEach((tag) => {
+      const noteCount =
+        explicitTagCounts.get(tag.name) || explicitTagCounts.get(tag.id) || 0;
       allTags.set(tag.name, {
         ...tag,
         noteCount,
       });
-    }
+    });
 
     // Add dynamic tags that don't have explicit entities
     for (const [tagName, count] of dynamicTagCounts) {
@@ -1884,6 +1954,12 @@ app.get("/api/:userId/tags", async (req, res) => {
     // Convert to array and sort by note count (most used first)
     const result = Array.from(allTags.values()).sort(
       (a, b) => (b.noteCount || 0) - (a.noteCount || 0)
+    );
+
+    // Cache the result for better performance
+    setCachedData("tags_with_counts", userId, result);
+    console.log(
+      `🏷️ Loaded ${result.length} tags with counts from disk (cached for next time)`
     );
 
     res.json(result);

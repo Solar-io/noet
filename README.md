@@ -1,251 +1,93 @@
-# Noet App 📝
+# No Sleep Timer 🌙
 
-A React-based note-taking application with rich text editing capabilities using TipTap editor.
+A sleep timer that prevents your computer from going to sleep, designed to look like a regular timer rather than an obvious "keep-awake" tool.
 
-## Current Status (Latest Update - December 2024)
+## Features
 
-✅ **STABLE VERSION** - All major issues resolved:
+- **Picture-in-Picture Keep-Awake**: Uses a tiny hidden video that can run in Picture-in-Picture mode to keep your system awake
+- **Multiple Duration Options**: 1hr, 4hr, 8hr, or custom duration
+- **Clean Interface**: Sleep-friendly purple design with glassmorphism effects
+- **NSA Background**: Displays the NSA website at low opacity for discretion
+- **Discord Notifications**: Optional webhook notifications when timer completes
+- **Persistent Settings**: Saves custom duration and Discord webhook to localStorage
+- **Manual Interface Control**: Toggle interface visibility with always-visible button
 
-- **PDF and Image Viewing**: ✅ **FIXED** - CSP and cross-origin policies updated
-- **Notebook Unnesting**: ✅ **FIXED** - Enhanced drop zones for folder management
-- Directory handling fixed with unified `scripts/simple-config.sh`
-- Tag management working (UUID tags filtered out)
-- Archive functionality restored
-- Font family selection added
-- Color picker enhanced
-- Backend/frontend ports configured correctly
-- All scripts work from any directory
+## How It Works
 
-## Quick Start
+The app uses the **Picture-in-Picture API** with a tiny 1x1 pixel video to keep your system awake. This method:
 
-**Option 1: Use the simple startup script (recommended)**
+- Creates a minimal hidden video element
+- Requests Picture-in-Picture mode which can run in the background
+- Works even when the browser tab is not active or the window is minimized
+- Is much more reliable than traditional keep-awake methods
+- Only requires one user interaction to activate
 
-```bash
-./scripts/dev/simple-noet.sh
-```
+## Usage
 
-**Option 2: Manual startup**
+### Simple Static Mode (Recommended)
 
-```bash
-# Start backend (port 3004)
-npm run backend
+1. Open `index.html` in your browser
+2. Choose a duration (1hr, 4hr, 8hr, or custom)
+3. Click start - the Picture-in-Picture video will automatically launch
+4. The timer will keep your system awake even if you minimize the browser
 
-# Start frontend (port 3001)
-npm run dev
-```
+### Browser Compatibility
 
-**Option 3: Use VS Code tasks**
+- **Chrome/Edge**: Full Picture-in-Picture support
+- **Firefox**: Limited PiP support, falls back to hidden video
+- **Safari**: Basic support varies by version
 
-- Open Command Palette (Cmd+Shift+P)
-- Run "Tasks: Run Task"
-- Select "Start Backend" and "Start Frontend"
+## Interface Controls
 
-## Demo Accounts
+- **Duration Buttons**: Quick selection for 1hr, 4hr, or 8hr
+- **Custom Duration**: Set any duration in minutes
+- **Discord Webhook**: Optional notifications when timer completes
+- **Toggle Interface**: Top-left button to show/hide controls manually
+- **Auto-hide**: Interface automatically hides when timer starts
 
-### Demo User
+## Technical Implementation
 
-- **Email**: demo@example.com
-- **Password**: demo123
+The keep-awake system:
 
-### Admin User
+1. Creates a 1x1 pixel canvas with minimal animation
+2. Converts canvas to video stream using `captureStream()`
+3. Creates hidden video element with the stream
+4. Requests Picture-in-Picture mode
+5. PiP video continues running even when tab is inactive
 
-- **Email**: admin@example.com
-- **Password**: admin123
+This approach is much more reliable than:
 
-## Current Working Features
+- Wake Lock API (limited browser support)
+- Service Workers (can be suspended)
+- WebSocket connections (can time out)
+- DOM manipulation (can be throttled)
 
-✅ **Core Functionality**
+## Privacy & Security
 
-- User login/authentication
-- Note creation and editing with TipTap rich text editor
-- Tag creation and management (filters out UUID tags)
-- Note archiving/unarchiving
-- File uploads and attachments
-- Real-time note counts and tag counts
+- **No Data Collection**: Everything runs locally in your browser
+- **No External Connections**: Except optional Discord webhook
+- **No Installation Required**: Pure HTML/CSS/JavaScript
+- **Open Source**: All code is visible and auditable
 
-✅ **UI Features**
+## Troubleshooting
 
-- **Enhanced Color Picker System**: 24 preset colors + custom color selection for tags, notebooks, and folders
-- **Sidebar Color Customization**: Full color picker in creation and editing forms
-- **Visual Color Indicators**: Icons display in selected colors throughout the interface
-- Comprehensive text color picker for rich text editing
-- Font family selection (serif, sans-serif, monospace)
-- Improved sidebar with proper tag counts
-- Archive view toggle
-- Note search and filtering
+If the system still goes to sleep:
 
-✅ **Technical**
+1. **Check Browser Support**: Ensure your browser supports Picture-in-Picture
+2. **Allow PiP**: Make sure you don't close the Picture-in-Picture window
+3. **Keep Browser Open**: Don't force-quit the browser entirely
+4. **Power Settings**: Check OS-level power management settings
 
-- Persistent tag storage across server restarts
-- Proper port configuration (frontend: 3001, backend: 3004)
-- Unified directory handling for all scripts
-- Comprehensive test suite
+## Development
 
-## Known Limitations
-
-⚠️ **Removed for Stability**
-
-- Font size selection (removed due to UI conflicts)
-- Advanced tag refresh logic (reverted to simple approach)
-
-## Project Structure
+The app is a simple static website:
 
 ```
-/Users/sgallant/sync/rygel/noet-app/
-├── src/                          # Frontend React application
-│   ├── components/               # React components
-│   ├── App-TipTap.jsx           # Main TipTap app
-│   └── TipTapEditor.jsx         # Rich text editor
-├── server/                       # Backend Express server
-│   └── server.js                # Main server file
-├── public/                       # Static assets
-├── scripts/simple-config.sh             # Unified directory configuration
-├── simple-noet.sh              # Simple startup script
-├── test-*.js                   # Test suite
-└── *.md                        # Documentation
+index.html  - Main interface
+style.css   - Purple sleep-friendly styling
+script.js   - Picture-in-Picture keep-awake logic
 ```
 
-## Scripts and Tools
+## License
 
-- `./scripts/dev/simple-noet.sh` - Start both backend and frontend
-- `./scripts/test/simple-test.sh` - Run basic tests
-- `./scripts/test/test-runner.sh` - Run comprehensive test suite
-- `./scripts/test/run-test.sh [test-file]` - Run specific test
-- `./scripts/dev/noet.sh` - Advanced startup with options
-
-### New Test Scripts (December 2024)
-
-- `node tests/integration/app-status.cjs` - Quick health check for all systems
-- `node tests/integration/attachment-functionality.cjs` - Comprehensive attachment testing
-- `public/simple-test.html` - Browser-based diagnostics page
-
-## Development Environment
-
-- **Frontend**: React + Vite (port 3001)
-- **Backend**: Express.js (port 3004)
-- **Editor**: TipTap with custom extensions
-- **Storage**: File-based JSON storage
-- **Testing**: Custom Node.js test suite
-
-## Tech Stack
-
-- **Frontend**: React 18, Vite, TipTap
-- **Backend**: Express.js, File-based storage
-- **Styling**: Tailwind CSS
-- **Icons**: Lucide React
-- **Build Tool**: Vite
-
-## Recent Major Changes
-
-1. **PDF and Image Viewing Fix** _(December 2024)_: Resolved attachment viewing issues
-
-   - Fixed Content Security Policy (CSP) configuration for cross-origin requests
-   - Updated PDF.js integration with stable CDN version 3.11.174
-   - Added proper render task cancellation to prevent canvas conflicts
-   - Cross-Origin Resource Policy configured for frontend-backend communication
-   - All attachment types now working properly
-
-2. **Notebook Unnesting Enhancement** _(December 2024)_: Improved folder management
-
-   - Enhanced drop zones with visual feedback for root-level drops
-   - Added dedicated `handleRootDrop()` function with error handling
-   - Improved drag-and-drop messaging and user experience
-   - Notebooks can now be easily moved out of folders
-
-3. **Color Picker Enhancement**: Added comprehensive color picker to sidebar for tags, notebooks, and folders
-
-   - 24 preset color swatches in organized grid layout
-   - Custom color picker for unlimited color options
-   - Enhanced creation and editing forms with color selection
-   - Real-time icon color updates and visual feedback
-   - Colors persist across browser sessions
-
-4. **Directory Handling**: Created `scripts/simple-config.sh` for unified directory management
-5. **Tag Management**: Fixed UUID tag filtering across frontend and backend
-6. **Archive Functionality**: Restored proper archive API calls
-7. **UI Enhancements**: Added comprehensive text color picker and font family selection
-8. **Stability**: Removed font size features and complex tag refresh logic
-9. **Port Configuration**: Fixed frontend (3001) and backend (3004) ports
-10. **Documentation**: Updated all docs to reflect current stable state
-
-## Testing
-
-Run the comprehensive test suite:
-
-```bash
-./scripts/test/test-runner.sh
-```
-
-Individual tests:
-
-```bash
-./scripts/test/run-test.sh tests/integration/tag-counts.js
-./scripts/test/run-test.sh tests/integration/note-counts.js
-./scripts/test/run-test.sh test-color-picker.js      # Test color picker functionality
-```
-
-## Development Workflow
-
-1. **Start development environment**:
-
-   ```bash
-   ./scripts/dev/simple-noet.sh
-   ```
-
-2. **Make changes** to frontend (`src/`) or backend (`server/`)
-
-3. **Test changes**:
-
-   ```bash
-   ./scripts/test/simple-test.sh
-   ```
-
-4. **Run comprehensive tests**:
-   ```bash
-   ./scripts/test/test-runner.sh
-   ```
-
-## For New Development
-
-Start with a stable baseline - all core functionality is working. The application is ready for new feature development or UI improvements.
-
-**🚨 IMPORTANT: Check these first to avoid redoing work!**
-
-- `docs/development/complete-development-history.md` - Everything we tried for tags & font size (what worked/failed)
-- `docs/development/technical-reference.md` - Exact working code you can copy/paste
-
-**Before making changes:**
-
-- Run the test suite to ensure current functionality works
-- Check the comprehensive documentation in the various `.md` files
-- Use the existing `scripts/simple-config.sh` pattern for any new scripts
-
-## Documentation Files
-
-### 🔥 Essential References (Start Here!)
-
-- `docs/development/complete-development-history.md` - **Complete journey of all tag & font size work** - Never start from scratch!
-- `docs/development/technical-reference.md` - **Copy-paste ready working code** for all implementations
-- `docs/current-state.md` - Quick status overview and what's working
-- `docs/project-handoff.md` - Comprehensive technical handoff guide
-
-### Specific Technical Details
-
-- `COMPLETE_SIMPLE_SOLUTION.md` - Overview of recent fixes
-- `TAG_NAME_RESOLUTION_FIX.md` - Tag management improvements
-- `SIMPLE_DIRECTORY_SOLUTION.md` - Directory handling solution
-- `TAGS_IMPLEMENTATION_COMPLETE.md` - Tag system details
-- `UUID_TAG_AND_ARCHIVE_FIXES.md` - Recent bug fixes
-
-## Contributing
-
-1. Ensure all tests pass with `./scripts/test/test-runner.sh`
-2. Test both frontend and backend functionality
-3. Update documentation if adding new features
-4. Follow the existing code patterns and directory structure
-
----
-
-**Status**: Stable and Ready for Development ✅  
-**Version**: Current (post-stability-fixes)  
-**Last Updated**: January 2025
+MIT License - Use freely for personal or commercial projects.

@@ -23,8 +23,6 @@ import {
   Hash,
   Book,
   FolderOpen,
-  Grid,
-  List,
   Eye,
   EyeOff,
   ChevronDown,
@@ -68,7 +66,6 @@ const ImprovedNotesList = ({
   deletedNotes = [],
 }) => {
   const [backendUrl, setBackendUrl] = useState("");
-  const [viewMode, setViewMode] = useState("list");
   const [sortBy, setSortBy] = useState("updated");
   const [sortOrder, setSortOrder] = useState("desc");
   const [editingNoteId, setEditingNoteId] = useState(null);
@@ -963,6 +960,27 @@ const ImprovedNotesList = ({
     };
   }, [handleKeyDown]);
 
+  // Close filter menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Only close if we're clicking truly outside the filter container
+      if (showFilterMenu) {
+        const filterContainer = event.target.closest(".filter-menu-container");
+        if (!filterContainer) {
+          console.log("Closing filter menu due to outside click");
+          setShowFilterMenu(false);
+        } else {
+          console.log("Click inside filter menu - keeping open");
+        }
+      }
+    };
+
+    document.addEventListener("click", handleClickOutside);
+    return () => {
+      document.removeEventListener("click", handleClickOutside);
+    };
+  }, [showFilterMenu]);
+
   // Reset selections when view changes
   useEffect(() => {
     console.log("🔄 Selection reset triggered by view change:", {
@@ -1305,16 +1323,7 @@ const ImprovedNotesList = ({
       {/* Header */}
       <div className="flex-shrink-0 p-4 border-b border-gray-200">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">
-            {currentView === "all" && "All Notes"}
-            {currentView === "recent" && "Recent Notes"}
-            {currentView === "starred" && "Starred Notes"}
-            {currentView === "archived" && "Archived Notes"}
-            {currentView === "trash" && "Trash"}
-            {currentView === "notebook" && "Notebook"}
-            {currentView === "folder" && "Folder"}
-            {currentView === "tag" && "Tag"}
-          </h2>
+          <h2 className="text-lg font-semibold text-gray-900">Notes</h2>
           <div className="flex items-center space-x-2">
             <button
               onClick={onCreateNewNote}
@@ -1323,18 +1332,11 @@ const ImprovedNotesList = ({
             >
               <Plus size={16} />
             </button>
-            <button
-              onClick={() => setShowFilterMenu(!showFilterMenu)}
-              className="p-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-              title="Filter Options"
-            >
-              <Filter size={16} />
-            </button>
           </div>
         </div>
 
         {/* Search Bar */}
-        <div className="relative">
+        <div className="relative mb-3">
           <Search
             size={16}
             className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
@@ -1356,48 +1358,123 @@ const ImprovedNotesList = ({
           )}
         </div>
 
-        {/* Filter Menu */}
-        {showFilterMenu && (
-          <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-10 mt-2">
-            <div className="p-4">
-              <h3 className="font-medium text-gray-900 mb-2">Filter by Tags</h3>
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {availableTags.map((tag) => (
-                  <label
-                    key={tag.id}
-                    className="flex items-center space-x-2 text-sm"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedTagFilters.includes(tag.id)}
-                      onChange={() => toggleTagFilter(tag.id)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <div
-                      className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: tag.color }}
-                    />
-                    <span className="truncate">{tag.name}</span>
-                  </label>
-                ))}
-              </div>
-              <div className="mt-3 flex space-x-2">
-                <button
-                  onClick={clearTagFilters}
-                  className="text-xs text-gray-500 hover:text-gray-700"
+        {/* Filter and Sort Controls */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            {/* Filter Dropdown */}
+            <div className="relative filter-menu-container">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation(); // Prevent event bubbling
+                  setShowFilterMenu(!showFilterMenu);
+                }}
+                className={`flex items-center space-x-1 px-3 py-1 text-sm border rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  selectedTagFilters.length > 0
+                    ? "border-blue-300 bg-blue-50 text-blue-700"
+                    : "border-gray-300"
+                }`}
+              >
+                <Filter size={14} />
+                <span>Filter</span>
+                {selectedTagFilters.length > 0 && (
+                  <span className="bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
+                    {selectedTagFilters.length}
+                  </span>
+                )}
+                <ChevronDown size={14} />
+              </button>
+
+              {/* Filter Menu - positioned relative to button */}
+              {showFilterMenu && (
+                <div
+                  className="filter-menu-container absolute left-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50"
+                  style={{
+                    zIndex: 9999,
+                  }}
                 >
-                  Clear All
-                </button>
-                <button
-                  onClick={() => setShowFilterMenu(false)}
-                  className="text-xs text-blue-600 hover:text-blue-700"
-                >
-                  Close
-                </button>
-              </div>
+                  <div className="p-3">
+                    <div className="mb-2">
+                      <h3 className="text-sm font-medium text-gray-900 mb-2">
+                        Filter by Tags
+                      </h3>
+                      <div className="space-y-1 max-h-48 overflow-y-auto">
+                        {availableTags.length > 0 ? (
+                          availableTags.map((tag) => (
+                            <label
+                              key={tag.id}
+                              className="flex items-center space-x-2 text-sm cursor-pointer hover:bg-gray-50 p-1 rounded"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedTagFilters.includes(tag.id)}
+                                onChange={() => toggleTagFilter(tag.id)}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <div
+                                className="w-3 h-3 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: tag.color }}
+                              />
+                              <span className="truncate flex-1">
+                                {tag.name}
+                              </span>
+                              {tag.noteCount && (
+                                <span className="text-xs text-gray-500">
+                                  ({tag.noteCount})
+                                </span>
+                              )}
+                            </label>
+                          ))
+                        ) : (
+                          <p className="text-sm text-gray-500 py-2">
+                            No tags available
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    {selectedTagFilters.length > 0 && (
+                      <div className="pt-2 border-t border-gray-100">
+                        <button
+                          onClick={clearTagFilters}
+                          className="text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          Clear all filters
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Sort Dropdown */}
+            <div className="relative">
+              <select
+                value={`${sortBy}-${sortOrder}`}
+                onChange={(e) => {
+                  const [newSortBy, newSortOrder] = e.target.value.split("-");
+                  setSortBy(newSortBy);
+                  setSortOrder(newSortOrder);
+                }}
+                className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="updated-desc">Latest First</option>
+                <option value="updated-asc">Oldest First</option>
+                <option value="title-asc">A to Z</option>
+                <option value="title-desc">Z to A</option>
+                <option value="created-desc">Newest Created</option>
+                <option value="created-asc">Oldest Created</option>
+              </select>
             </div>
           </div>
-        )}
+
+          {/* Note count */}
+          <div className="text-sm text-gray-500">
+            {filteredAndSortedNotes.length} note
+            {filteredAndSortedNotes.length !== 1 ? "s" : ""}
+          </div>
+        </div>
       </div>
 
       {/* Notes List - Scrollable Content Area */}

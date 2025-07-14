@@ -146,18 +146,24 @@ const NoteEditor = ({
     if (!note || !backendUrl) return;
 
     try {
+      console.log("🔄 Updating note metadata:", updates);
       const response = await fetch(
         `${backendUrl}/api/${userId}/notes/${note.id}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ metadata: updates }),
+          body: JSON.stringify(updates), // Send updates directly, not wrapped in metadata
         }
       );
 
-      if (!response.ok) throw new Error("Failed to update note");
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ Failed to update note:", response.status, errorText);
+        throw new Error(`Failed to update note: ${response.status}`);
+      }
 
       const updatedNote = await response.json();
+      console.log("✅ Note updated successfully:", updatedNote);
       onNoteUpdate?.(updatedNote);
     } catch (error) {
       console.error("Error updating note metadata:", error);

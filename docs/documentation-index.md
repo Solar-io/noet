@@ -4,6 +4,8 @@
 
 ### Must Read Before Development
 
+- **`DEVELOPMENT_PROTOCOL.md`** - **🔥 MANDATORY development protocol for ALL code changes.** Prevents issues like untested changes, missing dependencies, and poor branch management that led to significant debugging overhead.
+
 - **`COMPLETE_DEVELOPMENT_HISTORY.md`** - Complete journey of tag & font size implementation work. Contains every approach tried, what failed, what worked, and why. **Read this before implementing similar features to avoid weeks of rediscovered failures!**
 
 - **`TECHNICAL_REFERENCE.md`** - Exact working code for all implementations. Copy-paste ready solutions for backend tag filtering, frontend UUID filtering, font family, color picker, directory handling, and testing.
@@ -34,6 +36,8 @@
 
 ### Development Environment & Process
 
+- `DEVELOPMENT_PROTOCOL.md` - **🔥 MANDATORY: Development protocol for ALL code changes. Must read before any development work!**
+- `DEVELOPMENT_PROTOCOL_PROMPT.md` - **Quick copy-paste template for future development sessions**
 - `DEVELOPMENT_ENVIRONMENT.md` - Development setup and environment configuration
 - `DEVELOPMENT_BEST_PRACTICES.md` - Coding standards and best practices
 - `DEVELOPMENT_STABILITY.md` - Stability considerations and testing approaches
@@ -59,10 +63,11 @@
 
 ### For Starting Development
 
-1. Read `COMPLETE_DEVELOPMENT_HISTORY.md` first!
-2. Check `TECHNICAL_REFERENCE.md` for working code
-3. Use `README-QUICK-START.md` to start the app
-4. Run tests with `test-runner.sh`
+1. **Read `DEVELOPMENT_PROTOCOL.md` first!** - Mandatory protocol for all code changes
+2. Read `COMPLETE_DEVELOPMENT_HISTORY.md` for context and lessons learned
+3. Check `TECHNICAL_REFERENCE.md` for working code
+4. Use `README-QUICK-START.md` to start the app
+5. Run tests with `test-runner.sh`
 
 ### For Understanding Current State
 

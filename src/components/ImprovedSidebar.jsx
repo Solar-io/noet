@@ -64,6 +64,9 @@ const ImprovedSidebar = ({
   onShowAdminInterface,
   onShowEvernoteImport,
   onNotesUpdate,
+  onNotebooksUpdate,
+  onFoldersUpdate,
+  onTagsUpdate,
   notebooks: propNotebooks = [],
   folders: propFolders = [],
   tags: propTags = [],
@@ -236,7 +239,10 @@ const ImprovedSidebar = ({
       if (response.ok) {
         const newFolder = await response.json();
         setInternalFolders((prev) => [...prev, newFolder]);
-        // Don't trigger notes refresh for folder creation
+        // Notify parent component to refresh its state
+        if (onFoldersUpdate) {
+          onFoldersUpdate();
+        }
         return newFolder;
       } else {
         throw new Error(`Failed to create folder: ${response.status}`);
@@ -267,7 +273,10 @@ const ImprovedSidebar = ({
       if (response.ok) {
         const newNotebook = await response.json();
         setInternalNotebooks((prev) => [...prev, newNotebook]);
-        // Don't trigger notes refresh for notebook creation
+        // Notify parent component to refresh its state
+        if (onNotebooksUpdate) {
+          onNotebooksUpdate();
+        }
         return newNotebook;
       } else {
         throw new Error(`Failed to create notebook: ${response.status}`);
@@ -297,7 +306,10 @@ const ImprovedSidebar = ({
       if (response.ok) {
         const newTag = await response.json();
         setInternalTags((prev) => [...prev, newTag]);
-        // Don't trigger notes refresh for tag creation
+        // Notify parent component to refresh its state
+        if (onTagsUpdate) {
+          onTagsUpdate();
+        }
         return newTag;
       } else {
         throw new Error(`Failed to create tag: ${response.status}`);
@@ -1161,6 +1173,81 @@ const ImprovedSidebar = ({
     );
   };
 
+  // Render creation form
+  const renderCreationForm = (type) => {
+    if (creating.type !== type) return null;
+
+    const getIcon = () => {
+      switch (type) {
+        case "folder":
+          return <FolderOpen size={14} style={{ color: creating.color }} />;
+        case "notebook":
+          return <Book size={14} style={{ color: creating.color }} />;
+        case "tag":
+          return <Hash size={14} style={{ color: creating.color }} />;
+        default:
+          return null;
+      }
+    };
+
+    const getButtonColor = () => {
+      switch (type) {
+        case "folder":
+          return "bg-blue-600 hover:bg-blue-700";
+        case "notebook":
+          return "bg-green-600 hover:bg-green-700";
+        case "tag":
+          return "bg-yellow-600 hover:bg-yellow-700";
+        default:
+          return "bg-blue-600 hover:bg-blue-700";
+      }
+    };
+
+    return (
+      <div className="bg-white border rounded-lg shadow-lg p-3 mb-2">
+        <div className="flex items-center space-x-2 mb-2">
+          {getIcon()}
+          <input
+            value={creating.name}
+            onChange={(e) =>
+              setCreating((prev) => ({
+                ...prev,
+                name: e.target.value,
+              }))
+            }
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submitCreation();
+              if (e.key === "Escape") cancelCreating();
+            }}
+            placeholder={`Enter ${type} name`}
+            className="flex-1 px-2 py-1 border rounded text-sm"
+            autoFocus
+          />
+        </div>
+        <div className="mb-2">
+          <ColorPicker
+            value={creating.color}
+            onChange={(color) => setCreating((prev) => ({ ...prev, color }))}
+          />
+        </div>
+        <div className="flex justify-end space-x-2">
+          <button
+            onClick={submitCreation}
+            className={`px-3 py-1 text-white rounded text-sm ${getButtonColor()}`}
+          >
+            Create
+          </button>
+          <button
+            onClick={cancelCreating}
+            className="px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   const renderTag = (tag, index) => {
     const isEditing = editing.type === "tag" && editing.id === tag.id;
     const isDragTarget = dragOver?.type === "tag" && dragOver?.id === tag.id;
@@ -1438,6 +1525,7 @@ const ImprovedSidebar = ({
             </button>
           </div>
           <div className="space-y-1">
+            {renderCreationForm("folder")}
             {folders.map((folder) => renderFolder(folder))}
           </div>
         </div>
@@ -1455,6 +1543,7 @@ const ImprovedSidebar = ({
             </button>
           </div>
           <div className="space-y-1">
+            {renderCreationForm("notebook")}
             {notebooks.map((notebook) => renderNotebook(notebook))}
           </div>
         </div>
@@ -1471,7 +1560,10 @@ const ImprovedSidebar = ({
               <Plus size={12} />
             </button>
           </div>
-          <div className="space-y-1">{tags.map((tag) => renderTag(tag))}</div>
+          <div className="space-y-1">
+            {renderCreationForm("tag")}
+            {tags.map((tag) => renderTag(tag))}
+          </div>
         </div>
       </div>
 
