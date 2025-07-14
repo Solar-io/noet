@@ -22,8 +22,9 @@
 
 ### Core Fixes & Solutions
 
-- `TAG_APPLICATION_AND_PERFORMANCE_FIX.md` - **🔥 NEW: Complete solution for tag application and 99.95% performance improvement**
-- `BATCH_TAGGING_FUNCTIONALITY_COMPLETE.md` - **🔥 NEW: Complete implementation guide for batch tagging system**
+- `TAG_APPLICATION_AND_PERFORMANCE_FIX.md` - **🔥 Complete solution for tag application and 99.95% performance improvement**
+- `BATCH_TAGGING_REGRESSION_FIX.md` - **🔥 NEW: Complete fix for batch tagging regression - backend API compatibility**
+- `BATCH_TAGGING_FUNCTIONALITY_COMPLETE.md` - **🔥 Complete implementation guide for batch tagging system**
 - `COMPLETE_SIMPLE_SOLUTION.md` - Overview of recent major fixes
 - `SIMPLE_DIRECTORY_SOLUTION.md` - Directory handling solution with `simple-config.sh`
 - `TAG_NAME_RESOLUTION_FIX.md` - Tag management improvements and UUID filtering

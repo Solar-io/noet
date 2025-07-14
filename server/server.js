@@ -1391,8 +1391,21 @@ app.post("/api/:userId/notes", async (req, res) => {
 app.put("/api/:userId/notes/:noteId", async (req, res) => {
   try {
     const { userId, noteId } = req.params;
-    const { content, markdown, title, tags, notebook, folder, ...otherFields } =
+
+    // Handle both direct field updates and metadata wrapper format
+    let { content, markdown, title, tags, notebook, folder, ...otherFields } =
       req.body;
+
+    // If metadata wrapper is used, extract fields from it
+    if (req.body.metadata) {
+      const metadataFields = req.body.metadata;
+      title = title || metadataFields.title;
+      tags = tags || metadataFields.tags;
+      notebook = notebook || metadataFields.notebook;
+      folder = folder || metadataFields.folder;
+      content = content || metadataFields.content;
+      markdown = markdown || metadataFields.markdown;
+    }
 
     const metadata = await readMetadata(userId, noteId);
     if (!metadata) {
