@@ -347,6 +347,216 @@ const TipTapEditor = ({
       handleDragLeave: (view) => {
         view.dom.classList.remove("drag-over");
       },
+      handleKeyDown: (view, event) => {
+        const { state, dispatch } = view;
+        const { selection } = state;
+        const { $from, $to } = selection;
+
+        // Handle Enter key for list exit behavior
+        if (event.key === "Enter") {
+          // Check if we're in a list item
+          const listItem = $from.node($from.depth - 1);
+          const listItemPos = $from.before($from.depth - 1);
+
+          if (listItem && listItem.type.name === "listItem") {
+            // Check if the list item is empty
+            const listItemContent = listItem.textContent.trim();
+
+            if (listItemContent === "") {
+              // This is an empty list item - exit the list
+              event.preventDefault();
+
+              // Get the list container
+              const listContainer = $from.node($from.depth - 2);
+              const listContainerPos = $from.before($from.depth - 2);
+
+              // If there's only one empty item in the list, remove the whole list
+              if (listContainer && listContainer.childCount === 1) {
+                const tr = state.tr.delete(
+                  listContainerPos,
+                  listContainerPos + listContainer.nodeSize
+                );
+                tr.insert(
+                  listContainerPos,
+                  state.schema.nodes.paragraph.create()
+                );
+                tr.setSelection(
+                  state.selection.constructor.near(
+                    tr.doc.resolve(listContainerPos + 1)
+                  )
+                );
+                dispatch(tr);
+                return true;
+              } else {
+                // Remove the empty list item and create a paragraph after the list
+                const tr = state.tr.delete(
+                  listItemPos,
+                  listItemPos + listItem.nodeSize
+                );
+                const afterListPos =
+                  listContainerPos + listContainer.nodeSize - listItem.nodeSize;
+                tr.insert(afterListPos, state.schema.nodes.paragraph.create());
+                tr.setSelection(
+                  state.selection.constructor.near(
+                    tr.doc.resolve(afterListPos + 1)
+                  )
+                );
+                dispatch(tr);
+                return true;
+              }
+            }
+          }
+        }
+
+        // Handle Backspace key for list item lifting
+        if (event.key === "Backspace") {
+          // Check if we're at the start of a list item
+          const listItem = $from.node($from.depth - 1);
+
+          if (
+            listItem &&
+            listItem.type.name === "listItem" &&
+            $from.parentOffset === 0
+          ) {
+            const listItemContent = listItem.textContent.trim();
+
+            // If the list item is empty, remove it
+            if (listItemContent === "") {
+              event.preventDefault();
+
+              const listItemPos = $from.before($from.depth - 1);
+              const listContainer = $from.node($from.depth - 2);
+              const listContainerPos = $from.before($from.depth - 2);
+
+              if (listContainer && listContainer.childCount === 1) {
+                // Last item in list - remove the whole list
+                const tr = state.tr.delete(
+                  listContainerPos,
+                  listContainerPos + listContainer.nodeSize
+                );
+                tr.insert(
+                  listContainerPos,
+                  state.schema.nodes.paragraph.create()
+                );
+                tr.setSelection(
+                  state.selection.constructor.near(
+                    tr.doc.resolve(listContainerPos + 1)
+                  )
+                );
+                dispatch(tr);
+              } else {
+                // Remove just this list item
+                const tr = state.tr.delete(
+                  listItemPos,
+                  listItemPos + listItem.nodeSize
+                );
+                dispatch(tr);
+              }
+              return true;
+            } else {
+              // List item has content - lift it out of the list
+              event.preventDefault();
+
+              const listItemPos = $from.before($from.depth - 1);
+              const listContainer = $from.node($from.depth - 2);
+              const listContainerPos = $from.before($from.depth - 2);
+
+              // Create a paragraph with the list item content
+              const paragraph = state.schema.nodes.paragraph.create(
+                {},
+                listItem.content
+              );
+
+              if (listContainer && listContainer.childCount === 1) {
+                // Last item in list - replace the whole list with paragraph
+                const tr = state.tr.replaceWith(
+                  listContainerPos,
+                  listContainerPos + listContainer.nodeSize,
+                  paragraph
+                );
+                tr.setSelection(
+                  state.selection.constructor.near(
+                    tr.doc.resolve(listContainerPos + 1)
+                  )
+                );
+                dispatch(tr);
+              } else {
+                // Replace just this list item with paragraph
+                const tr = state.tr.replaceWith(
+                  listItemPos,
+                  listItemPos + listItem.nodeSize,
+                  paragraph
+                );
+                tr.setSelection(
+                  state.selection.constructor.near(
+                    tr.doc.resolve(listItemPos + 1)
+                  )
+                );
+                dispatch(tr);
+              }
+              return true;
+            }
+          }
+        }
+
+        // Handle Tab key for list nesting
+        if (event.key === "Tab") {
+          const listItem = $from.node($from.depth - 1);
+
+          if (listItem && listItem.type.name === "listItem") {
+            event.preventDefault();
+
+            if (event.shiftKey) {
+              // Shift+Tab: outdent (lift) the list item
+              const listItemPos = $from.before($from.depth - 1);
+              const listContainer = $from.node($from.depth - 2);
+              const listContainerPos = $from.before($from.depth - 2);
+
+              // Create a paragraph with the list item content
+              const paragraph = state.schema.nodes.paragraph.create(
+                {},
+                listItem.content
+              );
+
+              if (listContainer && listContainer.childCount === 1) {
+                // Last item in list - replace the whole list with paragraph
+                const tr = state.tr.replaceWith(
+                  listContainerPos,
+                  listContainerPos + listContainer.nodeSize,
+                  paragraph
+                );
+                tr.setSelection(
+                  state.selection.constructor.near(
+                    tr.doc.resolve(listContainerPos + 1)
+                  )
+                );
+                dispatch(tr);
+              } else {
+                // Insert paragraph after the list
+                const afterListPos = listContainerPos + listContainer.nodeSize;
+                const tr = state.tr.delete(
+                  listItemPos,
+                  listItemPos + listItem.nodeSize
+                );
+                tr.insert(afterListPos - listItem.nodeSize, paragraph);
+                tr.setSelection(
+                  state.selection.constructor.near(
+                    tr.doc.resolve(afterListPos - listItem.nodeSize + 1)
+                  )
+                );
+                dispatch(tr);
+              }
+              return true;
+            } else {
+              // Tab: indent (nest) the list item
+              // For now, just maintain current behavior (could be enhanced later)
+              return false;
+            }
+          }
+        }
+
+        return false;
+      },
     },
   });
 
