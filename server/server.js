@@ -1790,6 +1790,9 @@ app.delete("/api/:userId/notebooks/:notebookId", async (req, res) => {
 
     await deleteNotebookFromDisk(userId, notebookId);
 
+    // Invalidate cache after deletion
+    clearUserCache(userId);
+
     res.json({ success: true });
   } catch (error) {
     if (error.message.includes("not found")) {
@@ -2042,6 +2045,9 @@ app.delete("/api/:userId/tags/:tagId", async (req, res) => {
 
     await deleteTagFromDisk(userId, tagId);
 
+    // Invalidate cache after deletion
+    clearUserCache(userId);
+
     res.json({ success: true });
   } catch (error) {
     if (error.message.includes("not found")) {
@@ -2129,7 +2135,46 @@ app.get("/api/:userId/folders", async (req, res) => {
     const sortedFolders = userFolders
       .filter((folder) => folder.userId === userId)
       .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
-    res.json(sortedFolders);
+
+    // Add note count to each folder
+    const foldersWithCounts = await Promise.all(
+      sortedFolders.map(async (folder) => {
+        const userNotesPath = join(NOTES_BASE_PATH, userId);
+        let noteCount = 0;
+        try {
+          const noteDirs = await fs.readdir(userNotesPath, {
+            withFileTypes: true,
+          });
+          for (const dirent of noteDirs) {
+            if (dirent.isDirectory()) {
+              const metadataPath = join(
+                userNotesPath,
+                dirent.name,
+                "metadata.json"
+              );
+              try {
+                const content = await fs.readFile(metadataPath, "utf8");
+                const noteData = JSON.parse(content);
+                if (noteData.folder === folder.id && !noteData.deleted) {
+                  noteCount++;
+                }
+              } catch (err) {
+                // Skip if metadata.json doesn't exist or can't be read
+                continue;
+              }
+            }
+          }
+        } catch (err) {
+          // Directory doesn't exist or can't be read, count remains 0
+        }
+        return {
+          ...folder,
+          noteCount,
+        };
+      })
+    );
+
+    res.json(foldersWithCounts);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -2196,6 +2241,9 @@ app.delete("/api/:userId/folders/:folderId", async (req, res) => {
     }
 
     await deleteFolderFromDisk(userId, folderId);
+
+    // Invalidate cache after deletion
+    clearUserCache(userId);
 
     res.json({ success: true });
   } catch (error) {
