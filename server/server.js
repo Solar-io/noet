@@ -309,6 +309,25 @@ function clearUserCache(userId) {
   keys.forEach((key) => dataCache.delete(key));
 }
 
+// Clear tags cache when tags are modified
+function clearTagsCache(userId) {
+  const tagsCacheKey = getCacheKey("tags", userId);
+  const tagsWithCountsCacheKey = getCacheKey("tags_with_counts", userId);
+  const tagsCacheExists = dataCache.has(tagsCacheKey);
+  const tagsWithCountsCacheExists = dataCache.has(tagsWithCountsCacheKey);
+
+  dataCache.delete(tagsCacheKey);
+  dataCache.delete(tagsWithCountsCacheKey);
+
+  console.log(
+    `🗑️ Cleared tags cache for user ${userId} (tags: ${
+      tagsCacheExists ? "existed" : "not found"
+    }, tags_with_counts: ${
+      tagsWithCountsCacheExists ? "existed" : "not found"
+    })`
+  );
+}
+
 // Initialize demo notebooks for existing notes
 const demoNotebooks = [
   {
@@ -697,8 +716,7 @@ async function saveTagToDisk(userId, tagId, tag) {
 
     console.log(`💾 Saved tag ${tagId} for user ${userId} to disk`);
 
-    // Update cache with new data
-    setCachedData("tags", userId, userTags);
+    // Note: Cache will be cleared after this function returns to ensure fresh data
   } catch (error) {
     console.error(`Error saving tag ${tagId} for user ${userId}:`, error);
     throw error;
@@ -1393,8 +1411,18 @@ app.put("/api/:userId/notes/:noteId", async (req, res) => {
     const { userId, noteId } = req.params;
 
     // Handle both direct field updates and metadata wrapper format
-    let { content, markdown, title, tags, notebook, folder, starred, archived, deleted, ...otherFields } =
-      req.body;
+    let {
+      content,
+      markdown,
+      title,
+      tags,
+      notebook,
+      folder,
+      starred,
+      archived,
+      deleted,
+      ...otherFields
+    } = req.body;
 
     // If metadata wrapper is used, extract fields from it
     if (req.body.metadata) {
@@ -2006,6 +2034,9 @@ app.post("/api/:userId/tags", async (req, res) => {
 
     await saveTagToDisk(userId, tagId, tag);
 
+    // Clear tags cache to ensure fresh data is served
+    clearTagsCache(userId);
+
     res.json(tag);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -2025,6 +2056,9 @@ app.put("/api/:userId/tags/:tagId", async (req, res) => {
 
     Object.assign(tag, updates, { updated: new Date().toISOString() });
     await saveTagToDisk(userId, tagId, tag);
+
+    // Clear tags cache to ensure fresh data is served
+    clearTagsCache(userId);
 
     res.json(tag);
   } catch (error) {
@@ -2047,6 +2081,9 @@ app.delete("/api/:userId/tags/:tagId", async (req, res) => {
     }
 
     await deleteTagFromDisk(userId, tagId);
+
+    // Clear tags cache to ensure fresh data is served
+    clearTagsCache(userId);
 
     res.json({ success: true });
   } catch (error) {
