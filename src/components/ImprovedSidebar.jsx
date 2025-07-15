@@ -90,6 +90,7 @@ const ImprovedSidebar = ({
   });
   const [dragOver, setDragOver] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [draggingType, setDraggingType] = useState(null); // Track what type is being dragged
 
   // Use props data if available, otherwise use internal state
   const folders = propFolders.length > 0 ? propFolders : internalFolders;
@@ -424,6 +425,7 @@ const ImprovedSidebar = ({
     }
 
     console.log(`🏗️ Starting ${type} drag:`, name);
+    setDraggingType(type); // Track what we're dragging
 
     // Set drag data in multiple formats for compatibility
     const dragData = { type, id, name };
@@ -445,6 +447,7 @@ const ImprovedSidebar = ({
       if (element && element.removeEventListener) {
         element.removeEventListener("dragend", cleanup);
       }
+      setDraggingType(null); // Clear dragging type
     };
     element.addEventListener("dragend", cleanup);
   };
@@ -983,7 +986,7 @@ const ImprovedSidebar = ({
       >
         {/* Enhanced drop indicator above - more prominent */}
         {isDragBefore && (
-          <div className="h-1 bg-blue-500 mx-1 mb-2 rounded-full shadow-md opacity-80 animate-pulse" />
+          <div className="h-1 bg-blue-500 mx-1 mb-2 rounded-full shadow-md opacity-80 animate-pulse pointer-events-none" />
         )}
 
         <div
@@ -995,15 +998,25 @@ const ImprovedSidebar = ({
               : ""
           }`}
           onDragOver={(e) => handleEnhancedDragOver(e, "folder", folder.id)}
-          onDragLeave={(e) => {
-            // Use a more lenient drag leave for individual items
-            setTimeout(() => {
-              if (!e.currentTarget.matches(":hover")) {
-                setDragOver(null);
-              }
-            }, 100);
-          }}
+          onDragLeave={(e) => handleDragLeave(e)}
           onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const dragType = dragOver?.type;
+            setDragOver(null);
+
+            if (dragType === "folder-before") {
+              handleReorderDrop(e, "folder", folder.id, "before");
+            } else if (dragType === "folder-after") {
+              handleReorderDrop(e, "folder", folder.id, "after");
+            } else {
+              handleDrop(e, "folder", folder.id);
+            }
+          }}
+          onDragOverCapture={(e) =>
+            handleEnhancedDragOver(e, "folder", folder.id)
+          }
+          onDropCapture={(e) => {
             e.preventDefault();
             e.stopPropagation();
             const dragType = dragOver?.type;
@@ -1140,7 +1153,7 @@ const ImprovedSidebar = ({
 
         {/* Enhanced drop indicator below - more prominent */}
         {isDragAfter && (
-          <div className="h-1 bg-blue-500 mx-1 mt-2 rounded-full shadow-md opacity-80 animate-pulse" />
+          <div className="h-1 bg-blue-500 mx-1 mt-2 rounded-full shadow-md opacity-80 animate-pulse pointer-events-none" />
         )}
       </div>
     );
@@ -1163,7 +1176,7 @@ const ImprovedSidebar = ({
       >
         {/* Enhanced drop indicator above - more prominent */}
         {isDragBefore && (
-          <div className="h-1 bg-green-500 mx-1 mb-2 rounded-full shadow-md opacity-80 animate-pulse" />
+          <div className="h-1 bg-green-500 mx-1 mb-2 rounded-full shadow-md opacity-80 animate-pulse pointer-events-none" />
         )}
 
         <div
@@ -1177,14 +1190,7 @@ const ImprovedSidebar = ({
               : ""
           }`}
           onDragOver={(e) => handleEnhancedDragOver(e, "notebook", notebook.id)}
-          onDragLeave={(e) => {
-            // Use a more lenient drag leave for individual items
-            setTimeout(() => {
-              if (!e.currentTarget.matches(":hover")) {
-                setDragOver(null);
-              }
-            }, 100);
-          }}
+          onDragLeave={(e) => handleDragLeave(e)}
           onDrop={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -1301,7 +1307,7 @@ const ImprovedSidebar = ({
 
         {/* Enhanced drop indicator below - more prominent */}
         {isDragAfter && (
-          <div className="h-1 bg-green-500 mx-1 mt-2 rounded-full shadow-md opacity-80 animate-pulse" />
+          <div className="h-1 bg-green-500 mx-1 mt-2 rounded-full shadow-md opacity-80 animate-pulse pointer-events-none" />
         )}
       </div>
     );
@@ -1394,7 +1400,7 @@ const ImprovedSidebar = ({
       <div key={tag.id} className="relative">
         {/* Enhanced drop indicator above - more prominent */}
         {isDragBefore && (
-          <div className="h-1 bg-yellow-500 mx-1 mb-2 rounded-full shadow-md opacity-80 animate-pulse" />
+          <div className="h-1 bg-yellow-500 mx-1 mb-2 rounded-full shadow-md opacity-80 animate-pulse pointer-events-none" />
         )}
 
         <div
@@ -1408,15 +1414,23 @@ const ImprovedSidebar = ({
               : ""
           }`}
           onDragOver={(e) => handleEnhancedDragOver(e, "tag", tag.id)}
-          onDragLeave={(e) => {
-            // Use a more lenient drag leave for individual items
-            setTimeout(() => {
-              if (!e.currentTarget.matches(":hover")) {
-                setDragOver(null);
-              }
-            }, 100);
-          }}
+          onDragOverCapture={(e) => handleEnhancedDragOver(e, "tag", tag.id)}
+          onDragLeave={(e) => handleDragLeave(e)}
           onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const dragType = dragOver?.type;
+            setDragOver(null);
+
+            if (dragType === "tag-before") {
+              handleReorderDrop(e, "tag", tag.id, "before");
+            } else if (dragType === "tag-after") {
+              handleReorderDrop(e, "tag", tag.id, "after");
+            } else {
+              handleDrop(e, "tag", tag.id);
+            }
+          }}
+          onDropCapture={(e) => {
             e.preventDefault();
             e.stopPropagation();
             const dragType = dragOver?.type;
@@ -1533,7 +1547,7 @@ const ImprovedSidebar = ({
 
         {/* Enhanced drop indicator below - more prominent */}
         {isDragAfter && (
-          <div className="h-1 bg-yellow-500 mx-1 mt-2 rounded-full shadow-md opacity-80 animate-pulse" />
+          <div className="h-1 bg-yellow-500 mx-1 mt-2 rounded-full shadow-md opacity-80 animate-pulse pointer-events-none" />
         )}
       </div>
     );
@@ -1675,19 +1689,15 @@ const ImprovedSidebar = ({
                 : ""
             }`}
             onDragOver={(e) => {
-              e.preventDefault();
-              e.dataTransfer.dropEffect = "move";
-              console.log("📍 Root notebooks area drag over");
-              setDragOver({ type: "root", id: "notebooks" });
+              // Only accept notebook drops in the root area
+              if (draggingType === "notebook") {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                console.log("📍 Root notebooks area drag over");
+                setDragOver({ type: "root", id: "notebooks" });
+              }
             }}
-            onDragLeave={(e) => {
-              // Use a more lenient drag leave for root drop zone
-              setTimeout(() => {
-                if (!e.currentTarget.matches(":hover")) {
-                  setDragOver(null);
-                }
-              }, 100);
-            }}
+            onDragLeave={(e) => handleDragLeave(e)}
             onDrop={handleRootDrop}
           >
             {renderCreationForm("notebook")}
