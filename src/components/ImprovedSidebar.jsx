@@ -464,6 +464,36 @@ const ImprovedSidebar = ({
     }
   };
 
+  // Enhanced drop zone handler with larger zones and better visual feedback
+  const handleEnhancedDragOver = (e, targetType, targetId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
+
+    // Get the current element's position info
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const height = rect.height;
+
+    // Make drop zones larger and more forgiving
+    const beforeZone = height * 0.35; // Increased from 0.25
+    const afterZone = height * 0.65; // Decreased from 0.75
+
+    let dropType;
+    if (y < beforeZone) {
+      dropType = `${targetType}-before`;
+    } else if (y > afterZone) {
+      dropType = `${targetType}-after`;
+    } else {
+      dropType = targetType;
+    }
+
+    console.log(
+      `📍 Enhanced drag over: ${dropType} (y=${y}, height=${height})`
+    );
+    setDragOver({ type: dropType, id: targetId });
+  };
+
   const handleDrop = async (e, targetType, targetId) => {
     e.preventDefault();
     console.log("📦 Sidebar drop:", targetType, targetId);
@@ -920,37 +950,20 @@ const ImprovedSidebar = ({
         style={{ marginLeft: depth * 16 }}
         className="relative"
       >
-        {/* Elegant drop indicator above */}
+        {/* Enhanced drop indicator above - more prominent */}
         {isDragBefore && (
-          <div className="h-0.5 bg-blue-500 mx-2 mb-1 rounded-full shadow-sm" />
+          <div className="h-1 bg-blue-500 mx-1 mb-2 rounded-full shadow-md opacity-80 animate-pulse" />
         )}
 
         <div
-          className={`flex items-start justify-between p-2 rounded-lg hover:bg-gray-100 cursor-move group relative ${
-            isDragTarget ? "bg-blue-50 border-2 border-blue-300" : ""
-          } ${
+          className={`flex items-start justify-between p-3 rounded-lg hover:bg-gray-100 cursor-move group relative transition-all duration-150 ${
+            isDragTarget ? "bg-blue-50 border-2 border-blue-400 shadow-md" : ""
+          } ${isDragBefore || isDragAfter ? "bg-blue-25" : ""} ${
             currentView === "folder" && currentView.folderId === folder.id
               ? "bg-blue-50"
               : ""
           }`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            e.dataTransfer.dropEffect = "move";
-
-            // Determine if this is a before/after drop or target drop
-            const rect = e.currentTarget.getBoundingClientRect();
-            const y = e.clientY - rect.top;
-            const height = rect.height;
-
-            if (y < height * 0.25) {
-              setDragOver({ type: "folder-before", id: folder.id });
-            } else if (y > height * 0.75) {
-              setDragOver({ type: "folder-after", id: folder.id });
-            } else {
-              setDragOver({ type: "folder", id: folder.id });
-            }
-          }}
+          onDragOver={(e) => handleEnhancedDragOver(e, "folder", folder.id)}
           onDragLeave={handleDragLeave}
           onDrop={(e) => {
             e.preventDefault();
@@ -1087,9 +1100,9 @@ const ImprovedSidebar = ({
           </div>
         )}
 
-        {/* Elegant drop indicator below */}
+        {/* Enhanced drop indicator below - more prominent */}
         {isDragAfter && (
-          <div className="h-0.5 bg-blue-500 mx-2 mt-1 rounded-full shadow-sm" />
+          <div className="h-1 bg-blue-500 mx-1 mt-2 rounded-full shadow-md opacity-80 animate-pulse" />
         )}
       </div>
     );
@@ -1110,37 +1123,22 @@ const ImprovedSidebar = ({
         style={{ marginLeft: depth * 16 }}
         className="relative"
       >
-        {/* Elegant drop indicator above */}
+        {/* Enhanced drop indicator above - more prominent */}
         {isDragBefore && (
-          <div className="h-0.5 bg-green-500 mx-2 mb-1 rounded-full shadow-sm" />
+          <div className="h-1 bg-green-500 mx-1 mb-2 rounded-full shadow-md opacity-80 animate-pulse" />
         )}
 
         <div
-          className={`flex items-start justify-between p-2 rounded-lg hover:bg-gray-100 cursor-move group relative ${
-            isDragTarget ? "bg-green-50 border-2 border-green-300" : ""
-          } ${
+          className={`flex items-start justify-between p-3 rounded-lg hover:bg-gray-100 cursor-move group relative transition-all duration-150 ${
+            isDragTarget
+              ? "bg-green-50 border-2 border-green-400 shadow-md"
+              : ""
+          } ${isDragBefore || isDragAfter ? "bg-green-25" : ""} ${
             currentView === "notebook" && currentView.notebookId === notebook.id
               ? "bg-green-50"
               : ""
           }`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            e.dataTransfer.dropEffect = "move";
-
-            // Determine if this is a before/after drop or target drop
-            const rect = e.currentTarget.getBoundingClientRect();
-            const y = e.clientY - rect.top;
-            const height = rect.height;
-
-            if (y < height * 0.25) {
-              setDragOver({ type: "notebook-before", id: notebook.id });
-            } else if (y > height * 0.75) {
-              setDragOver({ type: "notebook-after", id: notebook.id });
-            } else {
-              setDragOver({ type: "notebook", id: notebook.id });
-            }
-          }}
+          onDragOver={(e) => handleEnhancedDragOver(e, "notebook", notebook.id)}
           onDragLeave={handleDragLeave}
           onDrop={(e) => {
             e.preventDefault();
@@ -1256,9 +1254,9 @@ const ImprovedSidebar = ({
           </div>
         </div>
 
-        {/* Elegant drop indicator below */}
+        {/* Enhanced drop indicator below - more prominent */}
         {isDragAfter && (
-          <div className="h-0.5 bg-green-500 mx-2 mt-1 rounded-full shadow-sm" />
+          <div className="h-1 bg-green-500 mx-1 mt-2 rounded-full shadow-md opacity-80 animate-pulse" />
         )}
       </div>
     );
@@ -1349,37 +1347,22 @@ const ImprovedSidebar = ({
 
     return (
       <div key={tag.id} className="relative">
-        {/* Elegant drop indicator above */}
+        {/* Enhanced drop indicator above - more prominent */}
         {isDragBefore && (
-          <div className="h-0.5 bg-yellow-500 mx-2 mb-1 rounded-full shadow-sm" />
+          <div className="h-1 bg-yellow-500 mx-1 mb-2 rounded-full shadow-md opacity-80 animate-pulse" />
         )}
 
         <div
-          className={`flex items-start justify-between p-2 rounded-lg hover:bg-gray-100 cursor-move group relative ${
-            isDragTarget ? "bg-yellow-50 border-2 border-yellow-300" : ""
-          } ${
+          className={`flex items-start justify-between p-3 rounded-lg hover:bg-gray-100 cursor-move group relative transition-all duration-150 ${
+            isDragTarget
+              ? "bg-yellow-50 border-2 border-yellow-400 shadow-md"
+              : ""
+          } ${isDragBefore || isDragAfter ? "bg-yellow-25" : ""} ${
             currentView === "tag" && currentView.tagId === tag.id
               ? "bg-yellow-50"
               : ""
           }`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            e.dataTransfer.dropEffect = "move";
-
-            // Determine if this is a before/after drop or target drop
-            const rect = e.currentTarget.getBoundingClientRect();
-            const y = e.clientY - rect.top;
-            const height = rect.height;
-
-            if (y < height * 0.25) {
-              setDragOver({ type: "tag-before", id: tag.id });
-            } else if (y > height * 0.75) {
-              setDragOver({ type: "tag-after", id: tag.id });
-            } else {
-              setDragOver({ type: "tag", id: tag.id });
-            }
-          }}
+          onDragOver={(e) => handleEnhancedDragOver(e, "tag", tag.id)}
           onDragLeave={handleDragLeave}
           onDrop={(e) => {
             e.preventDefault();
@@ -1496,9 +1479,9 @@ const ImprovedSidebar = ({
           </div>
         </div>
 
-        {/* Elegant drop indicator below */}
+        {/* Enhanced drop indicator below - more prominent */}
         {isDragAfter && (
-          <div className="h-0.5 bg-yellow-500 mx-2 mt-1 rounded-full shadow-sm" />
+          <div className="h-1 bg-yellow-500 mx-1 mt-2 rounded-full shadow-md opacity-80 animate-pulse" />
         )}
       </div>
     );
@@ -1633,9 +1616,31 @@ const ImprovedSidebar = ({
               <Plus size={12} />
             </button>
           </div>
-          <div className="space-y-1">
+          <div
+            className={`space-y-1 min-h-[50px] rounded-lg transition-all duration-150 ${
+              dragOver?.type === "root"
+                ? "bg-gray-100 border-2 border-gray-400 border-dashed"
+                : ""
+            }`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+              console.log("📍 Root notebooks area drag over");
+              setDragOver({ type: "root", id: "notebooks" });
+            }}
+            onDragLeave={handleDragLeave}
+            onDrop={handleRootDrop}
+          >
             {renderCreationForm("notebook")}
             {notebooks.map((notebook) => renderNotebook(notebook))}
+            {dragOver?.type === "root" && (
+              <div className="text-center py-4 text-gray-500 text-sm">
+                <div className="flex items-center justify-center space-x-2">
+                  <Home size={16} />
+                  <span>Drop here to move notebook to root level</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
