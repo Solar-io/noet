@@ -6,6 +6,7 @@ import TipTapEditor, {
 import ImprovedNotesList from "./components/ImprovedNotesList.jsx";
 import NoteEditor from "./components/NoteEditor.jsx";
 import ImprovedSidebar from "./components/ImprovedSidebar.jsx";
+import ArcoTreeSidebar from "./components/ArcoTreeSidebar.jsx";
 import UserManagement from "./components/UserManagement.jsx";
 import AdminInterface from "./components/AdminInterface.jsx";
 import NoteVersionHistory from "./components/NoteVersionHistory.jsx";
@@ -623,6 +624,13 @@ const NoetTipTapApp = () => {
   const [deletedNotes, setDeletedNotes] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState(null);
+
+  // Resizable panels state
+  const [sidebarWidth, setSidebarWidth] = useState(320); // Wider for Arco Tree
+  const [notesListWidth, setNotesListWidth] = useState(384); // 24rem = 384px
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizingPanel, setResizingPanel] = useState(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Set up error recovery service user message handler
   useEffect(() => {
@@ -1816,6 +1824,52 @@ const NoetTipTapApp = () => {
     trash: notes.filter((n) => n.archived).length,
   };
 
+  // Resizable panels handlers
+  const handleMouseDown = (panel) => (e) => {
+    setIsResizing(true);
+    setResizingPanel(panel);
+    e.preventDefault();
+  };
+
+  const handleMouseMove = useCallback(
+    (e) => {
+      if (!isResizing || !resizingPanel) return;
+
+      const containerRect = document
+        .querySelector(".main-layout-container")
+        ?.getBoundingClientRect();
+      if (!containerRect) return;
+
+      const relativeX = e.clientX - containerRect.left;
+
+      if (resizingPanel === "sidebar") {
+        const newWidth = Math.max(200, Math.min(500, relativeX));
+        setSidebarWidth(newWidth);
+      } else if (resizingPanel === "notes-list") {
+        const newWidth = Math.max(300, Math.min(600, relativeX - sidebarWidth));
+        setNotesListWidth(newWidth);
+      }
+    },
+    [isResizing, resizingPanel, sidebarWidth]
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setIsResizing(false);
+    setResizingPanel(null);
+  }, []);
+
+  // Add/remove mouse event listeners for resizing
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+      return () => {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+      };
+    }
+  }, [isResizing, handleMouseMove, handleMouseUp]);
+
   if (!isAuthenticated) {
     return (
       <RobustErrorBoundary fallbackMessage="The login system encountered an error. Please refresh the page to try again.">
@@ -1857,30 +1911,52 @@ const NoetTipTapApp = () => {
         </div>
       )}
 
-      <div className="h-screen flex bg-gray-50 main-layout-container">
+      <div
+        className={`h-screen flex bg-gray-50 main-layout-container ${
+          isResizing ? "resizing" : ""
+        }`}
+      >
         {/* Sidebar Panel */}
-        <div className="bg-white border-r border-gray-200 flex-shrink-0 h-full flex flex-col w-64">
-          <ImprovedSidebar
+        <div
+          className="bg-white border-r border-gray-200 flex-shrink-0 h-full flex flex-col resizable-panel"
+          style={{ width: sidebarCollapsed ? "48px" : `${sidebarWidth}px` }}
+        >
+          <ArcoTreeSidebar
+            userId={user?.id}
+            notebooks={notebooks}
+            folders={folders}
+            tags={tags}
             currentView={currentView}
             onViewChange={handleViewChange}
-            user={user}
-            onLogout={handleLogout}
-            onShowSettings={() => setShowSettings(true)}
-            onShowUserManagement={() => setShowUserManagement(true)}
-            onShowAdminInterface={() => setShowAdminInterface(true)}
-            onShowEvernoteImport={() => setShowEvernoteImport(true)}
+            onRefreshData={async () => {
+              await Promise.all([
+                loadNotes(),
+                loadNotebooks(),
+                loadFolders(),
+                loadTags(),
+              ]);
+            }}
+            onUpdateNote={handleNoteUpdate}
             onNotesUpdate={loadNotes}
             onNotebooksUpdate={loadNotebooks}
             onFoldersUpdate={loadFolders}
             onTagsUpdate={loadTags}
-            notebooks={notebooks}
-            folders={folders}
-            tags={tags}
+            sidebarCollapsed={sidebarCollapsed}
+            onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
           />
         </div>
 
+        {/* Sidebar Resize Handle */}
+        <div
+          className="w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize flex-shrink-0 resize-handle"
+          onMouseDown={handleMouseDown("sidebar")}
+        />
+
         {/* Notes List Panel */}
-        <div className="border-r border-gray-200 flex-shrink-0 h-full flex flex-col w-96">
+        <div
+          className="border-r border-gray-200 flex-shrink-0 h-full flex flex-col resizable-panel"
+          style={{ width: `${notesListWidth}px` }}
+        >
           <RobustErrorBoundary
             fallbackMessage="The notes list encountered an error. Your notes are safe."
             additionalInfo="Try refreshing the page if this persists."
@@ -1913,6 +1989,12 @@ const NoetTipTapApp = () => {
             />
           </RobustErrorBoundary>
         </div>
+
+        {/* Notes List Resize Handle */}
+        <div
+          className="w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize flex-shrink-0 resize-handle"
+          onMouseDown={handleMouseDown("notes-list")}
+        />
 
         {/* Main Content Panel */}
         <div className="flex-1 min-w-0 h-full flex flex-col">

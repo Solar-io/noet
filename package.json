@@ -38,6 +38,7 @@
   "author": "Sam Gallant",
   "license": "MIT",
   "dependencies": {
+    "@arco-design/web-react": "^2.66.2",
     "@tiptap/extension-blockquote": "^2.23.0",
     "@tiptap/extension-bullet-list": "^2.23.0",
     "@tiptap/extension-code-block": "^2.23.0",

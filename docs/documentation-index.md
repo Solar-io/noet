@@ -22,7 +22,10 @@
 
 ### Core Fixes & Solutions
 
-- `COMPREHENSIVE_TAG_SYSTEM_RESTORATION.md` - **🔥 NEW: Complete restoration of all tag system functionality - PRIORITY READ**
+- `CSS_IMPORT_ORDER_FIX_COMPLETE.md` - **🔥 URGENT: Fix for black boxes UI issue - CSS import order**
+- `ARCO_TREE_MIGRATION_COMPLETE.md` - **🔥 NEW: Migration to React Arco Design Tree with drag-and-drop**
+- `LIST_FUNCTIONALITY_FIX_COMPLETE.md` - **🔥 Complete fix for delete operations and note counts**
+- `COMPREHENSIVE_TAG_SYSTEM_RESTORATION.md` - **🔥 Complete restoration of all tag system functionality**
 - `TAG_APPLICATION_AND_PERFORMANCE_FIX.md` - **🔥 Complete solution for tag application and 99.95% performance improvement**
 - `BATCH_TAGGING_REGRESSION_FIX.md` - **🔥 Complete fix for batch tagging regression - backend API compatibility**
 - `UI_IMPROVEMENTS_TAG_COUNTS_AND_DISPLAY.md` - **🔥 UI improvements for tag counts and header display**
