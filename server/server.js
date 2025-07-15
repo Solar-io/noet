@@ -1851,26 +1851,54 @@ app.post("/api/:userId/notebooks/reorder", async (req, res) => {
       return res.status(404).json({ error: "One or both notebooks not found" });
     }
 
-    // Load all user notebooks to update sort orders
+    // Get all user notebooks and sort them by current sortOrder
     const userNotebooks = await loadAllUserNotebooksFromDisk(userId);
+    const sortedUserNotebooks = userNotebooks
+      .filter((nb) => nb.userId === userId)
+      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
 
-    // Update sort orders
-    userNotebooks.forEach((notebook, index) => {
-      if (!notebook.sortOrder) notebook.sortOrder = index;
+    // Initialize sortOrder if not set
+    sortedUserNotebooks.forEach((notebook, index) => {
+      if (notebook.sortOrder === undefined || notebook.sortOrder === null) {
+        notebook.sortOrder = index;
+      }
     });
 
-    // Calculate new sort order for the moved notebook
-    if (position === "before") {
-      sourceNotebook.sortOrder = targetNotebook.sortOrder - 0.5;
-    } else {
-      sourceNotebook.sortOrder = targetNotebook.sortOrder + 0.5;
-    }
-
-    await updateNotebookSortOrderOnDisk(
-      userId,
-      sourceId,
-      sourceNotebook.sortOrder
+    // Remove source notebook from current position
+    const sourceIndex = sortedUserNotebooks.findIndex(
+      (nb) => nb.id === sourceId
     );
+    const targetIndex = sortedUserNotebooks.findIndex(
+      (nb) => nb.id === targetId
+    );
+
+    if (sourceIndex !== -1 && targetIndex !== -1) {
+      // Remove source from array
+      const [movedNotebook] = sortedUserNotebooks.splice(sourceIndex, 1);
+
+      // Calculate new target index after removal
+      let newTargetIndex = sortedUserNotebooks.findIndex(
+        (nb) => nb.id === targetId
+      );
+
+      // Insert at correct position
+      if (position === "before") {
+        sortedUserNotebooks.splice(newTargetIndex, 0, movedNotebook);
+      } else {
+        sortedUserNotebooks.splice(newTargetIndex + 1, 0, movedNotebook);
+      }
+
+      // Reassign sortOrder values to maintain proper order and save each notebook
+      for (let index = 0; index < sortedUserNotebooks.length; index++) {
+        const notebook = sortedUserNotebooks[index];
+        notebook.sortOrder = index;
+        await updateNotebookSortOrderOnDisk(
+          userId,
+          notebook.id,
+          notebook.sortOrder
+        );
+      }
+    }
 
     res.json({ success: true });
   } catch (error) {
@@ -2267,22 +2295,46 @@ app.post("/api/:userId/folders/reorder", async (req, res) => {
       return res.status(404).json({ error: "One or both folders not found" });
     }
 
-    // Load all user folders to update sort orders
+    // Get all user folders and sort them by current sortOrder
     const userFolders = await loadAllUserFoldersFromDisk(userId);
+    const sortedUserFolders = userFolders
+      .filter((folder) => folder.userId === userId)
+      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
 
-    // Update sort orders
-    userFolders.forEach((folder, index) => {
-      if (!folder.sortOrder) folder.sortOrder = index;
+    // Initialize sortOrder if not set
+    sortedUserFolders.forEach((folder, index) => {
+      if (folder.sortOrder === undefined || folder.sortOrder === null) {
+        folder.sortOrder = index;
+      }
     });
 
-    // Calculate new sort order for the moved folder
-    if (position === "before") {
-      sourceFolder.sortOrder = targetFolder.sortOrder - 0.5;
-    } else {
-      sourceFolder.sortOrder = targetFolder.sortOrder + 0.5;
-    }
+    // Remove source folder from current position
+    const sourceIndex = sortedUserFolders.findIndex((f) => f.id === sourceId);
+    const targetIndex = sortedUserFolders.findIndex((f) => f.id === targetId);
 
-    await updateFolderSortOrderOnDisk(userId, sourceId, sourceFolder.sortOrder);
+    if (sourceIndex !== -1 && targetIndex !== -1) {
+      // Remove source from array
+      const [movedFolder] = sortedUserFolders.splice(sourceIndex, 1);
+
+      // Calculate new target index after removal
+      let newTargetIndex = sortedUserFolders.findIndex(
+        (f) => f.id === targetId
+      );
+
+      // Insert at correct position
+      if (position === "before") {
+        sortedUserFolders.splice(newTargetIndex, 0, movedFolder);
+      } else {
+        sortedUserFolders.splice(newTargetIndex + 1, 0, movedFolder);
+      }
+
+      // Reassign sortOrder values to maintain proper order and save each folder
+      for (let index = 0; index < sortedUserFolders.length; index++) {
+        const folder = sortedUserFolders[index];
+        folder.sortOrder = index;
+        await updateFolderSortOrderOnDisk(userId, folder.id, folder.sortOrder);
+      }
+    }
 
     res.json({ success: true });
   } catch (error) {

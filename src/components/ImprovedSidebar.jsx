@@ -339,14 +339,26 @@ const ImprovedSidebar = ({
           setInternalFolders((prev) =>
             prev.map((f) => (f.id === id ? updatedItem : f))
           );
+          // Notify parent component to refresh its state
+          if (onFoldersUpdate) {
+            onFoldersUpdate();
+          }
         } else if (type === "notebook") {
           setInternalNotebooks((prev) =>
             prev.map((n) => (n.id === id ? updatedItem : n))
           );
+          // Notify parent component to refresh its state
+          if (onNotebooksUpdate) {
+            onNotebooksUpdate();
+          }
         } else if (type === "tag") {
           setInternalTags((prev) =>
             prev.map((t) => (t.id === id ? updatedItem : t))
           );
+          // Notify parent component to refresh its state
+          if (onTagsUpdate) {
+            onTagsUpdate();
+          }
         }
 
         return updatedItem;
@@ -373,10 +385,22 @@ const ImprovedSidebar = ({
           setInternalFolders((prev) => prev.filter((f) => f.id !== id));
           // Also remove notebooks in this folder
           setInternalNotebooks((prev) => prev.filter((n) => n.folderId !== id));
+          // Notify parent component to refresh its state
+          if (onFoldersUpdate) {
+            onFoldersUpdate();
+          }
         } else if (type === "notebook") {
           setInternalNotebooks((prev) => prev.filter((n) => n.id !== id));
+          // Notify parent component to refresh its state
+          if (onNotebooksUpdate) {
+            onNotebooksUpdate();
+          }
         } else if (type === "tag") {
           setInternalTags((prev) => prev.filter((t) => t.id !== id));
+          // Notify parent component to refresh its state
+          if (onTagsUpdate) {
+            onTagsUpdate();
+          }
         }
       }
     } catch (error) {
@@ -400,7 +424,29 @@ const ImprovedSidebar = ({
     }
 
     console.log(`🏗️ Starting ${type} drag:`, name);
-    e.dataTransfer.setData("text/plain", JSON.stringify({ type, id, name }));
+
+    // Set drag data in multiple formats for compatibility
+    const dragData = { type, id, name };
+    const dragDataString = JSON.stringify(dragData);
+
+    e.dataTransfer.setData("text/plain", dragDataString);
+    e.dataTransfer.setData("application/json", dragDataString);
+    e.dataTransfer.effectAllowed = "move";
+
+    // Add visual feedback
+    e.currentTarget.style.opacity = "0.5";
+
+    // Store reference for cleanup
+    const element = e.currentTarget;
+    const cleanup = function () {
+      if (element && element.style) {
+        element.style.opacity = "";
+      }
+      if (element && element.removeEventListener) {
+        element.removeEventListener("dragend", cleanup);
+      }
+    };
+    element.addEventListener("dragend", cleanup);
   };
 
   const handleDragOver = (e, targetType, targetId) => {
@@ -424,7 +470,18 @@ const ImprovedSidebar = ({
     setDragOver(null);
 
     try {
-      const dragData = JSON.parse(e.dataTransfer.getData("text/plain"));
+      // Try to get drag data from multiple formats for compatibility
+      let dragDataText =
+        e.dataTransfer.getData("application/json") ||
+        e.dataTransfer.getData("text/plain") ||
+        e.dataTransfer.getData("text");
+
+      if (!dragDataText) {
+        console.error("No drag data available");
+        return;
+      }
+
+      const dragData = JSON.parse(dragDataText);
       const { type: sourceType, id: sourceId } = dragData;
       console.log(
         "🎯 Drop data:",
@@ -492,7 +549,18 @@ const ImprovedSidebar = ({
     setDragOver(null);
 
     try {
-      const dragData = JSON.parse(e.dataTransfer.getData("text/plain"));
+      // Try to get drag data from multiple formats for compatibility
+      let dragDataText =
+        e.dataTransfer.getData("application/json") ||
+        e.dataTransfer.getData("text/plain") ||
+        e.dataTransfer.getData("text");
+
+      if (!dragDataText) {
+        console.error("No drag data available");
+        return;
+      }
+
+      const dragData = JSON.parse(dragDataText);
       const { type: sourceType, id: sourceId } = dragData;
 
       console.log(
@@ -538,7 +606,18 @@ const ImprovedSidebar = ({
     setDragOver(null);
 
     try {
-      const dragData = JSON.parse(e.dataTransfer.getData("text/plain"));
+      // Try to get drag data from multiple formats for compatibility
+      let dragDataText =
+        e.dataTransfer.getData("application/json") ||
+        e.dataTransfer.getData("text/plain") ||
+        e.dataTransfer.getData("text");
+
+      if (!dragDataText) {
+        console.error("No drag data available");
+        return;
+      }
+
+      const dragData = JSON.parse(dragDataText);
       const { type: sourceType, id: sourceId, name } = dragData;
 
       console.log("🎯 Root drop data:", sourceType, sourceId, name);
@@ -736,6 +815,10 @@ const ImprovedSidebar = ({
 
       if (response.ok) {
         console.log("✅ Notebook reordering completed successfully");
+        // Refresh the UI to show the new order
+        if (onNotebooksUpdate) {
+          onNotebooksUpdate();
+        }
       } else {
         console.error("❌ Failed to reorder notebooks:", await response.text());
       }
@@ -773,6 +856,10 @@ const ImprovedSidebar = ({
 
       if (response.ok) {
         console.log("✅ Folder reordering completed successfully");
+        // Refresh the UI to show the new order
+        if (onFoldersUpdate) {
+          onFoldersUpdate();
+        }
       } else {
         console.error("❌ Failed to reorder folders:", await response.text());
       }
@@ -801,6 +888,10 @@ const ImprovedSidebar = ({
 
       if (response.ok) {
         console.log("✅ Tag reordering completed successfully");
+        // Refresh the UI to show the new order
+        if (onTagsUpdate) {
+          onTagsUpdate();
+        }
       } else {
         console.error("❌ Failed to reorder tags:", await response.text());
       }
@@ -835,8 +926,8 @@ const ImprovedSidebar = ({
         )}
 
         <div
-          className={`flex items-start justify-between p-2 rounded-lg hover:bg-gray-100 cursor-pointer group relative ${
-            isDragTarget ? "bg-blue-50" : ""
+          className={`flex items-start justify-between p-2 rounded-lg hover:bg-gray-100 cursor-move group relative ${
+            isDragTarget ? "bg-blue-50 border-2 border-blue-300" : ""
           } ${
             currentView === "folder" && currentView.folderId === folder.id
               ? "bg-blue-50"
@@ -875,7 +966,7 @@ const ImprovedSidebar = ({
               handleDrop(e, "folder", folder.id);
             }
           }}
-          draggable
+          draggable={true}
           onDragStart={(e) => handleDragStart(e, "folder", folder.id)}
           onClick={() => {
             onViewChange("folder", { folderId: folder.id });
@@ -1025,8 +1116,8 @@ const ImprovedSidebar = ({
         )}
 
         <div
-          className={`flex items-start justify-between p-2 rounded-lg hover:bg-gray-100 cursor-pointer group relative ${
-            isDragTarget ? "bg-green-50" : ""
+          className={`flex items-start justify-between p-2 rounded-lg hover:bg-gray-100 cursor-move group relative ${
+            isDragTarget ? "bg-green-50 border-2 border-green-300" : ""
           } ${
             currentView === "notebook" && currentView.notebookId === notebook.id
               ? "bg-green-50"
@@ -1065,7 +1156,7 @@ const ImprovedSidebar = ({
               handleDrop(e, "notebook", notebook.id);
             }
           }}
-          draggable
+          draggable={true}
           onDragStart={(e) => handleDragStart(e, "notebook", notebook.id)}
           onClick={() => onViewChange("notebook", { notebookId: notebook.id })}
         >
@@ -1264,8 +1355,8 @@ const ImprovedSidebar = ({
         )}
 
         <div
-          className={`flex items-start justify-between p-2 rounded-lg hover:bg-gray-100 cursor-pointer group relative ${
-            isDragTarget ? "bg-yellow-50" : ""
+          className={`flex items-start justify-between p-2 rounded-lg hover:bg-gray-100 cursor-move group relative ${
+            isDragTarget ? "bg-yellow-50 border-2 border-yellow-300" : ""
           } ${
             currentView === "tag" && currentView.tagId === tag.id
               ? "bg-yellow-50"
@@ -1304,7 +1395,7 @@ const ImprovedSidebar = ({
               handleDrop(e, "tag", tag.id);
             }
           }}
-          draggable
+          draggable={true}
           onDragStart={(e) => handleDragStart(e, "tag", tag.id)}
           onClick={() => onViewChange("tag", { tagId: tag.id })}
         >

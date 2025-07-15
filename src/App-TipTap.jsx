@@ -1925,6 +1925,7 @@ const NoetTipTapApp = () => {
               onContentChange={handleNoteContentChange}
               onDelete={handleNoteDelete}
               onNoteUpdate={handleNoteUpdate}
+              onTagsUpdate={loadTags}
               availableTags={tags}
             >
               <RobustErrorBoundary

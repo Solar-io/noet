@@ -27,6 +27,7 @@ const NoteEditor = ({
   onContentChange,
   onDelete,
   onNoteUpdate,
+  onTagsUpdate, // Add onTagsUpdate prop
   availableTags = [], // Receive tags as props instead of loading them
   children,
 }) => {
@@ -943,12 +944,7 @@ const NoteEditor = ({
                   noteTags={noteTags}
                   onTagsChange={handleTagsChange}
                   availableTags={availableTags}
-                  onTagsUpdate={() => {
-                    // Refresh tags by calling the parent component
-                    if (onNoteUpdate) {
-                      onNoteUpdate();
-                    }
-                  }}
+                  onTagsUpdate={onTagsUpdate}
                 />
               </div>
 
