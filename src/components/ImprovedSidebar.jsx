@@ -457,10 +457,24 @@ const ImprovedSidebar = ({
   };
 
   const handleDragLeave = (e) => {
-    // Only clear if we're actually leaving the drop target
-    if (!e.currentTarget.contains(e.relatedTarget)) {
-      console.log("🚪 Sidebar drag leave");
-      setDragOver(null);
+    // More lenient drag leave detection - only clear if we're really leaving
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+
+    // Check if mouse is still within the element bounds (with some tolerance)
+    const isStillInside =
+      x >= rect.left - 10 &&
+      x <= rect.right + 10 &&
+      y >= rect.top - 10 &&
+      y <= rect.bottom + 10;
+
+    if (!isStillInside) {
+      console.log("🚪 Sidebar drag leave (actually leaving)");
+      // Add a small delay to prevent premature clearing
+      setTimeout(() => {
+        setDragOver(null);
+      }, 50);
     }
   };
 
@@ -585,18 +599,21 @@ const ImprovedSidebar = ({
         e.dataTransfer.getData("text/plain") ||
         e.dataTransfer.getData("text");
 
+      console.log("🔍 Drag data text:", dragDataText);
+
       if (!dragDataText) {
-        console.error("No drag data available");
+        console.error("❌ No drag data available in reorder drop");
         return;
       }
 
       const dragData = JSON.parse(dragDataText);
-      const { type: sourceType, id: sourceId } = dragData;
+      const { type: sourceType, id: sourceId, name } = dragData;
 
       console.log(
         "🎯 Reorder data:",
         sourceType,
         sourceId,
+        name,
         "->",
         targetType,
         targetId,
@@ -605,15 +622,22 @@ const ImprovedSidebar = ({
 
       // Handle reordering within the same type
       if (sourceType === targetType && sourceId !== targetId) {
+        console.log(`🔄 Starting ${sourceType} reorder from ${name}`);
+
         if (sourceType === "notebook") {
+          console.log("📚 Calling reorderNotebooks...");
           await reorderNotebooks(sourceId, targetId, position);
         } else if (sourceType === "folder") {
+          console.log("📁 Calling reorderFolders...");
           await reorderFolders(sourceId, targetId, position);
         } else if (sourceType === "tag") {
+          console.log("🏷️ Calling reorderTags...");
           await reorderTags(sourceId, targetId, position);
         }
 
+        console.log("✅ Reorder completed, refreshing data...");
         await loadAllData(); // Refresh data
+        console.log("✅ Data refreshed");
         // Don't refresh notes for reordering operations - they don't affect note content
       }
       // Handle notebook to root drop (unnesting via reorder zones)
@@ -621,6 +645,13 @@ const ImprovedSidebar = ({
         console.log("📚→🏠 Moving notebook to root (unnesting via reorder)");
         await updateItem("notebook", sourceId, { folderId: null });
         await loadAllData(); // Refresh data
+      } else {
+        console.log(
+          "⚠️ Reorder operation not handled:",
+          sourceType,
+          "->",
+          targetType
+        );
       }
     } catch (error) {
       console.error("❌ Reorder drop error:", error);
@@ -964,7 +995,14 @@ const ImprovedSidebar = ({
               : ""
           }`}
           onDragOver={(e) => handleEnhancedDragOver(e, "folder", folder.id)}
-          onDragLeave={handleDragLeave}
+          onDragLeave={(e) => {
+            // Use a more lenient drag leave for individual items
+            setTimeout(() => {
+              if (!e.currentTarget.matches(":hover")) {
+                setDragOver(null);
+              }
+            }, 100);
+          }}
           onDrop={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -1139,7 +1177,14 @@ const ImprovedSidebar = ({
               : ""
           }`}
           onDragOver={(e) => handleEnhancedDragOver(e, "notebook", notebook.id)}
-          onDragLeave={handleDragLeave}
+          onDragLeave={(e) => {
+            // Use a more lenient drag leave for individual items
+            setTimeout(() => {
+              if (!e.currentTarget.matches(":hover")) {
+                setDragOver(null);
+              }
+            }, 100);
+          }}
           onDrop={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -1363,7 +1408,14 @@ const ImprovedSidebar = ({
               : ""
           }`}
           onDragOver={(e) => handleEnhancedDragOver(e, "tag", tag.id)}
-          onDragLeave={handleDragLeave}
+          onDragLeave={(e) => {
+            // Use a more lenient drag leave for individual items
+            setTimeout(() => {
+              if (!e.currentTarget.matches(":hover")) {
+                setDragOver(null);
+              }
+            }, 100);
+          }}
           onDrop={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -1628,7 +1680,14 @@ const ImprovedSidebar = ({
               console.log("📍 Root notebooks area drag over");
               setDragOver({ type: "root", id: "notebooks" });
             }}
-            onDragLeave={handleDragLeave}
+            onDragLeave={(e) => {
+              // Use a more lenient drag leave for root drop zone
+              setTimeout(() => {
+                if (!e.currentTarget.matches(":hover")) {
+                  setDragOver(null);
+                }
+              }, 100);
+            }}
             onDrop={handleRootDrop}
           >
             {renderCreationForm("notebook")}
