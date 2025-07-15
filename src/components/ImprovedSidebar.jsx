@@ -373,14 +373,26 @@ const ImprovedSidebar = ({
           setInternalFolders((prev) => prev.filter((f) => f.id !== id));
           // Also remove notebooks in this folder
           setInternalNotebooks((prev) => prev.filter((n) => n.folderId !== id));
+          // Notify parent component to refresh
+          onFoldersUpdate?.();
         } else if (type === "notebook") {
           setInternalNotebooks((prev) => prev.filter((n) => n.id !== id));
+          // Notify parent component to refresh
+          onNotebooksUpdate?.();
         } else if (type === "tag") {
           setInternalTags((prev) => prev.filter((t) => t.id !== id));
+          // Notify parent component to refresh
+          onTagsUpdate?.();
         }
+
+        // Also trigger notes refresh since deleting organizational items affects note filtering
+        onNotesUpdate?.();
+
+        console.log(`✅ Successfully deleted ${type} and refreshed UI`);
       }
     } catch (error) {
       console.error(`Error deleting ${type}:`, error);
+      alert(`Failed to delete ${type}. Please try again.`);
     }
   };
 

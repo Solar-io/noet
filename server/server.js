@@ -1344,6 +1344,7 @@ app.post("/api/:userId/notes", async (req, res) => {
       markdown,
       tags = [],
       notebook = null,
+      folder = null,
     } = req.body;
 
     const noteId = uuidv4();
@@ -1364,7 +1365,7 @@ app.post("/api/:userId/notes", async (req, res) => {
       updated: now,
       tags,
       notebook,
-      folder: null,
+      folder,
       starred: false,
       deleted: false,
       version: 1,
