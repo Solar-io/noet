@@ -3,9 +3,10 @@ import TipTapEditor, {
   NoteStorageService,
   AdminSettings,
 } from "./TipTapEditor.jsx";
+import ImprovedSidebar from "./components/ImprovedSidebar.jsx";
+import SimplifiedSidebar from "./components/SimplifiedSidebar.jsx";
 import ImprovedNotesList from "./components/ImprovedNotesList.jsx";
 import NoteEditor from "./components/NoteEditor.jsx";
-import ImprovedSidebar from "./components/ImprovedSidebar.jsx";
 import UserManagement from "./components/UserManagement.jsx";
 import AdminInterface from "./components/AdminInterface.jsx";
 import NoteVersionHistory from "./components/NoteVersionHistory.jsx";
@@ -1247,7 +1248,33 @@ const NoetTipTapApp = () => {
       console.log("✅ Note moved to trash successfully");
     } catch (error) {
       console.error("Error deleting note:", error);
-      alert("Failed to delete note");
+    }
+  };
+
+  // Add updateNote function for SimplifiedSidebar
+  const updateNote = async (noteId, updates) => {
+    if (!user?.id) return;
+
+    try {
+      const response = await fetch(
+        `${backendUrl}/api/${user.id}/notes/${noteId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updates),
+        }
+      );
+
+      if (!response.ok) throw new Error("Failed to update note");
+
+      const updatedNote = await response.json();
+      handleNoteUpdate(updatedNote);
+
+      console.log("✅ Note updated successfully");
+      return updatedNote;
+    } catch (error) {
+      console.error("Error updating note:", error);
+      throw error;
     }
   };
 
@@ -1861,22 +1888,54 @@ const NoetTipTapApp = () => {
       <div className="h-screen flex bg-gray-50 main-layout-container">
         {/* Sidebar Panel */}
         <div className="bg-white border-r border-gray-200 flex-shrink-0 h-full flex flex-col w-64">
-          <ImprovedSidebar
+          <SimplifiedSidebar
             currentView={currentView}
             onViewChange={handleViewChange}
             user={user}
-            onLogout={handleLogout}
-            onShowSettings={() => setShowSettings(true)}
-            onShowUserManagement={() => setShowUserManagement(true)}
-            onShowAdminInterface={() => setShowAdminInterface(true)}
-            onShowEvernoteImport={() => setShowEvernoteImport(true)}
-            onNotesUpdate={loadNotes}
+            noteCount={notes.length}
             onNotebooksUpdate={loadNotebooks}
             onFoldersUpdate={loadFolders}
             onTagsUpdate={loadTags}
             notebooks={notebooks}
             folders={folders}
             tags={tags}
+            updateNote={updateNote}
+            updateFolder={async (id, data) => {
+              // Implement folder update
+              console.log("Update folder:", id, data);
+            }}
+            updateNotebook={async (id, data) => {
+              // Implement notebook update
+              console.log("Update notebook:", id, data);
+            }}
+            updateTag={async (id, data) => {
+              // Implement tag update
+              console.log("Update tag:", id, data);
+            }}
+            deleteFolder={async (id) => {
+              // Implement folder delete
+              console.log("Delete folder:", id);
+            }}
+            deleteNotebook={async (id) => {
+              // Implement notebook delete
+              console.log("Delete notebook:", id);
+            }}
+            deleteTag={async (id) => {
+              // Implement tag delete
+              console.log("Delete tag:", id);
+            }}
+            createFolder={async (data) => {
+              // Implement folder create
+              console.log("Create folder:", data);
+            }}
+            createNotebook={async (data) => {
+              // Implement notebook create
+              console.log("Create notebook:", data);
+            }}
+            createTag={async (data) => {
+              // Implement tag create
+              console.log("Create tag:", data);
+            }}
           />
         </div>
 
