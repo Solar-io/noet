@@ -626,6 +626,21 @@ const NoetTipTapApp = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState(null);
 
+  // Resizable panels state - load from localStorage with fallbacks
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const saved = localStorage.getItem("noet-sidebar-width");
+    const parsed = saved ? parseInt(saved) : 256;
+    // Ensure within valid bounds (200-400px)
+    return Math.max(200, Math.min(400, parsed));
+  });
+  const [notesListWidth, setNotesListWidth] = useState(() => {
+    const saved = localStorage.getItem("noet-noteslist-width");
+    const parsed = saved ? parseInt(saved) : 384;
+    // Ensure within valid bounds (300-600px)
+    return Math.max(300, Math.min(600, parsed));
+  });
+  const [isResizing, setIsResizing] = useState(null); // null, 'sidebar', or 'notesList'
+
   // Set up error recovery service user message handler
   useEffect(() => {
     errorRecoveryService.setUserMessageHandler((message, type) => {
@@ -899,6 +914,75 @@ const NoetTipTapApp = () => {
     setSelectedNote(null);
     setCurrentView("all");
   }, []);
+
+  // Resize handlers for panels
+  const handleResizeStart = useCallback((panel, event) => {
+    event.preventDefault();
+    setIsResizing(panel);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+
+  const handleResizeMove = useCallback(
+    (event) => {
+      if (!isResizing) return;
+
+      event.preventDefault();
+      const clientX = event.clientX;
+
+      if (isResizing === "sidebar") {
+        // Sidebar resize: constrain between 200px and 400px
+        const newWidth = Math.max(200, Math.min(400, clientX));
+        setSidebarWidth(newWidth);
+      } else if (isResizing === "notesList") {
+        // Notes list resize: calculate relative to the notes list starting position
+        // The notes list starts after: sidebar width + sidebar resize handle (1px)
+        const notesListStart = sidebarWidth + 1;
+        const availableWidth = clientX - notesListStart;
+        const newWidth = Math.max(300, Math.min(600, availableWidth));
+        setNotesListWidth(newWidth);
+
+        // Debug logging (remove in production)
+        if (process.env.NODE_ENV === "development") {
+          console.log("Notes list resize:", {
+            clientX,
+            sidebarWidth,
+            notesListStart,
+            availableWidth,
+            newWidth,
+          });
+        }
+      }
+    },
+    [isResizing, sidebarWidth]
+  );
+
+  const handleResizeEnd = useCallback(() => {
+    setIsResizing(null);
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+  }, []);
+
+  // Add global mouse event listeners for resize
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener("mousemove", handleResizeMove);
+      document.addEventListener("mouseup", handleResizeEnd);
+      return () => {
+        document.removeEventListener("mousemove", handleResizeMove);
+        document.removeEventListener("mouseup", handleResizeEnd);
+      };
+    }
+  }, [isResizing, handleResizeMove, handleResizeEnd]);
+
+  // Save panel widths to localStorage when they change
+  useEffect(() => {
+    localStorage.setItem("noet-sidebar-width", sidebarWidth.toString());
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    localStorage.setItem("noet-noteslist-width", notesListWidth.toString());
+  }, [notesListWidth]);
 
   const createNewNote = async () => {
     console.log("🚀 createNewNote called");
@@ -1885,9 +1969,16 @@ const NoetTipTapApp = () => {
         </div>
       )}
 
-      <div className="h-screen flex bg-gray-50 main-layout-container">
+      <div
+        className={`h-screen flex bg-gray-50 main-layout-container ${
+          isResizing ? "resizing" : ""
+        }`}
+      >
         {/* Sidebar Panel */}
-        <div className="bg-white border-r border-gray-200 flex-shrink-0 h-full flex flex-col w-64">
+        <div
+          className="bg-white border-r border-gray-200 flex-shrink-0 h-full flex flex-col resizable-panel"
+          style={{ width: `${sidebarWidth}px` }}
+        >
           <SimplifiedSidebar
             currentView={currentView}
             onViewChange={handleViewChange}
@@ -1901,46 +1992,248 @@ const NoetTipTapApp = () => {
             tags={tags}
             updateNote={updateNote}
             updateFolder={async (id, data) => {
-              // Implement folder update
-              console.log("Update folder:", id, data);
+              try {
+                const response = await fetch(
+                  `${backendUrl}/api/${user.id}/folders/${id}`,
+                  {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data),
+                  }
+                );
+                if (response.ok) {
+                  await loadFolders();
+                  return await response.json();
+                } else {
+                  throw new Error(
+                    `Failed to update folder: ${response.status}`
+                  );
+                }
+              } catch (error) {
+                console.error("Error updating folder:", error);
+                alert("Failed to update folder. Please try again.");
+              }
             }}
             updateNotebook={async (id, data) => {
-              // Implement notebook update
-              console.log("Update notebook:", id, data);
+              try {
+                const response = await fetch(
+                  `${backendUrl}/api/${user.id}/notebooks/${id}`,
+                  {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data),
+                  }
+                );
+                if (response.ok) {
+                  await loadNotebooks();
+                  return await response.json();
+                } else {
+                  throw new Error(
+                    `Failed to update notebook: ${response.status}`
+                  );
+                }
+              } catch (error) {
+                console.error("Error updating notebook:", error);
+                alert("Failed to update notebook. Please try again.");
+              }
             }}
             updateTag={async (id, data) => {
-              // Implement tag update
-              console.log("Update tag:", id, data);
+              try {
+                const response = await fetch(
+                  `${backendUrl}/api/${user.id}/tags/${id}`,
+                  {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data),
+                  }
+                );
+                if (response.ok) {
+                  await loadTags();
+                  return await response.json();
+                } else {
+                  throw new Error(`Failed to update tag: ${response.status}`);
+                }
+              } catch (error) {
+                console.error("Error updating tag:", error);
+                alert("Failed to update tag. Please try again.");
+              }
             }}
             deleteFolder={async (id) => {
-              // Implement folder delete
-              console.log("Delete folder:", id);
+              if (
+                !confirm(
+                  "Are you sure you want to delete this folder? All notes in this folder will be moved to the default location."
+                )
+              ) {
+                return;
+              }
+              try {
+                const response = await fetch(
+                  `${backendUrl}/api/${user.id}/folders/${id}`,
+                  {
+                    method: "DELETE",
+                  }
+                );
+                if (response.ok) {
+                  await loadFolders();
+                  await loadNotes(); // Refresh notes since they may have been moved
+                } else {
+                  throw new Error(
+                    `Failed to delete folder: ${response.status}`
+                  );
+                }
+              } catch (error) {
+                console.error("Error deleting folder:", error);
+                alert("Failed to delete folder. Please try again.");
+              }
             }}
             deleteNotebook={async (id) => {
-              // Implement notebook delete
-              console.log("Delete notebook:", id);
+              if (
+                !confirm(
+                  "Are you sure you want to delete this notebook? All notes in this notebook will be moved to the default location."
+                )
+              ) {
+                return;
+              }
+              try {
+                const response = await fetch(
+                  `${backendUrl}/api/${user.id}/notebooks/${id}`,
+                  {
+                    method: "DELETE",
+                  }
+                );
+                if (response.ok) {
+                  await loadNotebooks();
+                  await loadNotes(); // Refresh notes since they may have been moved
+                } else {
+                  throw new Error(
+                    `Failed to delete notebook: ${response.status}`
+                  );
+                }
+              } catch (error) {
+                console.error("Error deleting notebook:", error);
+                alert("Failed to delete notebook. Please try again.");
+              }
             }}
             deleteTag={async (id) => {
-              // Implement tag delete
-              console.log("Delete tag:", id);
+              if (
+                !confirm(
+                  "Are you sure you want to delete this tag? It will be removed from all notes."
+                )
+              ) {
+                return;
+              }
+              try {
+                const response = await fetch(
+                  `${backendUrl}/api/${user.id}/tags/${id}`,
+                  {
+                    method: "DELETE",
+                  }
+                );
+                if (response.ok) {
+                  await loadTags();
+                  await loadNotes(); // Refresh notes since tags may have been removed
+                } else {
+                  throw new Error(`Failed to delete tag: ${response.status}`);
+                }
+              } catch (error) {
+                console.error("Error deleting tag:", error);
+                alert("Failed to delete tag. Please try again.");
+              }
             }}
             createFolder={async (data) => {
-              // Implement folder create
-              console.log("Create folder:", data);
+              try {
+                const response = await fetch(
+                  `${backendUrl}/api/${user.id}/folders`,
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      name: data.name?.trim() || "New Folder",
+                      color: data.color || "#3b82f6",
+                      parentId: data.parentId || null,
+                    }),
+                  }
+                );
+                if (response.ok) {
+                  await loadFolders();
+                  return await response.json();
+                } else {
+                  throw new Error(
+                    `Failed to create folder: ${response.status}`
+                  );
+                }
+              } catch (error) {
+                console.error("Error creating folder:", error);
+                alert("Failed to create folder. Please try again.");
+              }
             }}
             createNotebook={async (data) => {
-              // Implement notebook create
-              console.log("Create notebook:", data);
+              try {
+                const response = await fetch(
+                  `${backendUrl}/api/${user.id}/notebooks`,
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      name: data.name?.trim() || "New Notebook",
+                      color: data.color || "#10b981",
+                      folderId: data.folderId || null,
+                    }),
+                  }
+                );
+                if (response.ok) {
+                  await loadNotebooks();
+                  return await response.json();
+                } else {
+                  throw new Error(
+                    `Failed to create notebook: ${response.status}`
+                  );
+                }
+              } catch (error) {
+                console.error("Error creating notebook:", error);
+                alert("Failed to create notebook. Please try again.");
+              }
             }}
             createTag={async (data) => {
-              // Implement tag create
-              console.log("Create tag:", data);
+              try {
+                const response = await fetch(
+                  `${backendUrl}/api/${user.id}/tags`,
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      name: data.name?.trim() || "New Tag",
+                      color: data.color || "#f59e0b",
+                    }),
+                  }
+                );
+                if (response.ok) {
+                  await loadTags();
+                  return await response.json();
+                } else {
+                  throw new Error(`Failed to create tag: ${response.status}`);
+                }
+              } catch (error) {
+                console.error("Error creating tag:", error);
+                alert("Failed to create tag. Please try again.");
+              }
             }}
           />
         </div>
 
+        {/* Sidebar Resize Handle */}
+        <div
+          className="resize-handle w-1 bg-gray-300 hover:bg-blue-500 cursor-col-resize flex-shrink-0 h-full relative"
+          onMouseDown={(e) => handleResizeStart("sidebar", e)}
+        >
+          <div className="absolute inset-0 w-3 -ml-1" /> {/* Expand hit area */}
+        </div>
+
         {/* Notes List Panel */}
-        <div className="border-r border-gray-200 flex-shrink-0 h-full flex flex-col w-96">
+        <div
+          className="border-r border-gray-200 flex-shrink-0 h-full flex flex-col resizable-panel"
+          style={{ width: `${notesListWidth}px` }}
+        >
           <RobustErrorBoundary
             fallbackMessage="The notes list encountered an error. Your notes are safe."
             additionalInfo="Try refreshing the page if this persists."
@@ -1972,6 +2265,14 @@ const NoetTipTapApp = () => {
               deletedNotes={deletedNotes}
             />
           </RobustErrorBoundary>
+        </div>
+
+        {/* Notes List Resize Handle */}
+        <div
+          className="resize-handle w-1 bg-gray-300 hover:bg-blue-500 cursor-col-resize flex-shrink-0 h-full relative"
+          onMouseDown={(e) => handleResizeStart("notesList", e)}
+        >
+          <div className="absolute inset-0 w-3 -ml-1" /> {/* Expand hit area */}
         </div>
 
         {/* Main Content Panel */}
